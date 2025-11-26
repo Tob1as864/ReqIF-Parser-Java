@@ -30,7 +30,7 @@ public class XHTMLElementText extends XHTMLLeaf {
 	
 	@Override
 	public String toString() {
-		return tagName + " {" + textContent + "}";
+		return textContent;
 	}
 
 }
