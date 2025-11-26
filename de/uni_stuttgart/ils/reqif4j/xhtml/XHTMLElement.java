@@ -106,7 +106,11 @@ public class XHTMLElement extends XHTMLNode {
 	
 	@Override
 	public String toString() {
-		return tagName + (!children.isEmpty() ? "\t" + children.toString() : "");
+		StringBuilder sb = new StringBuilder();
+		sb.append('<').append(tagName).append('>');
+		sb.append((!children.isEmpty() ? this.listToString(children) : ""));
+		sb.append("</").append(tagName).append('>');
+		return sb.toString();
 	}
 
 }

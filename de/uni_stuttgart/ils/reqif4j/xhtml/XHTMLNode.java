@@ -2,12 +2,14 @@ package de.uni_stuttgart.ils.reqif4j.xhtml;
 
 import org.w3c.dom.Node;
 
+import java.util.List;
 
 
 public class XHTMLNode {
 
 	protected String tagName;
 	protected XHTMLNode parent = null;
+	protected Node node;
 	
 	
 	/**
@@ -27,19 +29,34 @@ public class XHTMLNode {
 	
 	
 	public XHTMLNode(Node xhtmlElement) {
-		
+
+		this.node = xhtmlElement;
 		this.tagName = xhtmlElement.getNodeName();
 	}
 	
 	public XHTMLNode(Node xhtmlElement, XHTMLNode parent) {
-		
+		this.node = xhtmlElement;
 		this.tagName = xhtmlElement.getNodeName();
 		this.parent = parent;
 	}
 	
 	@Override
 	public String toString() {
-		return tagName;
+		StringBuilder sb = new StringBuilder();
+		sb.append("<").append(tagName).append(">");
+		sb.append("</").append(tagName).append(">");
+		return sb.toString();
 	}
-	
+
+	public Node getNode() {
+		return node;
+	}
+
+	protected String listToString(List<XHTMLNode> list){
+		StringBuilder sb = new StringBuilder();
+		for(XHTMLNode node : list){
+			sb.append(node.toString());
+		}
+		return sb.toString();
+	}
 }

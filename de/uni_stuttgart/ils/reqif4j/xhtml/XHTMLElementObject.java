@@ -26,7 +26,11 @@ public class XHTMLElementObject extends XHTMLElement {
 	
 	@Override
 	public String toString() {
-		return tagName + " {" + data +  "}" + (!children.isEmpty() ? "\t" + children.toString() : "");
+		StringBuilder sb = new StringBuilder();
+		sb.append('<').append(tagName).append(" ").append(data).append('>');
+		sb.append((!children.isEmpty() ? "\t" + this.listToString(children) : ""));
+		sb.append("</").append(tagName).append('>');
+		return sb.toString();
 	}
 
 }
