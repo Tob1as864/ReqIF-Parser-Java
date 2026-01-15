@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.*;
+import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -184,6 +185,14 @@ public class SpecObject {
 														}
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueDate(attributeValue, attributeDefinition));
 														break;
+
+						case ReqIFConst.REAL:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+														attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+														attributeValue = "0.0";
+															}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
+														break;
 												
 						default:						break;
 					}
@@ -196,6 +205,13 @@ public class SpecObject {
 			for(AttributeDefinition attributeDefinition: specType.getAttributeDefinitions().values()) {
 				
 				if(!this.attributeValues.containsKey(attributeDefinition.getName())) {
+
+					Datatype datatype = attributeDefinition.getDataType();
+
+					if(datatype == null) {
+						throw new ExceptionSpecObject("Attribute definition not existing in ReqIF parser\n", attributeDefinition);
+					}
+
 					switch(attributeDefinition.getDataType().getType()) {
 					
 						case ReqIFConst.BOOLEAN:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueBoolean(attributeDefinition.getDefaultValue(), attributeDefinition));
@@ -214,7 +230,11 @@ public class SpecObject {
 														break;
 
 						case ReqIFConst.DATE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDate(attributeDefinition.getDefaultValue(), attributeDefinition));
-											
+														break;
+
+						case ReqIFConst.DOUBLE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDouble(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+
 						default:						break;
 					}
 				}

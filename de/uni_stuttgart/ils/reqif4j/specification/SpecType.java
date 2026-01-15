@@ -128,7 +128,14 @@ public class SpecType {
 											
 						case ReqIFConst.XHTML:			this.attributeDefinitions.put(attDefID, new AttributeDefinitionXHTML(attributeDefinition, dataTypes));
 														break;
+
 						case ReqIFConst.DATE:			this.attributeDefinitions.put(attDefID, new AttributeDefinitionDate(attributeDefinition, dataTypes));
+														break;
+
+						case ReqIFConst.DOUBLE:			this.attributeDefinitions.put(attDefID, new AttributeDefinitionDouble(attributeDefinition, dataTypes));
+														break;
+						//Convert REAL to DOUBLE
+						case ReqIFConst.REAL:			this.attributeDefinitions.put(attDefID, new AttributeDefinitionDouble(attributeDefinition, dataTypes));
 														break;
 											
 						default:						this.attributeDefinitions.put(attDefID, new AttributeDefinition(attributeDefinition, dataTypes));

@@ -53,6 +53,8 @@ public class ReqIFConst {
 	public final static String ENUMERATION = "ENUMERATION";
 	public final static String XHTML = "XHTML";
 	public final static String DATE = "DATE";
+	public final static String REAL = "REAL";
+	public final static String DOUBLE = "DOUBLE";
 	public final static String UNDEFINED = "UNDEFINED";
 	
 	public final static String REQ = "REQ";
