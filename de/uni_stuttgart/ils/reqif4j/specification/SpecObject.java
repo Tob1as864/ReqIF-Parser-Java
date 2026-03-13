@@ -170,7 +170,8 @@ public class SpecObject {
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueString(attributeValue, attributeDefinition));
 														break;
 							
-						case ReqIFConst.ENUMERATION:	String enumValueRef = ((Element)attribute).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes().item(1).getTextContent(); 
+						case ReqIFConst.ENUMERATION:	String enumValueRef = ((Element)attribute).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes().item(1).getTextContent();
+														// TODO check how it is behaving if more than one enum value exits. Right now the attribute value is only a string.
 														attributeValue = specType.getEnumValueName(enumValueRef);
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueEnumeration(attributeValue, attributeDefinition));
 														break;
