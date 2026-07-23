@@ -12,6 +12,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
+import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
+
 public class ReqIFDocument {
 
 
@@ -19,6 +21,7 @@ public class ReqIFDocument {
 
 	protected String filePath;
 	private String fileName;
+	private TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
 
 	private ReqIFHeader header;
 	private ReqIFCoreContent content;
@@ -42,9 +45,14 @@ public class ReqIFDocument {
 
 
 	public ReqIFDocument(String filePath) throws FileNotFoundException {
+		this(filePath, TypeClassifier.defaultClassifier());
+	}
+
+	public ReqIFDocument(String filePath, TypeClassifier typeClassifier) throws FileNotFoundException {
 
 		this.filePath = filePath;
 		this.fileName = extractFileName(filePath);
+		setTypeClassifier(typeClassifier);
 
 		try {
 			this.reqifDocument = newDocumentBuilder().parse(this.filePath);
@@ -56,9 +64,14 @@ public class ReqIFDocument {
 	}
 
 	public ReqIFDocument(InputStream is, String filePath) throws FileNotFoundException {
+		this(is, filePath, TypeClassifier.defaultClassifier());
+	}
+
+	public ReqIFDocument(InputStream is, String filePath, TypeClassifier typeClassifier) throws FileNotFoundException {
 
 		this.filePath = filePath;
 		this.fileName = extractFileName(filePath);
+		setTypeClassifier(typeClassifier);
 
 		try {
 			this.reqifDocument = newDocumentBuilder().parse(is);
@@ -70,9 +83,14 @@ public class ReqIFDocument {
 	}
 
 	public ReqIFDocument(InputStream is, String zipFilePath, String fileName) {
+		this(is, zipFilePath, fileName, TypeClassifier.defaultClassifier());
+	}
+
+	public ReqIFDocument(InputStream is, String zipFilePath, String fileName, TypeClassifier typeClassifier) {
 
 		this.filePath = zipFilePath;
 		this.fileName = fileName;
+		setTypeClassifier(typeClassifier);
 
 		try {
 			this.reqifDocument = newDocumentBuilder().parse(is);
@@ -81,6 +99,10 @@ public class ReqIFDocument {
 		} catch (SAXException | IOException | ParserConfigurationException e) {
 			throw new ReqIFParseException("Failed to parse ReqIF document " + fileName + " in " + zipFilePath, e);
 		}
+	}
+
+	private void setTypeClassifier(TypeClassifier typeClassifier) {
+		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 	}
 
 
@@ -119,7 +141,7 @@ public class ReqIFDocument {
 		if (this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).getLength() == 0) {
 			throw new ReqIFParseException("Document contains no " + ReqIFConst.CORE_CONTENT + " element: " + this.fileName);
 		}
-		this.content = new ReqIFCoreContent((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0));
+		this.content = new ReqIFCoreContent((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0), this.typeClassifier);
 	}
 
 	private static String extractFileName(String path) {

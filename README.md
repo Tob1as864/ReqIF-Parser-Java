@@ -22,3 +22,34 @@ Every push and pull request runs the test suite via GitHub Actions
 fixed parser defects documented in `FEHLERANALYSE.md` (namespace-prefixed
 XHTML, multiselect enumerations, image/object conversion, picture lookup
 in .reqifz archives, and crash robustness).
+
+# Custom type classification
+ReqIF has no semantic "this is a requirement" flag - spec types only carry
+free-form LONG-NAMEs. By default the parser applies a substring heuristic
+("req", "sub", "headline" in the spec type name, see
+`LongNameTypeClassifier`). Projects with other naming conventions can plug
+in their own strategy:
+
+```java
+TypeClassifier classifier = new TypeClassifier() {
+    @Override
+    public String classifySpecType(SpecType specType) {
+        String name = specType.getName().toLowerCase();
+        if (name.contains("anforderung")) return ReqIFConst.REQ;
+        if (name.contains("überschrift")) return ReqIFConst.HEADLINE;
+        return ReqIFConst.TEXT;
+    }
+
+    @Override
+    public boolean isRequirement(SpecObject specObject) {
+        return ReqIFConst.REQ.equals(specObject.getType());
+    }
+
+    @Override
+    public boolean isSubRequirement(SpecObject specObject) {
+        return false;
+    }
+};
+
+ReqIF reqif = new ReqIF("spec.reqif", classifier);
+```

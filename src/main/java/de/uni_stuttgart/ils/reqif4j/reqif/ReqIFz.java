@@ -10,11 +10,22 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
+
 public class ReqIFz extends ReqIFFile {
 
     private static final String EXTRACTION_SUFFIX = "_unzipped";
 
     public ReqIFz(String filePath) throws IOException {
+        this(filePath, TypeClassifier.defaultClassifier());
+    }
+
+    /**
+     * @param typeClassifier strategy deciding how spec objects are classified
+     *                       (requirement/headline/text); null uses the default
+     *                       LONG-NAME heuristic
+     */
+    public ReqIFz(String filePath, TypeClassifier typeClassifier) throws IOException {
 
         this.path = filePath;
         this.name = extractFileName(filePath);
@@ -63,7 +74,7 @@ public class ReqIFz extends ReqIFFile {
                     if (zipEntry.getName().endsWith("reqif")) {
                         this.numberOfReqIFDocuments++;
                         try (InputStream reqifIS = new FileInputStream(newFile)) {
-                            this.reqifDocuments.put(zipEntry.getName(), new ReqIFDocument(reqifIS, filePath, zipEntry.getName()));
+                            this.reqifDocuments.put(zipEntry.getName(), new ReqIFDocument(reqifIS, filePath, zipEntry.getName(), typeClassifier));
                         }
                     } else if (zipEntry.getName().endsWith("png") || zipEntry.getName().endsWith("jpeg") || zipEntry.getName().endsWith("jpg")) {
                         // Keyed by the archive entry path (forward slashes), which is

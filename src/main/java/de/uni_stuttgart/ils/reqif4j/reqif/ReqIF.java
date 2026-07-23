@@ -7,6 +7,8 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.HashMap;
 
+import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
+
 public class ReqIF extends ReqIFFile {
 
 
@@ -26,11 +28,20 @@ public class ReqIF extends ReqIFFile {
 
 
 	public ReqIF(String filePath) throws FileNotFoundException {
+		this(filePath, TypeClassifier.defaultClassifier());
+	}
+
+	/**
+	 * @param typeClassifier strategy deciding how spec objects are classified
+	 *                       (requirement/headline/text); null uses the default
+	 *                       LONG-NAME heuristic
+	 */
+	public ReqIF(String filePath, TypeClassifier typeClassifier) throws FileNotFoundException {
 
 		this.path = filePath;
 		this.name = extractFileName(filePath);
 
-		this.reqifDocuments.put(this.name, new ReqIFDocument(filePath));
+		this.reqifDocuments.put(this.name, new ReqIFDocument(filePath, typeClassifier));
 		this.numberOfReqIFDocuments = 1;
 
 		this.picturesIS = new HashMap<String, InputStream>();
