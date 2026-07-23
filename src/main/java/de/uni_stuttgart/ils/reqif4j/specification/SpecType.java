@@ -62,28 +62,34 @@ public class SpecType {
 	}
 	
 	public String getEnumValueKey(String id) {
-		
+
 		for(AttributeDefinition attributeDefinition: this.attributeDefinitions.values()) {
-			
+			//Falls noch keine Klasse für diese Attributsdefinition definiert ist
+			if(attributeDefinition.getDataType() == null){
+				continue;
+			}
 			if(attributeDefinition.getDataType().getClass().equals(DatatypeEnumeration.class)) {
-				
+
 				if(((DatatypeEnumeration)attributeDefinition.getDataType()).getEnumValueName(id) != null) {
-					
+
 					return ((DatatypeEnumeration)attributeDefinition.getDataType()).getEnumValueKey(id);
 				}
 			}
 		}
 		return "";
 	}
-	
+
 	public String getEnumValueOtherContent(String id) {
-		
+
 		for(AttributeDefinition attributeDefinition: this.attributeDefinitions.values()) {
-			
+			//Falls noch keine Klasse für diese Attributsdefinition definiert ist
+			if(attributeDefinition.getDataType() == null){
+				continue;
+			}
 			if(attributeDefinition.getDataType().getClass().equals(DatatypeEnumeration.class)) {
-				
+
 				if(((DatatypeEnumeration)attributeDefinition.getDataType()).getEnumValueName(id) != null) {
-					
+
 					return ((DatatypeEnumeration)attributeDefinition.getDataType()).getEnumValueOtherContent(id);
 				}
 			}

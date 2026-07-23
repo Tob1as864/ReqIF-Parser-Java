@@ -3,70 +3,75 @@ package de.uni_stuttgart.ils.reqif4j.datatypes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
+
 public class DatatypeEnumeration extends Datatype {
-	
-	
+
+
 	private Map<String, DatatypeEnumerationValue> enumValues = new LinkedHashMap<String, DatatypeEnumerationValue>();
-	private String id;
-	private String name;
-	
-	
-	
-	
-	public String getID() {
-		return this.id;
+
+
+	/**
+	 * @return all enum values of this datatype, keyed by IDENTIFIER
+	 */
+	public Map<String, DatatypeEnumerationValue> getEnumValues() {
+		return this.enumValues;
 	}
-	
-	public String getName() {
-		return this.name;
-	}
-	
+
+	/**
+	 * @return the LONG-NAME of the enum value with the given id, or null if
+	 *         unknown
+	 */
 	public String getEnumValueName(String id) {
-		if(this.enumValues.get(id) == null) {
-			return null;
-		}
-		return this.enumValues.get(id).getName();
+		DatatypeEnumerationValue value = this.enumValues.get(id);
+		return value == null ? null : value.getName();
 	}
-	
+
+	/**
+	 * @return the KEY of the enum value with the given id, or null if unknown
+	 */
 	public String getEnumValueKey(String id) {
-		return this.enumValues.get(id).getKey();
+		DatatypeEnumerationValue value = this.enumValues.get(id);
+		return value == null ? null : value.getKey();
 	}
-	
+
+	/**
+	 * @return the OTHER-CONTENT of the enum value with the given id, or null if
+	 *         unknown
+	 */
 	public String getEnumValueOtherContent(String id) {
-		return this.enumValues.get(id).getOtherContent();
+		DatatypeEnumerationValue value = this.enumValues.get(id);
+		return value == null ? null : value.getOtherContent();
 	}
-	
-	
-	
+
 
 	public DatatypeEnumeration(String id, String name, Node enumeration) {
 		super(id, name, ReqIFConst.ENUMERATION);
-		
-		this.id = id;
-		this.name = name;
-		
-		NodeList values = enumeration.getChildNodes().item(1).getChildNodes();
-		for(int value = 0; value < values.getLength(); value++) {
-			
-			if(!values.item(value).getNodeName().equals(ReqIFConst._TEXT)) {
-				
-				String identifier = values.item(value).getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-				String longName = values.item(value).getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-				String key = values.item(value).getChildNodes().item(1).getChildNodes().item(1).getAttributes().getNamedItem(ReqIFConst.KEY).getTextContent();
-				String otherContent;
-				if (values.item(value).getChildNodes().item(1).getChildNodes().item(1).getAttributes().getNamedItem(ReqIFConst.OTHER_CONTENT) != null) {
-					otherContent = values.item(value).getChildNodes().item(1).getChildNodes().item(1).getAttributes().getNamedItem(ReqIFConst.OTHER_CONTENT).getTextContent();
-				}else{
-					otherContent = "";
-				}
-				
-				enumValues.put(identifier, new DatatypeEnumerationValue(identifier, longName, key, otherContent));
+
+		// Iterate ENUM-VALUE elements independent of whitespace text nodes,
+		// namespace prefixes and optional attributes.
+		for (Element enumValue : XmlUtils.descendantsByLocalName(enumeration, ReqIFConst.ENUM_VALUE)) {
+
+			String identifier = XmlUtils.attribute(enumValue, ReqIFConst.IDENTIFIER);
+			if (identifier == null) {
+				continue;
 			}
+			String longName = XmlUtils.attribute(enumValue, ReqIFConst.LONG_NAME);
+
+			Element embeddedValue = XmlUtils.firstDescendantByLocalName(enumValue, ReqIFConst.EMBEDDED_VALUE);
+			String key = embeddedValue == null ? "" : orEmpty(XmlUtils.attribute(embeddedValue, ReqIFConst.KEY));
+			String otherContent = embeddedValue == null ? "" : orEmpty(XmlUtils.attribute(embeddedValue, ReqIFConst.OTHER_CONTENT));
+
+			enumValues.put(identifier, new DatatypeEnumerationValue(identifier, orEmpty(longName), key, otherContent));
 		}
+	}
+
+	private static String orEmpty(String value) {
+		return value == null ? "" : value;
 	}
 
 }

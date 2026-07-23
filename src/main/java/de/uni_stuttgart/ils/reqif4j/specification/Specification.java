@@ -11,6 +11,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueBoolean;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
@@ -144,9 +145,15 @@ public class Specification {
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueString(attributeValue, attributeDefinition));
 														break;
 							
-						case ReqIFConst.ENUMERATION:	String enumValueRef = ((Element)attribute).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes().item(1).getTextContent(); 
-														attributeValue = specType.getEnumValueName(enumValueRef);
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueEnumeration(attributeValue, attributeDefinition));
+						case ReqIFConst.ENUMERATION:	// Multiselect: read ALL ENUM-VALUE-REF children, not just the first
+														List<String> enumRefs = new ArrayList<String>();
+														List<String> enumNames = new ArrayList<String>();
+														for(Element ref : XmlUtils.descendantsByLocalName(attribute, ReqIFConst.ENUM_VALUE_REF)) {
+															String refID = ref.getTextContent().trim();
+															enumRefs.add(refID);
+															enumNames.add(specType.getEnumValueName(refID));
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueEnumeration(enumNames, enumRefs, attributeDefinition));
 														break;
 							
 						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinitionName, new AttributeValueXHTML(attribute, attributeDefinition));
@@ -175,9 +182,14 @@ public class Specification {
 						case ReqIFConst.STRING:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueString(attributeDefinition.getDefaultValue(), attributeDefinition));
 														break;
 						
-						case ReqIFConst.ENUMERATION:	this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(attributeDefinition.getDefaultValue(), attributeDefinition));
+						case ReqIFConst.ENUMERATION:	if(attributeDefinition instanceof AttributeDefinitionEnumeration) {
+															AttributeDefinitionEnumeration enumDefinition = (AttributeDefinitionEnumeration) attributeDefinition;
+															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(enumDefinition.getDefaultValues(), enumDefinition.getDefaultValueRefs(), attributeDefinition));
+														}else{
+															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(attributeDefinition.getDefaultValue(), attributeDefinition));
+														}
 														break;
-						
+
 						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueXHTML(attributeDefinition.getDefaultValue(), attributeDefinition));
 														break;
 											

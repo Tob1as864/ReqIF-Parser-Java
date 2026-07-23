@@ -12,6 +12,12 @@ public class ReqIFConst {
 	public final static String MAX_LENGTH = "MAX-LENGTH";
 	
 	public final static String _TEXT = "#text";
+	public final static String ENUM_VALUE = "ENUM-VALUE";
+	public final static String ENUM_VALUE_REF = "ENUM-VALUE-REF";
+	public final static String SPECIFIED_VALUES = "SPECIFIED-VALUES";
+	public final static String EMBEDDED_VALUE = "EMBEDDED-VALUE";
+	public final static String PROPERTIES = "PROPERTIES";
+	public final static String MULTI_VALUED = "MULTI-VALUED";
 	public final static String TYPE = "TYPE";
 	public final static String VALUES = "VALUES";
 	public final static String DATATYPES = "DATATYPES";
