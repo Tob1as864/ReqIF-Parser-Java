@@ -41,6 +41,17 @@ public class AttributeValueXHTML extends AttributeValue {
 	public XHTMLElementDiv getDivValue() {
 		return this.divValue;
 	}
+
+	/**
+	 * @return the deconstructed element list (P/TBL/L/H/OBJ tokens with their
+	 *         content), never null
+	 */
+	public AttributeValueXHTMLElementList getElementList() {
+		if(this.value instanceof AttributeValueXHTMLElementList) {
+			return (AttributeValueXHTMLElementList) this.value;
+		}
+		return new AttributeValueXHTMLElementList();
+	}
 	
 	
 	
@@ -56,23 +67,27 @@ public class AttributeValueXHTML extends AttributeValue {
 
 		for(int e=0; e < div.getChildNodes().getLength(); e++) {
 			Node xhtmlElement = div.getChildNodes().item(e);
-			String elementName = div.getChildNodes().item(e).getNodeName();
-			xhtmlElementList.add(elementName, decostructXHTMLElement(elementName, xhtmlElement));
-			/*if(elementName.contains("xhtml:")) {
-				if(elementName.endsWith("p")) {
-					xhtmlElementList.add("P",decostructXHTMLElement("P", xhtmlElement));
-				}else if(elementName.endsWith("table")) {
-					xhtmlElementList.add("TBL",decostructXHTMLElement("TBL", xhtmlElement));
-				}else if(elementName.endsWith(":ul")) {
-					xhtmlElementList.add("L", decostructXHTMLElement("L", xhtmlElement));
-				}else if(elementName.contains(":h")) {
-					xhtmlElementList.add("H",decostructXHTMLElement("H", xhtmlElement));
-				}else if(elementName.contains("object")) {
-					xhtmlElementList.add("OBJ",decostructXHTMLElement("OBJ", xhtmlElement));
-				}
-			}*/
+			// Map the element's local name to the content token expected by
+			// decostructXHTMLElement. The former implementation passed the raw
+			// (prefixed) node name, which never matched, so all content lists
+			// stayed empty.
+			String token = elementToken(XmlUtils.localName(xhtmlElement));
+			if(token != null) {
+				xhtmlElementList.add(token, decostructXHTMLElement(token, xhtmlElement));
+			}
 		}
 		return xhtmlElementList;
+	}
+
+	private static String elementToken(String localName) {
+		switch(localName.replaceAll("[0-9]", "")) {
+			case "p":		return "P";
+			case "table":	return "TBL";
+			case "ul":		return "L";
+			case "h":		return "H";
+			case "object":	return "OBJ";
+			default:		return null;
+		}
 	}
 		
 	private List<String> decostructXHTMLElement(String elementType, Node xhtmlElement) {
@@ -146,9 +161,12 @@ public class AttributeValueXHTML extends AttributeValue {
 			}
 			
 		}else if(elementType.equals("OBJ")) {
-			//System.out.println("\n"+xhtmlElement.getAttributes().getNamedItem("data").getTextContent());
-			String path = xhtmlElement.getAttributes().getNamedItem("data").getTextContent().trim();
-			content.add(path.replace("/", System.getProperty("file.separator")));
+			// Keep the original URI (forward slashes) so it matches the picture
+			// entries of the .reqifz archive on every platform.
+			String path = XmlUtils.attribute(xhtmlElement, "data");
+			if(path != null) {
+				content.add(path.trim());
+			}
 		}
 		
 		/*//
@@ -185,10 +203,10 @@ public class AttributeValueXHTML extends AttributeValue {
 						
 					}else if(leName.endsWith("var")) {
 						list.add("VAR");
-						if(child.getTextContent().trim().equals("")) {
+						if(listChild.getTextContent().trim().equals("")) {
 							list.add("VARIABLE_NAME_MISSING");
 						}else{
-							list.add(child.getTextContent().trim());
+							list.add(listChild.getTextContent().trim());
 						}
 						
 					///
