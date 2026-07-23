@@ -2,7 +2,25 @@
 
 Stand: 2026-07-23 · Analysierte Dateien: alle 62 Java-Klassen unter `de/uni_stuttgart/ils/reqif4j/`
 
-Die Fehler sind nach Schweregrad gruppiert. Datei- und Zeilenangaben beziehen sich auf den aktuellen Stand des Branches.
+## Behebungsstand
+
+Die Fehler der Abschnitte 1–4 sind auf diesem Branch **behoben** und durch Tests abgesichert,
+die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `mvn verify`) laufen:
+
+| Bereich | Fix-Commit | Tests |
+|---|---|---|
+| Namespace-Handling, XXE, `System.exit`, `item(1)`-Navigation | "Fix XHTML namespace handling and harden the XML parser" | `XHTMLNamespaceTest`, `ParserHardeningTest` |
+| Multiselect-Enums, Enum-Defaults, Null-Sicherheit | "Fix multiselect enumerations, enum defaults and enum null-safety" | `MultiselectEnumTest` |
+| Bild-/Objekt-Pipeline, Bild-Zuordnung, Zip-Slip | "Fix image/object conversion pipeline" | `ImagePipelineTest` |
+| Crash-/Robustheitsfehler (Abschnitt 3 + 4.1) | "Fix crash bugs and robustness issues" | `RobustnessTest` |
+
+Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
+die LONG-NAME-Heuristik der Typklassifizierung (4.2), die `type`-Semantik von `SpecRelation` (4.3),
+HTML-Escaping/Attribut-Erhalt in `toString()` (4.8) sowie die kosmetischen Punkte aus Abschnitt 5
+(bis auf den entfernten `javax.xml.crypto.Data`-Import).
+
+Die ursprüngliche Analyse folgt unverändert. Datei- und Zeilenangaben beziehen sich auf den
+Stand **vor** den Fixes (Quellen liegen inzwischen unter `src/main/java/`).
 
 ---
 
