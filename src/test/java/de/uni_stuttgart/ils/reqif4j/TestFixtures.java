@@ -33,7 +33,10 @@ public final class TestFixtures {
 			      <DATATYPES>
 			        <DATATYPE-DEFINITION-STRING IDENTIFIER="dt-string" LONG-NAME="String" MAX-LENGTH="255"/>
 			        <DATATYPE-DEFINITION-BOOLEAN IDENTIFIER="dt-bool" LONG-NAME="Bool"/>
-			        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int" LONG-NAME="Int" MIN="0" MAX="1000000"/>
+			        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int" LONG-NAME="Int" MIN="0" MAX="9223372036854775807"/>
+			        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int-unbounded" LONG-NAME="IntUnbounded"/>
+			        <DATATYPE-DEFINITION-STRING IDENTIFIER="dt-string-unbounded" LONG-NAME="StringUnbounded"/>
+			        <DATATYPE-DEFINITION-DATE IDENTIFIER="dt-date" LONG-NAME="Date"/>
 			        <DATATYPE-DEFINITION-XHTML IDENTIFIER="dt-xhtml" LONG-NAME="XhtmlType"/>
 			        <DATATYPE-DEFINITION-CUSTOM IDENTIFIER="dt-custom" LONG-NAME="Custom"/>
 			        <DATATYPE-DEFINITION-ENUMERATION IDENTIFIER="dt-enum" LONG-NAME="Color">
@@ -80,7 +83,11 @@ public final class TestFixtures {
 			          </SPEC-ATTRIBUTES>
 			        </SPEC-OBJECT-TYPE>
 			        <SPECIFICATION-TYPE IDENTIFIER="st-spec" LONG-NAME="Spec Type">
-			          <SPEC-ATTRIBUTES/>
+			          <SPEC-ATTRIBUTES>
+			            <ATTRIBUTE-DEFINITION-DATE IDENTIFIER="ad-review" LONG-NAME="ReviewDate">
+			              <TYPE><DATATYPE-DEFINITION-DATE-REF>dt-date</DATATYPE-DEFINITION-DATE-REF></TYPE>
+			            </ATTRIBUTE-DEFINITION-DATE>
+			          </SPEC-ATTRIBUTES>
 			        </SPECIFICATION-TYPE>
 			      </SPEC-TYPES>
 			      <SPEC-OBJECTS>
@@ -121,6 +128,11 @@ public final class TestFixtures {
 			      <SPECIFICATIONS>
 			        <SPECIFICATION IDENTIFIER="spec-1" LONG-NAME="Main Spec">
 			          <TYPE><SPECIFICATION-TYPE-REF>st-spec</SPECIFICATION-TYPE-REF></TYPE>
+			          <VALUES>
+			            <ATTRIBUTE-VALUE-DATE THE-VALUE="2026-01-01">
+			              <DEFINITION><ATTRIBUTE-DEFINITION-DATE-REF>ad-review</ATTRIBUTE-DEFINITION-DATE-REF></DEFINITION>
+			            </ATTRIBUTE-VALUE-DATE>
+			          </VALUES>
 			          <CHILDREN>
 			            <SPEC-HIERARCHY IDENTIFIER="sh-1">
 			              <OBJECT><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF></OBJECT>

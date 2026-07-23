@@ -7,6 +7,7 @@ import java.util.Map;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.*;
 import de.uni_stuttgart.ils.reqif4j.specification.*;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -102,13 +103,15 @@ public class ReqIFCoreContent {
                             break;
 
                         case ReqIFConst.INTEGER:
-                            String min = dataType.getAttributes().getNamedItem(ReqIFConst.MIN).getTextContent();
-                            String max = dataType.getAttributes().getNamedItem(ReqIFConst.MAX).getTextContent();
+                            // MIN/MAX are optional in ReqIF
+                            String min = XmlUtils.attribute(dataType, ReqIFConst.MIN);
+                            String max = XmlUtils.attribute(dataType, ReqIFConst.MAX);
                             this.dataTypes.put(dataTypeID, new DatatypeInteger(dataTypeID, dataTypeName, min, max));
                             break;
 
                         case ReqIFConst.STRING:
-                            String maxLength = dataType.getAttributes().getNamedItem(ReqIFConst.MAX_LENGTH).getTextContent();
+                            // MAX-LENGTH is optional in ReqIF
+                            String maxLength = XmlUtils.attribute(dataType, ReqIFConst.MAX_LENGTH);
                             this.dataTypes.put(dataTypeID, new DatatypeString(dataTypeID, dataTypeName, maxLength));
                             break;
 
@@ -130,7 +133,9 @@ public class ReqIFCoreContent {
                             break;
 
                         default:
-                            this.dataTypes.put(null, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED));
+                            // Register unknown datatypes under their ID (formerly the
+                            // key was null, making them unresolvable).
+                            this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED));
                             break;
                     }
                 }

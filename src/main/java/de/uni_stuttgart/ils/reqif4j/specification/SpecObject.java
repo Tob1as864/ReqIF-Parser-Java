@@ -46,7 +46,8 @@ public class SpecObject {
 	}
 	
 	public Object getAttribute(String attributeName) {
-		return this.attributeValues.get(attributeName).getValue();
+		AttributeValue attributeValue = this.attributeValues.get(attributeName);
+		return attributeValue == null ? null : attributeValue.getValue();
 	}
 	
 	public boolean isReq() {
@@ -196,11 +197,11 @@ public class SpecObject {
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueDate(attributeValue, attributeDefinition));
 														break;
 
-						case ReqIFConst.REAL:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-														attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+						case ReqIFConst.REAL:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
 														}else{
-														attributeValue = "0.0";
-															}
+															attributeValue = "";
+														}
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
 														break;
 												

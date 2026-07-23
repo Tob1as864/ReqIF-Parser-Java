@@ -14,6 +14,8 @@ import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueBoolean;
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueDate;
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueDouble;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueInteger;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueString;
@@ -43,7 +45,8 @@ public class Specification {
 	
 	///
 	public String getDescription() {
-		return (String) this.attributeValues.get("Description").getValue();
+		AttributeValue description = this.attributeValues.get("Description");
+		return description == null ? null : (String) description.getValue();
 	}
 	//*/
 	
@@ -64,7 +67,8 @@ public class Specification {
 	}
 	
 	public Object getAttribute(String attributeName) {
-		return this.attributeValues.get(attributeName).getValue();
+		AttributeValue attributeValue = this.attributeValues.get(attributeName);
+		return attributeValue == null ? null : attributeValue.getValue();
 	}
 	
 	public int getNumberOfSpecObjects() {
@@ -158,7 +162,24 @@ public class Specification {
 							
 						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinitionName, new AttributeValueXHTML(attribute, attributeDefinition));
 														break;
-												
+
+						// DATE and REAL values were formerly ignored on specifications
+						case ReqIFConst.DATE:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueDate(attributeValue, attributeDefinition));
+														break;
+
+						case ReqIFConst.REAL:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
+														break;
+
 						default:						break;
 					}
 				}
@@ -169,8 +190,12 @@ public class Specification {
 			
 			for(AttributeDefinition attributeDefinition: specType.getAttributeDefinitions().values()) {
 				
-				if(!this.attributeValues.containsKey(attributeDefinition.getName())) { 
-					
+				if(!this.attributeValues.containsKey(attributeDefinition.getName())) {
+
+					if(attributeDefinition.getDataType() == null) {
+						throw new ExceptionSpecObject("Attribute definition not existing in ReqIF parser\n", attributeDefinition);
+					}
+
 					switch(attributeDefinition.getDataType().getType()) {
 					
 						case ReqIFConst.BOOLEAN:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueBoolean(attributeDefinition.getDefaultValue(), attributeDefinition));
@@ -192,7 +217,13 @@ public class Specification {
 
 						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueXHTML(attributeDefinition.getDefaultValue(), attributeDefinition));
 														break;
-											
+
+						case ReqIFConst.DATE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDate(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+
+						case ReqIFConst.DOUBLE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDouble(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+
 						default:						break;
 					}
 				}

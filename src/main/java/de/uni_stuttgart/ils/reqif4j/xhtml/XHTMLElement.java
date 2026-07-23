@@ -14,7 +14,7 @@ public class XHTMLElement extends XHTMLNode {
 	protected List<XHTMLNode> children = null;
 	
 	public boolean hasChildren() {
-		return children == null ? false : children.isEmpty();
+		return children != null && !children.isEmpty();
 	}
 	
 	public List<XHTMLNode> getChildren() {

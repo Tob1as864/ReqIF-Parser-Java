@@ -58,8 +58,11 @@ public class SpecHierarchy {
 	
 	public AttributeValueXHTMLElementList getXHTMLContent() {
 		for(AttributeValue attributeValue: this.specObject.getAttributes().values()) {
-			if(attributeValue.getDatatype().equals(ReqIFConst.XHTML)) {
-				return (AttributeValueXHTMLElementList)attributeValue.getValue();
+			// getValue() returns the rendered string, so the element list has
+			// to be fetched via its dedicated getter (the former cast threw
+			// ClassCastException on every call).
+			if(attributeValue instanceof AttributeValueXHTML) {
+				return ((AttributeValueXHTML)attributeValue).getElementList();
 			}
 		}
 		return null;

@@ -64,12 +64,23 @@ public class ReqIFHeader {
 			this.reqifVersion = theHeader.getElementsByTagName(ReqIFConst.REQ_IF_VERSION).item(0).getTextContent();
 		}
 		if(theHeader.getElementsByTagName(ReqIFConst.COMMENT).getLength() > 0) {
-			//this.comment = theHeader.getElementsByTagName(ReqIFConst.COMMENT).item(0).getTextContent();
-			this.author = theHeader.getElementsByTagName(ReqIFConst.COMMENT).item(0).getTextContent().split("Created by: ")[1];
+			// The "Created by: " convention is tool-specific; a comment without
+			// it must not crash the parser.
+			String comment = theHeader.getElementsByTagName(ReqIFConst.COMMENT).item(0).getTextContent();
+			int createdBy = comment.indexOf("Created by: ");
+			if(createdBy >= 0) {
+				this.author = comment.substring(createdBy + "Created by: ".length()).trim();
+			}
 		}
 		if(theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).getLength() > 0) {
-			String[] date = theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).item(0).getTextContent().split("T")[0].split("-");
-			this.creationDate = date[2] + "." + date[1] + "." + date[0];
+			String creationTime = theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).item(0).getTextContent();
+			String[] date = creationTime.split("T")[0].split("-");
+			if(date.length >= 3) {
+				this.creationDate = date[2] + "." + date[1] + "." + date[0];
+			}else{
+				// unexpected format: keep the raw value instead of crashing
+				this.creationDate = creationTime;
+			}
 		}
 		if(theHeader.getElementsByTagName(ReqIFConst.TITLE).getLength() > 0) {
 			this.title = theHeader.getElementsByTagName(ReqIFConst.TITLE).item(0).getTextContent().replace("_Template", "");
