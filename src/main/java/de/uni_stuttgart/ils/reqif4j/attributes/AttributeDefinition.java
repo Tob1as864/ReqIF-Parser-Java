@@ -8,6 +8,7 @@ import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 public class AttributeDefinition {
 	
@@ -44,14 +45,18 @@ public class AttributeDefinition {
 		this.id = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
 		
-		Element attDef = (Element) attributeDefinition;
-		String typeID = attDef.getElementsByTagName(ReqIFConst.TYPE).item(0).getChildNodes().item(1).getTextContent();
-		this.type = dataTypes.get(typeID);
-		
-		NodeList defVal = attDef.getElementsByTagName(ReqIFConst.DEFAULT_VALUE);
-		if(defVal.getLength() > 0) {
-			
-			Node attDefVal = defVal.item(0).getChildNodes().item(1);
+		// Navigate by element (not by fixed child index) so both pretty-printed
+		// and minified ReqIF files are handled.
+		Element typeElement = XmlUtils.firstChildElementByLocalName(attributeDefinition, ReqIFConst.TYPE);
+		Element typeRef = XmlUtils.firstChildElement(typeElement);
+		if(typeRef != null) {
+			this.type = dataTypes.get(typeRef.getTextContent().trim());
+		}
+
+		Element defVal = XmlUtils.firstChildElementByLocalName(attributeDefinition, ReqIFConst.DEFAULT_VALUE);
+		if(defVal != null) {
+
+			Node attDefVal = XmlUtils.firstChildElement(defVal);
 			if(attDefVal != null && attDefVal.hasAttributes() && attDefVal.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) != null) {
 				this.defaultValue = attDefVal.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
 			}

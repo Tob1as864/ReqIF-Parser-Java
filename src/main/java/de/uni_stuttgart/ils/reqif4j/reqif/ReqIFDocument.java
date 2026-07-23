@@ -3,6 +3,7 @@ package de.uni_stuttgart.ils.reqif4j.reqif;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -12,104 +13,118 @@ import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
 public class ReqIFDocument {
-	
-	
-	private DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-	private DocumentBuilder builder;
+
+
 	private Document reqifDocument;
-	
+
 	protected String filePath;
 	private String fileName;
-	
+
 	private ReqIFHeader header;
 	private ReqIFCoreContent content;
-    
-    
-    public String getFilePath() {
-    	return this.filePath;
-    }
-    
-    public String getFileName() {
-    	return this.fileName;
-    }
-	
+
+
+	public String getFilePath() {
+		return this.filePath;
+	}
+
+	public String getFileName() {
+		return this.fileName;
+	}
+
 	public ReqIFHeader getHeader() {
-    	return this.header;
-    }
-    
-    public ReqIFCoreContent getCoreContent() {
-    	return this.content;
-    }
-	
-    
-    
-    
+		return this.header;
+	}
+
+	public ReqIFCoreContent getCoreContent() {
+		return this.content;
+	}
+
+
 	public ReqIFDocument(String filePath) throws FileNotFoundException {
-		
+
 		this.filePath = filePath;
-		this.fileName = this.filePath.substring(filePath.lastIndexOf(System.getProperty("file.separator"))+1);
-		
+		this.fileName = extractFileName(filePath);
+
 		try {
-			
-			this.builder = factory.newDocumentBuilder();
-			this.reqifDocument = this.builder.parse(this.filePath);
-			
-			if(this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).getLength() > 0 && this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0).hasChildNodes()) {
-				header = new ReqIFHeader((Element)this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0));
-			}
-			content = new ReqIFCoreContent((Element)this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0));
-			
-			this.builder = null;
-			this.factory = null;
-			
+			this.reqifDocument = newDocumentBuilder().parse(this.filePath);
+			readDocument();
+
 		} catch (SAXException | IOException | ParserConfigurationException e) {
-			e.printStackTrace();
-			System.exit(1);
+			throw new ReqIFParseException("Failed to parse ReqIF document " + filePath, e);
 		}
 	}
-	
+
 	public ReqIFDocument(InputStream is, String filePath) throws FileNotFoundException {
-		
+
 		this.filePath = filePath;
-		this.fileName = this.filePath.substring(filePath.lastIndexOf(System.getProperty("file.separator"))+1);
-		
+		this.fileName = extractFileName(filePath);
+
 		try {
-						
-			this.builder = factory.newDocumentBuilder();
-			this.reqifDocument = this.builder.parse(is);
-			
-			if(this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).getLength() > 0 && this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0).hasChildNodes()) {
-				header = new ReqIFHeader((Element)this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0));
-			}
-			content = new ReqIFCoreContent((Element)this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0));
-			
+			this.reqifDocument = newDocumentBuilder().parse(is);
+			readDocument();
+
 		} catch (SAXException | IOException | ParserConfigurationException e) {
-			e.printStackTrace();
-			System.exit(1);
+			throw new ReqIFParseException("Failed to parse ReqIF document " + filePath, e);
 		}
 	}
-	
+
 	public ReqIFDocument(InputStream is, String zipFilePath, String fileName) {
-		
-		this.filePath = zipFilePath;		//		TODO
+
+		this.filePath = zipFilePath;
 		this.fileName = fileName;
-		
+
 		try {
-			
-			this.builder = factory.newDocumentBuilder();
-			
-			this.reqifDocument = this.builder.parse(is);
-			
-			if(this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).getLength() > 0 && this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0).hasChildNodes()) {
-				header = new ReqIFHeader((Element)this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0));
-			}
-			content = new ReqIFCoreContent((Element)this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0));
-			
-			
+			this.reqifDocument = newDocumentBuilder().parse(is);
+			readDocument();
+
 		} catch (SAXException | IOException | ParserConfigurationException e) {
-			e.printStackTrace();
-			System.exit(1);
+			throw new ReqIFParseException("Failed to parse ReqIF document " + fileName + " in " + zipFilePath, e);
 		}
 	}
-	
+
+
+	/**
+	 * Creates a namespace-aware, XXE-hardened document builder. Namespace
+	 * awareness is required so XHTML content with namespace prefixes
+	 * (e.g. {@code xhtml:div}) can be matched by local name.
+	 */
+	private static DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
+
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		factory.setNamespaceAware(true);
+
+		// Harden against XXE / entity expansion attacks
+		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+		factory.setXIncludeAware(false);
+		factory.setExpandEntityReferences(false);
+		try {
+			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+		} catch (IllegalArgumentException ignored) {
+			// parser implementation does not support these attributes
+		}
+
+		return factory.newDocumentBuilder();
+	}
+
+	private void readDocument() {
+
+		if (this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).getLength() > 0
+				&& this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0).hasChildNodes()) {
+			this.header = new ReqIFHeader((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0));
+		}
+		if (this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).getLength() == 0) {
+			throw new ReqIFParseException("Document contains no " + ReqIFConst.CORE_CONTENT + " element: " + this.fileName);
+		}
+		this.content = new ReqIFCoreContent((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0));
+	}
+
+	private static String extractFileName(String path) {
+		int lastSeparator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+		return path.substring(lastSeparator + 1);
+	}
+
 }

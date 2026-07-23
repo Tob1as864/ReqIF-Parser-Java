@@ -7,6 +7,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.XHTML;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 public class XHTMLElement extends XHTMLNode {
 	
@@ -47,8 +48,10 @@ public class XHTMLElement extends XHTMLNode {
 		for(int child = 0; child < children.getLength(); child++) {
 				
 			Node childNode = children.item(child);
-			String nodeName = childNode.getNodeName();
-			
+			// Match by local name so namespace-prefixed XHTML (xhtml:p,
+			// reqif-xhtml:object, ...) is recognized; strip digits to map h1-h6 to h.
+			String nodeName = XmlUtils.localName(childNode);
+
 			switch (nodeName.replaceAll("[0-9]", "")) {
 			
 				case XHTML.BR:		this.children.add(new XHTMLElementBr(childNode, this));

@@ -10,6 +10,7 @@ import org.w3c.dom.NodeList;
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumeration;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 public class SpecType {
 	
@@ -100,9 +101,10 @@ public class SpecType {
 		this.type = ReqIFConst.UNDEFINED;
 
 		//Doors relationship definitionen habe keine ChildNodes
-		if(specType.getChildNodes().getLength() > 0 && !(specType.getChildNodes().item(1) == null)) {
+		Node specAttributes = XmlUtils.firstChildElementByLocalName(specType, ReqIFConst.SPEC_ATTRIBUTES);
+		if(specAttributes != null) {
 
-			NodeList attributeDefinitions = specType.getChildNodes().item(1).getChildNodes();
+			NodeList attributeDefinitions = specAttributes.getChildNodes();
 
 			for(int specatt = 0; specatt < attributeDefinitions.getLength(); specatt++) {
 				

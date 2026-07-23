@@ -7,10 +7,11 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElementDiv;
 
 public class AttributeValueXHTML extends AttributeValue {
-	
+
 	XHTMLElementDiv divValue;
 
 	@Override
@@ -23,8 +24,11 @@ public class AttributeValueXHTML extends AttributeValue {
 
 	public AttributeValueXHTML(Node xhtmlContent, AttributeDefinition type) {
 		super(type);
-		
-		this.divValue = new XHTMLElementDiv(((Element)xhtmlContent).getElementsByTagName(XHTML.DIV).item(0));
+
+		// The div may carry a namespace prefix (xhtml:div, reqif-xhtml:div, ...),
+		// so it has to be located by local name.
+		Node div = XmlUtils.firstDescendantByLocalName(xhtmlContent, XHTML.DIV);
+		this.divValue = div == null ? null : new XHTMLElementDiv(div);
 		this.value = deconstructXHTML(xhtmlContent);
 	}
 	
@@ -42,11 +46,14 @@ public class AttributeValueXHTML extends AttributeValue {
 	
 	
 	private AttributeValueXHTMLElementList deconstructXHTML(Node xhtmlContent) {
-		
+
 		AttributeValueXHTMLElementList xhtmlElementList = new AttributeValueXHTMLElementList();
-		
-		Node div = ((Element)xhtmlContent).getElementsByTagName(XHTML.DIV).item(0);
-		
+
+		Node div = XmlUtils.firstDescendantByLocalName(xhtmlContent, XHTML.DIV);
+		if(div == null) {
+			return xhtmlElementList;
+		}
+
 		for(int e=0; e < div.getChildNodes().getLength(); e++) {
 			Node xhtmlElement = div.getChildNodes().item(e);
 			String elementName = div.getChildNodes().item(e).getNodeName();

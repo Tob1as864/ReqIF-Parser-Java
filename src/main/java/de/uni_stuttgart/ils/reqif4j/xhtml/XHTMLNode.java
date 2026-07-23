@@ -2,6 +2,8 @@ package de.uni_stuttgart.ils.reqif4j.xhtml;
 
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
+
 import java.util.List;
 
 
@@ -10,10 +12,10 @@ public class XHTMLNode {
 	protected String tagName;
 	protected XHTMLNode parent = null;
 	protected Node node;
-	
-	
+
+
 	/**
-	 * @return the node name of this xhtml node
+	 * @return the tag name of this xhtml node without any namespace prefix
 	 */
 	public String getTagName() {
 		return this.tagName;
@@ -31,12 +33,12 @@ public class XHTMLNode {
 	public XHTMLNode(Node xhtmlElement) {
 
 		this.node = xhtmlElement;
-		this.tagName = xhtmlElement.getNodeName();
+		this.tagName = XmlUtils.localName(xhtmlElement);
 	}
-	
+
 	public XHTMLNode(Node xhtmlElement, XHTMLNode parent) {
 		this.node = xhtmlElement;
-		this.tagName = xhtmlElement.getNodeName();
+		this.tagName = XmlUtils.localName(xhtmlElement);
 		this.parent = parent;
 	}
 	

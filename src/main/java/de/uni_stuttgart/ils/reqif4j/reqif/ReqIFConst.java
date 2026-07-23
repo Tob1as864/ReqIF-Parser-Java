@@ -18,6 +18,7 @@ public class ReqIFConst {
 	public final static String DEFAULT_VALUE = "DEFAULT-VALUE";
 	public final static String DEFINITION = "DEFINITION";
 	public final static String SPEC_TYPES = "SPEC-TYPES";
+	public final static String SPEC_ATTRIBUTES = "SPEC-ATTRIBUTES";
 	public final static String SPEC_OBJECTS = "SPEC-OBJECTS";
 	public final static String SPEC_OBJECT = "SPEC-OBJECT";
 	public final static String SPEC_RELATIONS = "SPEC-RELATIONS";

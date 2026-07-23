@@ -10,6 +10,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 public class SpecObject {
 	
@@ -138,8 +139,9 @@ public class SpecObject {
 				Node attribute = attributeValues.item(attval);
 				String attValNodeName = attribute.getNodeName();
 				if(!attValNodeName.equals(ReqIFConst._TEXT)) {
-					
-					String attributeDefinitionRef = ((Element)attribute).getElementsByTagName(ReqIFConst.DEFINITION).item(0).getChildNodes().item(1).getTextContent();
+
+					String attributeDefinitionRef = XmlUtils.firstChildElement(
+							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
 					String attributeDefinitionName = specType.getAttributeDefinitions().get(attributeDefinitionRef).getName();
 					String attributeValue;
 					AttributeDefinition attributeDefinition = specType.getAttributeDefinition(attributeDefinitionRef);
