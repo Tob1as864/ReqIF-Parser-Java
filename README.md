@@ -9,3 +9,16 @@ This fork is based on https://github.com/bfriebel/requirements-interchange-forma
 
 # Supported Formats
 ReqIF file extensions .reqif and .reqifz (compressed).
+
+# Build & Test
+The project builds with Maven (Java 17+):
+
+```
+mvn verify
+```
+
+Every push and pull request runs the test suite via GitHub Actions
+(`.github/workflows/ci.yml`). The tests in `src/test/java` cover the
+fixed parser defects documented in `FEHLERANALYSE.md` (namespace-prefixed
+XHTML, multiselect enumerations, image/object conversion, picture lookup
+in .reqifz archives, and crash robustness).

@@ -1,0 +1,262 @@
+package de.uni_stuttgart.ils.reqif4j.specification;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import de.uni_stuttgart.ils.reqif4j.attributes.*;
+import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
+
+public class SpecObject {
+	
+	
+	protected String id;
+	protected SpecType specType;
+	protected String type;
+	protected Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
+	
+	
+	
+	
+	public String getID() {
+		return this.id;
+	}
+	
+	public String getType() {
+		return this.type;
+	}
+	
+	public String getSpecType() {
+		return this.specType.getType();
+	}
+	
+	public String getSpecTypeName() {
+		return this.specType.getName();
+	}
+	
+	public Map<String, AttributeValue> getAttributes() {
+		return this.attributeValues;
+	}
+	
+	public Object getAttribute(String attributeName) {
+		AttributeValue attributeValue = this.attributeValues.get(attributeName);
+		return attributeValue == null ? null : attributeValue.getValue();
+	}
+	
+	public boolean isReq() {
+		
+		if(this.type.equals(ReqIFConst.REQ)) {
+			
+			for(AttributeValue attValue: this.attributeValues.values()) {
+				
+				if(attValue.getDatatype().equals(ReqIFConst.BOOLEAN) && attValue.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
+					
+					if((Boolean)attValue.getValue()) {
+						return true;
+						
+					}else{
+						return false;
+					}
+				}
+			}
+		}
+		return false;
+	}
+	
+	public boolean isHeadline() {
+		
+		if(this.type.equals(ReqIFConst.HEADLINE)) {
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	public boolean isSubReq() {
+		
+		if(this.type.equals(ReqIFConst.SUB_REQ)) {
+			
+			for(AttributeValue attValue: this.attributeValues.values()) {
+				
+				if(attValue.getDatatype().equals(ReqIFConst.BOOLEAN) && attValue.getName().toLowerCase().contains(ReqIFConst.SUB.toLowerCase()) && attValue.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
+					
+					if((Boolean)attValue.getValue()) {
+						return true;
+						
+					}else{
+						return false;
+					}
+				}
+			}
+		}
+		return false;
+	}
+	
+	public boolean isText() {
+		
+		if(!this.isReq() && !this.isHeadline() && !this.isSubReq()) {
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	
+	public SpecObject(Node specObject){
+		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+	}
+	
+	public SpecObject(Node specObject, SpecType specType) {
+		
+		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+		this.specType = specType;
+		
+		if(this.specType.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
+			
+			if(this.specType.getName().toLowerCase().contains(ReqIFConst.SUB.toLowerCase())) {
+				this.type = ReqIFConst.SUB_REQ;
+			
+			}else{
+				this.type = ReqIFConst.REQ;
+			}
+		}else if(this.specType.getName().toLowerCase().contains(ReqIFConst.HEADLINE.toLowerCase())) {
+			this.type = ReqIFConst.HEADLINE;
+		
+		}else{
+			this.type = ReqIFConst.TEXT;
+		}
+		
+		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
+				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
+			
+			NodeList attributeValues = ((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes();
+			for(int attval = 0; attval < attributeValues.getLength(); attval++) {
+				
+				Node attribute = attributeValues.item(attval);
+				String attValNodeName = attribute.getNodeName();
+				if(!attValNodeName.equals(ReqIFConst._TEXT)) {
+
+					String attributeDefinitionRef = XmlUtils.firstChildElement(
+							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
+					String attributeDefinitionName = specType.getAttributeDefinitions().get(attributeDefinitionRef).getName();
+					String attributeValue;
+					AttributeDefinition attributeDefinition = specType.getAttributeDefinition(attributeDefinitionRef);
+					
+					switch(attValNodeName.substring(attValNodeName.lastIndexOf("-")+1)) {
+					
+						case ReqIFConst.BOOLEAN:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueBoolean(attributeValue, attributeDefinition));
+														break;
+							
+						case ReqIFConst.INTEGER:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueInteger(attributeValue, attributeDefinition));
+														break;
+							
+						case ReqIFConst.STRING:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueString(attributeValue, attributeDefinition));
+														break;
+							
+						case ReqIFConst.ENUMERATION:	// Multiselect: read ALL ENUM-VALUE-REF children, not just the first
+														List<String> enumRefs = new ArrayList<String>();
+														List<String> enumNames = new ArrayList<String>();
+														for(Element ref : XmlUtils.descendantsByLocalName(attribute, ReqIFConst.ENUM_VALUE_REF)) {
+															String refID = ref.getTextContent().trim();
+															enumRefs.add(refID);
+															enumNames.add(specType.getEnumValueName(refID));
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueEnumeration(enumNames, enumRefs, attributeDefinition));
+														break;
+							
+						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinitionName, new AttributeValueXHTML(attribute, attributeDefinition));
+														break;
+
+						case ReqIFConst.DATE:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueDate(attributeValue, attributeDefinition));
+														break;
+
+						case ReqIFConst.REAL:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
+														break;
+												
+						default:						break;
+					}
+				}
+			}
+		}
+		
+		if(this.attributeValues.size() < specType.getAttributeDefinitions().size()) {
+			
+			for(AttributeDefinition attributeDefinition: specType.getAttributeDefinitions().values()) {
+				
+				if(!this.attributeValues.containsKey(attributeDefinition.getName())) {
+
+					Datatype datatype = attributeDefinition.getDataType();
+
+					if(datatype == null) {
+						throw new ExceptionSpecObject("Attribute definition not existing in ReqIF parser\n", attributeDefinition);
+					}
+
+					switch(attributeDefinition.getDataType().getType()) {
+					
+						case ReqIFConst.BOOLEAN:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueBoolean(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+						
+						case ReqIFConst.INTEGER:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueInteger(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+						
+						case ReqIFConst.STRING:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueString(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+						
+						case ReqIFConst.ENUMERATION:	if(attributeDefinition instanceof AttributeDefinitionEnumeration) {
+															AttributeDefinitionEnumeration enumDefinition = (AttributeDefinitionEnumeration) attributeDefinition;
+															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(enumDefinition.getDefaultValues(), enumDefinition.getDefaultValueRefs(), attributeDefinition));
+														}else{
+															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(attributeDefinition.getDefaultValue(), attributeDefinition));
+														}
+														break;
+						
+						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueXHTML(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+
+						case ReqIFConst.DATE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDate(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+
+						case ReqIFConst.DOUBLE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDouble(attributeDefinition.getDefaultValue(), attributeDefinition));
+														break;
+
+						default:						break;
+					}
+				}
+			}
+		}
+		
+	}
+
+}
