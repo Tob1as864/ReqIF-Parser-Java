@@ -22,3 +22,82 @@ Every push and pull request runs the test suite via GitHub Actions
 fixed parser defects documented in `FEHLERANALYSE.md` (namespace-prefixed
 XHTML, multiselect enumerations, image/object conversion, picture lookup
 in .reqifz archives, and crash robustness).
+
+# Type classification
+
+ReqIF has no semantic "this is a requirement" flag. The categories
+`REQ`, `SUB-REQ`, `HEADLINE` and `TEXT` are **this parser's own** content
+categories, not official ReqIF types — the standard only defines structural
+types (`SPEC-OBJECT-TYPE`, `SPECIFICATION-TYPE`, `SPEC-RELATION-TYPE`) with
+free-form `LONG-NAME`s and free-form attributes. What an object *means* is a
+convention of the exporting tool or exchange profile.
+
+Classification is therefore a pluggable strategy (`TypeClassifier`). The
+strategy receives the fully parsed `SpecObject`, so it may decide based on
+the spec type name, the attribute values, or both. Two implementations ship
+with the library.
+
+## Default: `LongNameTypeClassifier`
+
+The default applies a substring heuristic on the spec type name
+("req", "sub", "headline"). It fits profiles whose type names follow that
+convention, but misses e.g. German type names or exports that only encode
+the content kind in attributes. It is used automatically when no classifier
+is passed.
+
+## Recommended for DOORS/Polarion exports: `ReqIFImplementationGuideClassifier`
+
+The ProSTEP iViP / ReqIF Implementor Forum "ReqIF Implementation Guide"
+standardizes **attribute names** (while type names stay free-form). Tools
+such as IBM DOORS, PTC and Polarion emit:
+
+- `ReqIF.ChapterName` — set on heading objects
+- `ReqIF.Text` — the requirement/description body
+
+This classifier decides by those attributes, independent of the type name,
+which is more robust and tool-independent:
+
+```java
+import de.uni_stuttgart.ils.reqif4j.specification.ReqIFImplementationGuideClassifier;
+
+ReqIF reqif = new ReqIF("doors-export.reqif", new ReqIFImplementationGuideClassifier());
+
+// custom attribute names, if your profile differs:
+ReqIF reqif2 = new ReqIF("export.reqif",
+        new ReqIFImplementationGuideClassifier("Heading", "Body"));
+```
+
+Rule: non-empty `ReqIF.ChapterName` → `HEADLINE`; else non-empty
+`ReqIF.Text` → `REQ`; else `TEXT`. Note that the guide does not distinguish
+normative requirements from informational text (both use `ReqIF.Text`), so
+text-bearing objects are reported as `REQ`; use a custom classifier if your
+profile marks requirements with an extra attribute.
+
+## Custom classifier
+
+Any other convention can be implemented directly:
+
+```java
+TypeClassifier classifier = new TypeClassifier() {
+    @Override
+    public String classify(SpecObject specObject) {
+        String name = specObject.getSpecTypeName().toLowerCase();
+        if (name.contains("anforderung")) return ReqIFConst.REQ;
+        if (name.contains("überschrift")) return ReqIFConst.HEADLINE;
+        return ReqIFConst.TEXT;
+    }
+
+    @Override
+    public boolean isRequirement(SpecObject specObject) {
+        return ReqIFConst.REQ.equals(specObject.getType());
+    }
+
+    @Override
+    public boolean isSubRequirement(SpecObject specObject) {
+        return false;
+    }
+};
+
+ReqIF reqif = new ReqIF("spec.reqif", classifier);          // .reqif
+ReqIFz reqifz = new ReqIFz("archive.reqifz", classifier);   // .reqifz
+```

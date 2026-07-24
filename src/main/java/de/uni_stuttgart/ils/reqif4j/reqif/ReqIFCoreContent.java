@@ -82,6 +82,14 @@ public class ReqIFCoreContent {
 
 
     public ReqIFCoreContent(Element coreContent) {
+        this(coreContent, TypeClassifier.defaultClassifier());
+    }
+
+    public ReqIFCoreContent(Element coreContent, TypeClassifier typeClassifier) {
+
+        if (typeClassifier == null) {
+            typeClassifier = TypeClassifier.defaultClassifier();
+        }
 
 
         if (coreContent.getElementsByTagName("DATATYPES").item(0).hasChildNodes()) {
@@ -186,7 +194,7 @@ public class ReqIFCoreContent {
                 String specObjID = specObj.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
                 String specObjTypeRef = ((Element) specObj).getElementsByTagName(ReqIFConst.SPEC_OBJECT_TYPE_REF).item(0).getTextContent();
 
-                this.specObjects.put(specObjID, new SpecObject(specObj, this.specTypes.get(specObjTypeRef)));
+                this.specObjects.put(specObjID, new SpecObject(specObj, this.specTypes.get(specObjTypeRef), typeClassifier));
             }
         }
 

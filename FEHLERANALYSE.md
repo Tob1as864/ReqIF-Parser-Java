@@ -13,9 +13,25 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | Multiselect-Enums, Enum-Defaults, Null-Sicherheit | "Fix multiselect enumerations, enum defaults and enum null-safety" | `MultiselectEnumTest` |
 | Bild-/Objekt-Pipeline, Bild-Zuordnung, Zip-Slip | "Fix image/object conversion pipeline" | `ImagePipelineTest` |
 | Crash-/Robustheitsfehler (Abschnitt 3 + 4.1) | "Fix crash bugs and robustness issues" | `RobustnessTest` |
+| LONG-NAME-Heuristik (4.2) → konfigurierbare Strategie | "Make spec object type classification pluggable" | `TypeClassifierTest` |
+| Attributbasierte Klassifizierung (Implementor-Guide-Profil) | "Add attribute-based ReqIF Implementation Guide classifier" | `ImplementationGuideClassifierTest` |
+
+Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
+die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
+Der Default (`LongNameTypeClassifier`) verhält sich exakt wie bisher; eigene Regeln
+lassen sich über `new ReqIF(pfad, classifier)` bzw. `new ReqIFz(pfad, classifier)`
+injizieren. Zusätzlich liegt mit `ReqIFImplementationGuideClassifier` eine
+attributbasierte Implementierung bei, die nach den standardisierten Attributnamen
+des ProSTEP-Implementor-Forums (`ReqIF.ChapterName`, `ReqIF.Text`) klassifiziert —
+tool-übergreifend robuster als die Namensheuristik und die empfohlene Wahl für
+DOORS-/Polarion-Exporte. Details siehe README-Abschnitt „Type classification".
+
+Hinweis: `REQ`/`SUB-REQ`/`HEADLINE`/`TEXT` sind **keine** offiziellen ReqIF-Typen,
+sondern parserinterne Inhaltskategorien. Der OMG-Standard definiert nur strukturelle
+Typen (`SPEC-OBJECT-TYPE` usw.) mit frei vergebenen Namen/Attributen.
 
 Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
-die LONG-NAME-Heuristik der Typklassifizierung (4.2), die `type`-Semantik von `SpecRelation` (4.3),
+die `type`-Semantik von `SpecRelation` (4.3),
 HTML-Escaping/Attribut-Erhalt in `toString()` (4.8) sowie die kosmetischen Punkte aus Abschnitt 5
 (bis auf den entfernten `javax.xml.crypto.Data`-Import).
 

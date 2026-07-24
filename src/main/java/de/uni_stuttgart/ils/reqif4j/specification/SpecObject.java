@@ -20,6 +20,7 @@ public class SpecObject {
 	protected String id;
 	protected SpecType specType;
 	protected String type;
+	protected TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
 	protected Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	
 	
@@ -51,23 +52,7 @@ public class SpecObject {
 	}
 	
 	public boolean isReq() {
-		
-		if(this.type.equals(ReqIFConst.REQ)) {
-			
-			for(AttributeValue attValue: this.attributeValues.values()) {
-				
-				if(attValue.getDatatype().equals(ReqIFConst.BOOLEAN) && attValue.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
-					
-					if((Boolean)attValue.getValue()) {
-						return true;
-						
-					}else{
-						return false;
-					}
-				}
-			}
-		}
-		return false;
+		return this.typeClassifier.isRequirement(this);
 	}
 	
 	public boolean isHeadline() {
@@ -80,23 +65,7 @@ public class SpecObject {
 	}
 	
 	public boolean isSubReq() {
-		
-		if(this.type.equals(ReqIFConst.SUB_REQ)) {
-			
-			for(AttributeValue attValue: this.attributeValues.values()) {
-				
-				if(attValue.getDatatype().equals(ReqIFConst.BOOLEAN) && attValue.getName().toLowerCase().contains(ReqIFConst.SUB.toLowerCase()) && attValue.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
-					
-					if((Boolean)attValue.getValue()) {
-						return true;
-						
-					}else{
-						return false;
-					}
-				}
-			}
-		}
-		return false;
+		return this.typeClassifier.isSubRequirement(this);
 	}
 	
 	public boolean isText() {
@@ -114,25 +83,15 @@ public class SpecObject {
 	}
 	
 	public SpecObject(Node specObject, SpecType specType) {
-		
+		this(specObject, specType, TypeClassifier.defaultClassifier());
+	}
+
+	public SpecObject(Node specObject, SpecType specType, TypeClassifier typeClassifier) {
+
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.specType = specType;
-		
-		if(this.specType.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
-			
-			if(this.specType.getName().toLowerCase().contains(ReqIFConst.SUB.toLowerCase())) {
-				this.type = ReqIFConst.SUB_REQ;
-			
-			}else{
-				this.type = ReqIFConst.REQ;
-			}
-		}else if(this.specType.getName().toLowerCase().contains(ReqIFConst.HEADLINE.toLowerCase())) {
-			this.type = ReqIFConst.HEADLINE;
-		
-		}else{
-			this.type = ReqIFConst.TEXT;
-		}
-		
+		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
+
 		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
 				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
 			
@@ -256,7 +215,11 @@ public class SpecObject {
 				}
 			}
 		}
-		
+
+		// Classify only after all attribute values are available, so an
+		// attribute-based classifier (e.g. the ReqIF Implementation Guide
+		// profile) can inspect them.
+		this.type = this.typeClassifier.classify(this);
 	}
 
 }
