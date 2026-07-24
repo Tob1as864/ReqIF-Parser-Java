@@ -12,7 +12,6 @@ import org.junit.jupiter.api.io.TempDir;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
-import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
 
 /**
@@ -82,8 +81,8 @@ class TypeClassifierTest {
 		TypeClassifier germanClassifier = new TypeClassifier() {
 
 			@Override
-			public String classifySpecType(SpecType specType) {
-				String name = specType.getName() == null ? "" : specType.getName().toLowerCase();
+			public String classify(SpecObject specObject) {
+				String name = specObject.getSpecTypeName() == null ? "" : specObject.getSpecTypeName().toLowerCase();
 				if (name.contains("anforderung")) {
 					return ReqIFConst.REQ;
 				}

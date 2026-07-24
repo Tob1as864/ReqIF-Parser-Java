@@ -20,9 +20,9 @@ public class LongNameTypeClassifier implements TypeClassifier {
 	static final LongNameTypeClassifier INSTANCE = new LongNameTypeClassifier();
 
 	@Override
-	public String classifySpecType(SpecType specType) {
+	public String classify(SpecObject specObject) {
 
-		String name = specType.getName() == null ? "" : specType.getName().toLowerCase();
+		String name = specObject.getSpecTypeName() == null ? "" : specObject.getSpecTypeName().toLowerCase();
 
 		if (name.contains(ReqIFConst.REQ.toLowerCase())) {
 			if (name.contains(ReqIFConst.SUB.toLowerCase())) {

@@ -92,8 +92,6 @@ public class SpecObject {
 		this.specType = specType;
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 
-		this.type = this.typeClassifier.classifySpecType(specType);
-		
 		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
 				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
 			
@@ -217,7 +215,11 @@ public class SpecObject {
 				}
 			}
 		}
-		
+
+		// Classify only after all attribute values are available, so an
+		// attribute-based classifier (e.g. the ReqIF Implementation Guide
+		// profile) can inspect them.
+		this.type = this.typeClassifier.classify(this);
 	}
 
 }

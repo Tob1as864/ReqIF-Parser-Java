@@ -14,11 +14,21 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | Bild-/Objekt-Pipeline, Bild-Zuordnung, Zip-Slip | "Fix image/object conversion pipeline" | `ImagePipelineTest` |
 | Crash-/Robustheitsfehler (Abschnitt 3 + 4.1) | "Fix crash bugs and robustness issues" | `RobustnessTest` |
 | LONG-NAME-Heuristik (4.2) → konfigurierbare Strategie | "Make spec object type classification pluggable" | `TypeClassifierTest` |
+| Attributbasierte Klassifizierung (Implementor-Guide-Profil) | "Add attribute-based ReqIF Implementation Guide classifier" | `ImplementationGuideClassifierTest` |
 
-Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`).
+Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
+die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
 Der Default (`LongNameTypeClassifier`) verhält sich exakt wie bisher; eigene Regeln
-(z. B. für deutschsprachige Profile) lassen sich über `new ReqIF(pfad, classifier)`
-bzw. `new ReqIFz(pfad, classifier)` injizieren.
+lassen sich über `new ReqIF(pfad, classifier)` bzw. `new ReqIFz(pfad, classifier)`
+injizieren. Zusätzlich liegt mit `ReqIFImplementationGuideClassifier` eine
+attributbasierte Implementierung bei, die nach den standardisierten Attributnamen
+des ProSTEP-Implementor-Forums (`ReqIF.ChapterName`, `ReqIF.Text`) klassifiziert —
+tool-übergreifend robuster als die Namensheuristik und die empfohlene Wahl für
+DOORS-/Polarion-Exporte. Details siehe README-Abschnitt „Type classification".
+
+Hinweis: `REQ`/`SUB-REQ`/`HEADLINE`/`TEXT` sind **keine** offiziellen ReqIF-Typen,
+sondern parserinterne Inhaltskategorien. Der OMG-Standard definiert nur strukturelle
+Typen (`SPEC-OBJECT-TYPE` usw.) mit frei vergebenen Namen/Attributen.
 
 Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
 die `type`-Semantik von `SpecRelation` (4.3),
