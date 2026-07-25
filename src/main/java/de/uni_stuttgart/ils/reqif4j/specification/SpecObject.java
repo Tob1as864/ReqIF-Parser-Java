@@ -92,6 +92,21 @@ public class SpecObject {
 		this.specType = specType;
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 
+		readAttributeValues(specObject, specType);
+
+		// Classify only after all attribute values are available, so an
+		// attribute-based classifier (e.g. the ReqIF Implementation Guide
+		// profile) can inspect them.
+		this.type = this.typeClassifier.classify(this);
+	}
+
+	/**
+	 * Reads all attribute values of the given node and fills in default values
+	 * for attribute definitions that carry no explicit value. Shared by
+	 * {@link SpecObject} and {@link SpecRelation}.
+	 */
+	protected void readAttributeValues(Node specObject, SpecType specType) {
+
 		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
 				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
 			
@@ -215,11 +230,6 @@ public class SpecObject {
 				}
 			}
 		}
-
-		// Classify only after all attribute values are available, so an
-		// attribute-based classifier (e.g. the ReqIF Implementation Guide
-		// profile) can inspect them.
-		this.type = this.typeClassifier.classify(this);
 	}
 
 }

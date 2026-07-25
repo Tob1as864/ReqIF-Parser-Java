@@ -15,6 +15,7 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | Crash-/Robustheitsfehler (Abschnitt 3 + 4.1) | "Fix crash bugs and robustness issues" | `RobustnessTest` |
 | LONG-NAME-Heuristik (4.2) → konfigurierbare Strategie | "Make spec object type classification pluggable" | `TypeClassifierTest` |
 | Attributbasierte Klassifizierung (Implementor-Guide-Profil) | "Add attribute-based ReqIF Implementation Guide classifier" | `ImplementationGuideClassifierTest` |
+| `SpecRelation`-Typsemantik + Relationsattribute (4.3) | "Fix SpecRelation type semantics and parse relation attributes" | `SpecRelationTest` |
 
 Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
 die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
@@ -30,9 +31,16 @@ Hinweis: `REQ`/`SUB-REQ`/`HEADLINE`/`TEXT` sind **keine** offiziellen ReqIF-Type
 sondern parserinterne Inhaltskategorien. Der OMG-Standard definiert nur strukturelle
 Typen (`SPEC-OBJECT-TYPE` usw.) mit frei vergebenen Namen/Attributen.
 
+Zu `SpecRelation` (4.3): Das geerbte Feld `type` trägt eine Inhaltskategorie und wurde
+mit der Relationstyp-Referenz überschrieben. Es enthält jetzt `UNDEFINED` (eine Relation
+hat keine Inhaltskategorie); die Referenz liegt in `getRelationTypeRef()`, der aufgelöste
+Name in `getRelationTypeName()`, die strukturelle Information weiterhin in `getSpecType()`
+(`SPEC-RELATION-TYPE`). Die Attributwerte der Relation werden jetzt geparst.
+**Breaking Change:** `getType()` liefert für Relationen `"UNDEFINED"` statt der Referenz-ID.
+
 Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
-die `type`-Semantik von `SpecRelation` (4.3),
-HTML-Escaping/Attribut-Erhalt in `toString()` (4.8) sowie die kosmetischen Punkte aus Abschnitt 5
+Tabellen-/Listen-Deconstruction (4.7), HTML-Escaping/Attribut-Erhalt in `toString()` (4.8)
+sowie die kosmetischen Punkte aus Abschnitt 5
 (bis auf den entfernten `javax.xml.crypto.Data`-Import).
 
 Die ursprüngliche Analyse folgt unverändert. Datei- und Zeilenangaben beziehen sich auf den

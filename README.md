@@ -101,3 +101,22 @@ TypeClassifier classifier = new TypeClassifier() {
 ReqIF reqif = new ReqIF("spec.reqif", classifier);          // .reqif
 ReqIFz reqifz = new ReqIFz("archive.reqifz", classifier);   // .reqifz
 ```
+
+# Spec relations
+`SpecRelation` extends `SpecObject`, but a relation has no *content*
+category, so the inherited `getType()` returns `ReqIFConst.UNDEFINED`.
+The relation's own type and its endpoints are exposed separately:
+
+```java
+SpecRelation rel = reqif.getReqIFCoreContent().getSpecRelation("sr-1");
+
+rel.getSourceObjID();        // "so-1"
+rel.getTargetObjID();        // "so-2"
+rel.getRelationTypeRef();    // "st-rel"     (SPEC-RELATION-TYPE-REF)
+rel.getRelationTypeName();   // "satisfies"  (resolved LONG-NAME)
+rel.getSpecType();           // "SPEC-RELATION-TYPE"
+rel.getAttribute("LinkComment");  // relation attribute values are parsed
+```
+
+`isReq()`, `isSubReq()`, `isHeadline()` and `isText()` all return `false`
+for relations.
