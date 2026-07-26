@@ -65,6 +65,9 @@ public class XHTMLElement extends XHTMLNode {
 									
 				case XHTML.OBJECT:	this.children.add(new XHTMLElementObject(childNode, this));
 									break;
+
+				case XHTML.OL:		this.children.add(new XHTMLElementOl(childNode, this));
+									break;
 				
 				case XHTML.P:		this.children.add(new XHTMLElementP(childNode, this));
 									break;

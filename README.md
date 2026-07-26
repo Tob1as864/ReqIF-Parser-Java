@@ -120,3 +120,29 @@ rel.getAttribute("LinkComment");  // relation attribute values are parsed
 
 `isReq()`, `isSubReq()`, `isHeadline()` and `isText()` all return `false`
 for relations.
+
+# XHTML content
+XHTML attribute values are available in two representations that are always
+in sync — the token list is derived from the node tree:
+
+```java
+AttributeValueXHTML desc = (AttributeValueXHTML) specObject.getAttributes().get("Description");
+
+desc.getDivValue();     // typed node tree (XHTMLElementTbl, XHTMLElementTh, ...)
+desc.getElementList();  // flat token list
+desc.getValue();        // rendered XHTML string
+```
+
+Token grammar of `getElementList()`:
+
+| element type | content tokens |
+|---|---|
+| `P` / `H` | `TXT` text \| `VAR` name [guid] \| `BR` \| `OBJ` path |
+| `TBL` | `TR` ( (`TH`\|`TC`) text (`OBJ` path)* )* |
+| `L` | `LE` ( inline \| `L` … `/L` \| `TBL` … )* |
+| `OBJ` | path |
+
+Header cells are reported as `TH`, data cells as `TC`; the cell text holds
+the complete cell content and images inside a cell follow as `OBJ` pairs.
+Nested lists use balanced `L` / `/L` markers. Ordered lists (`ol`) are
+treated like unordered ones.

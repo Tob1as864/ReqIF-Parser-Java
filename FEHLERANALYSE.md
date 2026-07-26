@@ -16,6 +16,7 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | LONG-NAME-Heuristik (4.2) → konfigurierbare Strategie | "Make spec object type classification pluggable" | `TypeClassifierTest` |
 | Attributbasierte Klassifizierung (Implementor-Guide-Profil) | "Add attribute-based ReqIF Implementation Guide classifier" | `ImplementationGuideClassifierTest` |
 | `SpecRelation`-Typsemantik + Relationsattribute (4.3) | "Fix SpecRelation type semantics and parse relation attributes" | `SpecRelationTest` |
+| Tabellen-/Listen-Deconstruction (4.7) | "Derive XHTML token list from the node tree" | `XHTMLDeconstructionTest` |
 
 Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
 die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
@@ -38,8 +39,16 @@ Name in `getRelationTypeName()`, die strukturelle Information weiterhin in `getS
 (`SPEC-RELATION-TYPE`). Die Attributwerte der Relation werden jetzt geparst.
 **Breaking Change:** `getType()` liefert für Relationen `"UNDEFINED"` statt der Referenz-ID.
 
+Zur Deconstruction (4.7): Die Token-Liste wird jetzt aus dem bereits geparsten
+Knotenbaum erzeugt statt ein zweites Mal aus dem rohen DOM. Damit entfällt die
+doppelte Parse-Logik, und die Liste erbt die Namespace-Korrektheit des Baums.
+Behoben: Zellen mit mehreren Kindelementen verlieren keinen Inhalt mehr (der letzte
+`item(1)`-Fehler), Kopfzellen werden als `TH` ausgewiesen, Bilder in Zellen bleiben
+erhalten, `L`/`/L`-Marker sind ausbalanciert, `ol`-Listen werden nicht mehr ignoriert.
+Die Token-Grammatik ist im Javadoc von `AttributeValueXHTML` dokumentiert.
+
 Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
-Tabellen-/Listen-Deconstruction (4.7), HTML-Escaping/Attribut-Erhalt in `toString()` (4.8)
+HTML-Escaping/Attribut-Erhalt in `toString()` (4.8)
 sowie die kosmetischen Punkte aus Abschnitt 5
 (bis auf den entfernten `javax.xml.crypto.Data`-Import).
 

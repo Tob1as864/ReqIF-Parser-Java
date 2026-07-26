@@ -117,7 +117,7 @@ public final class TestFixtures {
 			            <ATTRIBUTE-VALUE-XHTML>
 			              <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>ad-desc</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
 			              <THE-VALUE>
-			                <xhtml:div>Intro <xhtml:p>Text with <xhtml:span>span content</xhtml:span></xhtml:p><xhtml:object data="files/image.png" type="image/png">alternative text</xhtml:object></xhtml:div>
+			                <xhtml:div>Intro <xhtml:p>Text with <xhtml:span>span content</xhtml:span></xhtml:p><xhtml:object data="files/image.png" type="image/png">alternative text</xhtml:object><xhtml:table><xhtml:thead><xhtml:tr><xhtml:th>Header A</xhtml:th><xhtml:th>Header B</xhtml:th></xhtml:tr></xhtml:thead><xhtml:tbody><xhtml:tr><xhtml:td><xhtml:p>First para</xhtml:p><xhtml:p>Second para</xhtml:p></xhtml:td><xhtml:td><xhtml:object data="files/cell.png" type="image/png">cell image</xhtml:object></xhtml:td></xhtml:tr></xhtml:tbody></xhtml:table><xhtml:ul><xhtml:li>Outer item<xhtml:ul><xhtml:li>Inner item</xhtml:li></xhtml:ul></xhtml:li></xhtml:ul><xhtml:ol><xhtml:li>Numbered item</xhtml:li></xhtml:ol></xhtml:div>
 			              </THE-VALUE>
 			            </ATTRIBUTE-VALUE-XHTML>
 			          </VALUES>
