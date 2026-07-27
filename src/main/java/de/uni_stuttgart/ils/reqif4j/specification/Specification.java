@@ -34,7 +34,6 @@ public class Specification {
 	private Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
 	private List<SpecHierarchy> allSpecHierarchies = new ArrayList<SpecHierarchy>();
-	//private Map<Integer, List<SpecObject>> allSpecObjects = new HashMap<Integer, List<SpecObject>>();		//		TODO
 	
 	
 	
@@ -43,12 +42,14 @@ public class Specification {
 		return this.id;
 	}
 	
-	///
+	/**
+	 * @return the value of an attribute named "Description", or null if the
+	 *         specification has no such attribute
+	 */
 	public String getDescription() {
 		AttributeValue description = this.attributeValues.get("Description");
 		return description == null ? null : (String) description.getValue();
 	}
-	//*/
 	
 	public String getName() {
 		return this.name;

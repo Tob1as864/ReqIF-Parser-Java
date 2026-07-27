@@ -18,6 +18,7 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | `SpecRelation`-Typsemantik + Relationsattribute (4.3) | "Fix SpecRelation type semantics and parse relation attributes" | `SpecRelationTest` |
 | Tabellen-/Listen-Deconstruction (4.7) | "Derive XHTML token list from the node tree" | `XHTMLDeconstructionTest` |
 | XHTML-Ausgabe: Escaping, Attribute, Inhaltsverlust (4.8) | "Fix XHTML rendering" | `XHTMLRenderingTest` |
+| Code-Qualität (Abschnitt 5) | "Clean up code quality issues" | `CodeQualityFixesTest` |
 
 Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
 die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
@@ -65,8 +66,23 @@ beschrieben — tatsächlich lag **Inhaltsverlust** vor. Behoben:
 **Breaking Change:** `getValue()` liefert für XHTML-Attribute einen anderen (korrekten)
 String als zuvor. Baum (`getDivValue()`) und Token-Liste sind nicht betroffen.
 
-Bewusst nicht angefasst: die kosmetischen Punkte aus Abschnitt 5
-(bis auf den entfernten `javax.xml.crypto.Data`-Import).
+Zu Abschnitt 5: alle Punkte erledigt.
+- 5.1 Feld-Verschattung in `DatatypeBoolean`/`DatatypeXHTML` entfernt (die Getter der
+  Basisklasse liefern dieselben Werte).
+- 5.2 unbenutzter `javax.xml.crypto.Data`-Import entfernt.
+- 5.3 `ExceptionSpecObject`: lesbare Meldung mit Zeilenumbrüchen, Datentyp als Name
+  statt Objekt-Dump, verträgt eine fehlende Definition.
+- 5.4 durch das Java-17-Target gegenstandslos.
+- 5.5 `AttributeValueDate` parst den Wert zusätzlich nach `OffsetDateTime`
+  (`getDateTime()`, `getDate()`); `getValue()` liefert unverändert den Rohstring,
+  unparsbare Werte ergeben `null` statt einer Exception.
+- 5.6 `_Template`-Hack entfernt: `getTitle()` liefert den Titel wie im Dokument.
+  **Breaking Change** für Nutzer, die sich auf das Abschneiden verlassen haben.
+- 5.7 auskommentierter Code entfernt; `getComment()` ist reaktiviert (der `COMMENT`
+  wurde ohnehin gelesen). Die Tippfehler in den Methodennamen sind mit der
+  Neuimplementierung der Deconstruction entfallen.
+
+Damit sind alle Punkte der Analyse abgearbeitet.
 
 Die ursprüngliche Analyse folgt unverändert. Datei- und Zeilenangaben beziehen sich auf den
 Stand **vor** den Fixes (Quellen liegen inzwischen unter `src/main/java/`).

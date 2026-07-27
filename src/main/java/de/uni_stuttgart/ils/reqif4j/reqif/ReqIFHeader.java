@@ -11,7 +11,7 @@ public class ReqIFHeader {
 	private String toolID;
 	private String sourceToolID = "";
 	private String reqifVersion = "";
-	//private String comment = "";
+	private String comment = "";
 	private String creationDate = "";
 	
 	
@@ -41,9 +41,12 @@ public class ReqIFHeader {
 		return this.reqifVersion;
 	}
 	
-	/*public String getComment() {
+	/**
+	 * @return the COMMENT of the header, or "" if the document declares none
+	 */
+	public String getComment() {
 		return this.comment;
-	}*/
+	}
 	
 	public String getCreationDate() {
 		return this.creationDate;
@@ -66,10 +69,10 @@ public class ReqIFHeader {
 		if(theHeader.getElementsByTagName(ReqIFConst.COMMENT).getLength() > 0) {
 			// The "Created by: " convention is tool-specific; a comment without
 			// it must not crash the parser.
-			String comment = theHeader.getElementsByTagName(ReqIFConst.COMMENT).item(0).getTextContent();
-			int createdBy = comment.indexOf("Created by: ");
+			this.comment = theHeader.getElementsByTagName(ReqIFConst.COMMENT).item(0).getTextContent();
+			int createdBy = this.comment.indexOf("Created by: ");
 			if(createdBy >= 0) {
-				this.author = comment.substring(createdBy + "Created by: ".length()).trim();
+				this.author = this.comment.substring(createdBy + "Created by: ".length()).trim();
 			}
 		}
 		if(theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).getLength() > 0) {
@@ -83,7 +86,9 @@ public class ReqIFHeader {
 			}
 		}
 		if(theHeader.getElementsByTagName(ReqIFConst.TITLE).getLength() > 0) {
-			this.title = theHeader.getElementsByTagName(ReqIFConst.TITLE).item(0).getTextContent().replace("_Template", "");
+			// The title is returned as written in the document; stripping a
+			// "_Template" suffix was a tool-specific hack in a generic parser.
+			this.title = theHeader.getElementsByTagName(ReqIFConst.TITLE).item(0).getTextContent();
 		}
 	}
 
