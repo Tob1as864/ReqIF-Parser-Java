@@ -57,20 +57,7 @@ public class XHTMLElementObject extends XHTMLElement {
 		this.mimeType = XmlUtils.attribute(xhtmlElement, "type");
 	}
 
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append('<').append(tagName);
-		if (data != null) {
-			sb.append(" data=\"").append(data).append('"');
-		}
-		if (mimeType != null) {
-			sb.append(" type=\"").append(mimeType).append('"');
-		}
-		sb.append('>');
-		sb.append((!children.isEmpty() ? this.listToString(children) : ""));
-		sb.append("</").append(tagName).append('>');
-		return sb.toString();
-	}
+	// toString() is inherited: XHTMLElement renders all attributes generically,
+	// so data, type, width, height and alt are preserved.
 
 }

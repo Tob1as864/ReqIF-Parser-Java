@@ -17,6 +17,7 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | Attributbasierte Klassifizierung (Implementor-Guide-Profil) | "Add attribute-based ReqIF Implementation Guide classifier" | `ImplementationGuideClassifierTest` |
 | `SpecRelation`-Typsemantik + Relationsattribute (4.3) | "Fix SpecRelation type semantics and parse relation attributes" | `SpecRelationTest` |
 | Tabellen-/Listen-Deconstruction (4.7) | "Derive XHTML token list from the node tree" | `XHTMLDeconstructionTest` |
+| XHTML-Ausgabe: Escaping, Attribute, Inhaltsverlust (4.8) | "Fix XHTML rendering" | `XHTMLRenderingTest` |
 
 Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
 die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
@@ -47,9 +48,24 @@ Behoben: Zellen mit mehreren Kindelementen verlieren keinen Inhalt mehr (der let
 erhalten, `L`/`/L`-Marker sind ausbalanciert, `ol`-Listen werden nicht mehr ignoriert.
 Die Token-Grammatik ist im Javadoc von `AttributeValueXHTML` dokumentiert.
 
-Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
-HTML-Escaping/Attribut-Erhalt in `toString()` (4.8)
-sowie die kosmetischen Punkte aus Abschnitt 5
+Zur XHTML-Ausgabe (4.8): Der Punkt war in der Erstanalyse als reine Ausgabetreue
+beschrieben — tatsächlich lag **Inhaltsverlust** vor. Behoben:
+1. Text und Attributwerte werden escaped; die Ausgabe war zuvor **nicht wohlgeformt**
+   (aus `&lt;` wurde `<`) und damit weder erneut parsebar noch sicher einbettbar.
+2. Alle XML-Attribute bleiben erhalten (`style`, `colspan`, `href` …); Namespace-
+   Deklarationen werden ausgelassen, da Tag-Namen ohne Präfix ausgegeben werden.
+3. Void-Elemente werden selbstschließend gerendert (`<br/>` statt `<br></br>`,
+   das HTML5-Parser als zwei Umbrüche lesen).
+4. Elemente ohne eigene Klasse (`a`, `em`, `strong`, `b`, `i`, …) verloren zuvor
+   ihren **kompletten Inhalt**, weil der `default`-Zweig ein blattartiges `XHTMLNode`
+   erzeugte; sie werden jetzt als `XHTMLElement` mit Kindern geparst.
+5. Inline-Abstände bleiben erhalten (vorher lief „Siehe <a>Link</a>" zu „SieheLink"
+   zusammen); `getTextContent()` liefert weiterhin den getrimmten Text.
+
+**Breaking Change:** `getValue()` liefert für XHTML-Attribute einen anderen (korrekten)
+String als zuvor. Baum (`getDivValue()`) und Token-Liste sind nicht betroffen.
+
+Bewusst nicht angefasst: die kosmetischen Punkte aus Abschnitt 5
 (bis auf den entfernten `javax.xml.crypto.Data`-Import).
 
 Die ursprüngliche Analyse folgt unverändert. Datei- und Zeilenangaben beziehen sich auf den

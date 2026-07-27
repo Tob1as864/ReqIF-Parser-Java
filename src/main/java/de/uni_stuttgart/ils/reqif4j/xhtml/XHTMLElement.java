@@ -75,7 +75,9 @@ public class XHTMLElement extends XHTMLNode {
 				case XHTML.SPAN:	this.children.add(new XHTMLElementSpan(childNode, this));
 									break;
 									
-				case XHTML._TEXT:	if(!childNode.getTextContent().trim().isEmpty()) {
+									// Whitespace-only text nodes are kept: they carry the
+									// spacing between adjacent inline elements.
+				case XHTML._TEXT:	if(!childNode.getTextContent().isEmpty()) {
 										this.children.add(new XHTMLElementText(childNode, this));
 									}
 									break;
@@ -104,7 +106,16 @@ public class XHTMLElement extends XHTMLNode {
 				case XHTML.VAR:		this.children.add(new XHTMLElementVar(childNode, this));
 									break;
 				
-				default:			this.children.add(new XHTMLNode(childNode, this));
+									// Elements without a dedicated class (a, em, strong, ...)
+									// must still be parsed as elements, otherwise their
+									// whole content is lost on output.
+				default:			if(childNode.getNodeType() == Node.ELEMENT_NODE) {
+										this.children.add(new XHTMLElement(childNode, this));
+
+									}else if(childNode.getNodeType() == Node.CDATA_SECTION_NODE) {
+										this.children.add(new XHTMLElementText(childNode, this));
+									}
+									// comments and processing instructions are dropped
 									break;
 			}	
 		}
@@ -113,8 +124,13 @@ public class XHTMLElement extends XHTMLNode {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append('<').append(tagName).append('>');
-		sb.append((!children.isEmpty() ? this.listToString(children) : ""));
+		sb.append('<').append(tagName).append(attributesToString());
+		if(children.isEmpty() && isVoidElement()) {
+			sb.append("/>");
+			return sb.toString();
+		}
+		sb.append('>');
+		sb.append(this.listToString(children));
 		sb.append("</").append(tagName).append('>');
 		return sb.toString();
 	}

@@ -146,3 +146,20 @@ Header cells are reported as `TH`, data cells as `TC`; the cell text holds
 the complete cell content and images inside a cell follow as `OBJ` pairs.
 Nested lists use balanced `L` / `/L` markers. Ordered lists (`ol`) are
 treated like unordered ones.
+
+## Rendering (`getValue()`)
+
+`getValue()` returns the XHTML as a string. Text and attribute values are
+escaped, so the result is well-formed and can be parsed again or embedded
+safely. All XML attributes are preserved, void elements are self-closing,
+and elements without a dedicated node class (`a`, `em`, `strong`, …) keep
+their content:
+
+```html
+<div><p style="color:red">a &lt; b &amp; c</p>
+<p>Siehe <a href="http://x.y">diesen Link</a> und <em>Betonung</em>.</p>
+<br/><table><tr><td colspan="2">merged</td></tr></table></div>
+```
+
+Namespace declarations are omitted because tag names are rendered without
+their prefix.
