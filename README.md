@@ -189,6 +189,48 @@ mixed content, which would change XHTML attribute values. Enable it with
 `new ReqIFWriter().setIndent(true)` only when readable output matters more
 than exact XHTML content.
 
-Not covered yet: a builder API for creating documents from scratch,
-writing .reqifz archives, and ReqIF elements the parser does not model
-(alternative ids, relation groups, tool extensions).
+## Creating documents from scratch
+
+`ReqIFBuilder` assembles the same object model the parser produces, so a
+generated document is written exactly like a parsed one. Identifiers are
+validated while building: referencing an unknown datatype, spec type,
+spec object, attribute definition or enum value fails immediately with a
+`ReqIFBuildException` instead of producing a broken document.
+
+```java
+ReqIFDocument document = ReqIFBuilder.create()
+        .header(h -> h.id("hdr-1").title("My Spec").toolID("reqif4j")
+                      .creationTime("2026-07-23T10:00:00Z"))
+        .stringDatatype("dt-string", "String", 4096)
+        .xhtmlDatatype("dt-xhtml", "XHTML")
+        .enumerationDatatype("dt-enum", "Color", e -> e
+                .value("ev-red", "Red", "1", "#ff0000")
+                .value("ev-blue", "Blue", "2"))
+        .specObjectType("st-req", "Requirement Type", t -> t
+                .stringAttribute("ad-title", "ReqIF.Name", "dt-string")
+                .xhtmlAttribute("ad-text", "ReqIF.Text", "dt-xhtml")
+                .enumerationAttribute("ad-color", "Colors", "dt-enum",
+                                      true, List.of("ev-blue")))
+        .specificationType("st-spec", "Specification Type", t -> {})
+        .specRelationType("st-rel", "satisfies", t -> {})
+        .specObject("so-1", "st-req", o -> o
+                .set("ad-title", "First requirement")
+                .setEnum("ad-color", "ev-red", "ev-blue")   // multiselect
+                .setXhtml("ad-text", "<p>The system shall boot.</p>"))
+        .specObject("so-2", "st-req")
+        .specRelation("sr-1", "st-rel", "so-1", "so-2")
+        .specification("spec-1", "Main Spec", "st-spec", s -> s
+                .child("sh-1", "so-1", c -> c.child("sh-2", "so-2")))
+        .build();
+
+new ReqIFWriter().write(document, Path.of("out.reqif"));
+```
+
+XHTML values may be passed with or without a surrounding `div`; the
+markup is parsed, so the node tree and the token list work on generated
+values too. The content category of generated spec objects is derived by
+the same `TypeClassifier` used when reading (`typeClassifier(...)` to
+override).
+
+Not covered yet: writing .reqifz archives and ReqIF elements the parser
+does not model (alternative ids, relation groups, tool extensions).

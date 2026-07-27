@@ -44,6 +44,18 @@ public class ReqIFDocument {
 	}
 
 
+	/**
+	 * Creates a document from an object model, for documents that are generated
+	 * instead of parsed.
+	 */
+	public ReqIFDocument(ReqIFHeader header, ReqIFCoreContent content) {
+
+		this.header = header;
+		this.content = content;
+		this.fileName = header == null || header.getTitle().isEmpty() ? "generated.reqif" : header.getTitle() + ".reqif";
+		this.filePath = this.fileName;
+	}
+
 	public ReqIFDocument(String filePath) throws FileNotFoundException {
 		this(filePath, TypeClassifier.defaultClassifier());
 	}

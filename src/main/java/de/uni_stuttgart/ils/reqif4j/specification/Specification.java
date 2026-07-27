@@ -110,6 +110,39 @@ public class Specification {
 	
 	
 	
+	/**
+	 * Creates a specification from plain values, for documents that are
+	 * generated instead of parsed.
+	 */
+	public Specification(String id, String name, SpecType specType,
+			java.util.Collection<AttributeValue> attributeValues, List<SpecHierarchy> children) {
+
+		this.id = id;
+		this.name = name;
+		this.type = specType;
+
+		if(attributeValues != null) {
+			for(AttributeValue attributeValue: attributeValues) {
+				this.attributeValues.put(attributeValue.getName(), attributeValue);
+			}
+		}
+
+		if(children != null) {
+			for(SpecHierarchy child: children) {
+				this.children.put(child.getSpecHierarchyID(), child);
+				this.sectionCounter++;
+			}
+		}
+
+		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
+		for(SpecHierarchy specHierarchy: this.children.values()) {
+			allChildren.add(specHierarchy);
+			allChildren.addAll(specHierarchy.getAllChildren());
+		}
+		this.allSpecHierarchies.addAll(allChildren);
+		this.numberOfSpecObjects = allChildren.size();
+	}
+
 	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects) {
 		
 		this.id = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();

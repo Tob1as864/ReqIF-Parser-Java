@@ -152,6 +152,25 @@ public class SpecHierarchy {
 	
 	
 	
+	/**
+	 * Creates a hierarchy node from plain values, for documents that are
+	 * generated instead of parsed.
+	 */
+	public SpecHierarchy(String specHierarchyID, int hierarchyLvl, int section, SpecObject specObject,
+			List<SpecHierarchy> children) {
+
+		this.specHierarchyID = specHierarchyID;
+		this.hierarchyLvl = hierarchyLvl;
+		this.section = section;
+		this.specObject = specObject;
+
+		if(children != null) {
+			for(SpecHierarchy child: children) {
+				this.children.put(child.getSpecHierarchyID(), child);
+			}
+		}
+	}
+
 	public SpecHierarchy(int hierarchyLvl, int section, Node specHierarchy, Map<String, SpecObject> specObjects) {
 		
 		this.hierarchyLvl = hierarchyLvl;

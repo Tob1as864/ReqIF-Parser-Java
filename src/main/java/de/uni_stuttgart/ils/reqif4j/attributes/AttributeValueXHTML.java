@@ -1,10 +1,17 @@
 package de.uni_stuttgart.ils.reqif4j.attributes;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import org.w3c.dom.Node;
+import org.xml.sax.SAXException;
 
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElement;
@@ -56,6 +63,7 @@ public class AttributeValueXHTML extends AttributeValue {
 	private static final String T_LIST_END = "/L";
 
 	private static final String VARIABLE_NAME_MISSING = "VARIABLE_NAME_MISSING";
+	private static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
 	XHTMLElementDiv divValue;
 
@@ -77,10 +85,35 @@ public class AttributeValueXHTML extends AttributeValue {
 		this.value = deconstructXHTML(this.divValue);
 	}
 
+	/**
+	 * Creates an XHTML value from markup, for documents that are generated
+	 * instead of parsed. The markup is parsed so the node tree and the token
+	 * list are available just like for a parsed value; it may be given with or
+	 * without a surrounding div.
+	 */
 	public AttributeValueXHTML(String value, AttributeDefinition type) {
 		super(value, type);
 
+		Node div = value == null || value.isBlank() ? null : parseDiv(value);
+		this.divValue = div == null ? null : new XHTMLElementDiv(div);
+		this.value = deconstructXHTML(this.divValue);
+	}
 
+	private static Node parseDiv(String markup) {
+
+		String trimmed = markup.trim();
+		String document = trimmed.startsWith("<div")
+				? trimmed.replaceFirst("<div", "<div xmlns=\"" + XHTML_NAMESPACE + "\"")
+				: "<div xmlns=\"" + XHTML_NAMESPACE + "\">" + trimmed + "</div>";
+		try {
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			factory.setNamespaceAware(true);
+			return factory.newDocumentBuilder()
+					.parse(new ByteArrayInputStream(document.getBytes(StandardCharsets.UTF_8)))
+					.getDocumentElement();
+		} catch (SAXException | IOException | ParserConfigurationException e) {
+			throw new IllegalArgumentException("XHTML value is not well-formed: " + markup, e);
+		}
 	}
 
 	public XHTMLElementDiv getDivValue() {

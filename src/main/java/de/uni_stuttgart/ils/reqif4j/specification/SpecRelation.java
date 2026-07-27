@@ -1,5 +1,8 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
+import java.util.Collection;
+
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import org.w3c.dom.Element;
@@ -20,6 +23,21 @@ public class SpecRelation extends SpecObject {
     private String sourceObjID;
     private String targetObjID;
     private String relationTypeRef;
+
+    /**
+     * Creates a relation from plain values, for documents that are generated
+     * instead of parsed.
+     */
+    public SpecRelation(String id, SpecType specType, String sourceObjID, String targetObjID,
+            Collection<AttributeValue> attributeValues) {
+        super(id, specType, attributeValues);
+
+        this.sourceObjID = sourceObjID;
+        this.targetObjID = targetObjID;
+        this.relationTypeRef = specType == null ? null : specType.getID();
+        // a relation has no content category
+        this.type = ReqIFConst.UNDEFINED;
+    }
 
     public SpecRelation(Node specRelation, SpecType specType) {
         super(specRelation);

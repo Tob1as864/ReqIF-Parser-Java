@@ -1,6 +1,7 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +91,30 @@ public class SpecObject {
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 	}
 	
+	/**
+	 * Creates a spec object from plain values, for documents that are generated
+	 * instead of parsed. The content category is derived by the classifier, as
+	 * when reading.
+	 */
+	public SpecObject(String id, SpecType specType, Collection<AttributeValue> attributeValues,
+			TypeClassifier typeClassifier) {
+
+		this.id = id;
+		this.specType = specType;
+		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
+
+		if(attributeValues != null) {
+			for(AttributeValue attributeValue: attributeValues) {
+				this.attributeValues.put(attributeValue.getName(), attributeValue);
+			}
+		}
+		this.type = this.typeClassifier.classify(this);
+	}
+
+	public SpecObject(String id, SpecType specType, Collection<AttributeValue> attributeValues) {
+		this(id, specType, attributeValues, TypeClassifier.defaultClassifier());
+	}
+
 	public SpecObject(Node specObject, SpecType specType) {
 		this(specObject, specType, TypeClassifier.defaultClassifier());
 	}

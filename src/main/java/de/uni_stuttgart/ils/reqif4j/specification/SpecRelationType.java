@@ -12,8 +12,16 @@ public class SpecRelationType extends SpecType {
 	
 	public SpecRelationType(Node specType, Map<String, Datatype> dataTypes) {
 		super(specType, dataTypes);
-		
+
 		this.type = ReqIFConst.SPEC_RELATION_TYPE;
+	}
+
+	/**
+	 * Creates a spec relation type from plain values, for documents that are
+	 * generated instead of parsed.
+	 */
+	public SpecRelationType(String id, String name) {
+		super(id, name, ReqIFConst.SPEC_RELATION_TYPE);
 	}
 
 }
