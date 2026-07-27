@@ -37,9 +37,17 @@ public class SpecObject {
 	public String getSpecType() {
 		return this.specType.getType();
 	}
-	
+
 	public String getSpecTypeName() {
 		return this.specType.getName();
+	}
+
+	/**
+	 * @return the IDENTIFIER of the spec type this object refers to, or null if
+	 *         the reference could not be resolved
+	 */
+	public String getSpecTypeID() {
+		return this.specType == null ? null : this.specType.getID();
 	}
 	
 	public Map<String, AttributeValue> getAttributes() {

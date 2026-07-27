@@ -143,7 +143,7 @@ public class ReqIFCoreContent {
                         default:
                             // Register unknown datatypes under their ID (formerly the
                             // key was null, making them unresolvable).
-                            this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED));
+                            this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED, dataTypeNodeName));
                             break;
                     }
                 }

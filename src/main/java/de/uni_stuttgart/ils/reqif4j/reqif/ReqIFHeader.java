@@ -13,6 +13,7 @@ public class ReqIFHeader {
 	private String reqifVersion = "";
 	private String comment = "";
 	private String creationDate = "";
+	private String creationTime = "";
 	
 	
 	
@@ -48,8 +49,18 @@ public class ReqIFHeader {
 		return this.comment;
 	}
 	
+	/**
+	 * @return the creation date formatted as dd.MM.yyyy
+	 */
 	public String getCreationDate() {
 		return this.creationDate;
+	}
+
+	/**
+	 * @return the CREATION-TIME exactly as written in the document (xsd:dateTime)
+	 */
+	public String getCreationTime() {
+		return this.creationTime;
 	}
 	
 	
@@ -76,7 +87,8 @@ public class ReqIFHeader {
 			}
 		}
 		if(theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).getLength() > 0) {
-			String creationTime = theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).item(0).getTextContent();
+			this.creationTime = theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).item(0).getTextContent();
+			String creationTime = this.creationTime;
 			String[] date = creationTime.split("T")[0].split("-");
 			if(date.length >= 3) {
 				this.creationDate = date[2] + "." + date[1] + "." + date[0];

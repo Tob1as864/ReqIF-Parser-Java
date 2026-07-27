@@ -163,3 +163,32 @@ their content:
 
 Namespace declarations are omitted because tag names are rendered without
 their prefix.
+
+# Writing ReqIF (experimental)
+Beyond reading, the library can serialize the object model back to ReqIF
+XML. This is the foundation for generating documents; it works on the
+model, so a document read from a file and one modified programmatically
+are written the same way.
+
+```java
+ReqIF reqif = new ReqIF("in.reqif");
+
+new ReqIFWriter().write(reqif.getReqIFDocument(), Path.of("out.reqif"));
+String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+```
+
+Round-tripping (parse -> write -> parse) preserves the header, all
+datatypes including enumerations, spec types with attribute definitions
+and defaults, spec objects with all attribute value kinds (multiselect
+enumerations and XHTML included), spec relations with their attributes,
+and the specification hierarchy. Attribute values are written sorted by
+definition id so the output is reproducible.
+
+Indenting is **off by default**: the XML indenter inserts whitespace into
+mixed content, which would change XHTML attribute values. Enable it with
+`new ReqIFWriter().setIndent(true)` only when readable output matters more
+than exact XHTML content.
+
+Not covered yet: a builder API for creating documents from scratch,
+writing .reqifz archives, and ReqIF elements the parser does not model
+(alternative ids, relation groups, tool extensions).

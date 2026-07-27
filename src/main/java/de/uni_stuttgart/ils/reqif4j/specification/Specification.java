@@ -62,6 +62,14 @@ public class Specification {
 	public String getSpecTypeName() {
 		return this.type.getName();
 	}
+
+	/**
+	 * @return the IDENTIFIER of the specification type, or null if the
+	 *         reference could not be resolved
+	 */
+	public String getSpecTypeID() {
+		return this.type == null ? null : this.type.getID();
+	}
 	
 	public Map<String, AttributeValue> getAttributes() {
 		return this.attributeValues;
