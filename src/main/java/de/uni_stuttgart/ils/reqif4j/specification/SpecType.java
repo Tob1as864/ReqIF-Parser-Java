@@ -100,6 +100,28 @@ public class SpecType {
 	
 	
 	
+	/**
+	 * Creates a spec type from plain values, for documents that are generated
+	 * instead of parsed.
+	 *
+	 * @param kind SPEC-OBJECT-TYPE, SPECIFICATION-TYPE or SPEC-RELATION-TYPE
+	 */
+	public SpecType(String id, String name, String kind) {
+
+		this.id = id;
+		this.name = name;
+		this.type = kind;
+	}
+
+	/**
+	 * Adds an attribute definition; used when building a document.
+	 */
+	public SpecType addAttributeDefinition(AttributeDefinition attributeDefinition) {
+
+		this.attributeDefinitions.put(attributeDefinition.getID(), attributeDefinition);
+		return this;
+	}
+
 	public SpecType(Node specType, Map<String, Datatype> dataTypes) {
 		
 		this.id = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();

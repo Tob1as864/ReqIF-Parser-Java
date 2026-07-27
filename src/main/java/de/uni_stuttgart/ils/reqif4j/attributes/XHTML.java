@@ -11,6 +11,7 @@ public class XHTML {
 	// equals
 	public static final String LI = "li";
 	public static final String OBJECT = "object";
+	public static final String OL = "ol";
 	public static final String P = "p";
 	public static final String SPAN = "span";
 	public static final String TBODY = "tbody";

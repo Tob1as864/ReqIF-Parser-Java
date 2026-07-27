@@ -6,30 +6,46 @@ public class Datatype {
 	private String id;
 	private String name;
 	private String type;
-	
-	
-	
-	
+	private String sourceElementName;
+
+
+
+
 	public String getID() {
 		return this.id;
 	}
-	
+
 	public String getName() {
 		return this.name;
 	}
-	
+
 	public String getType() {
 		return this.type;
 	}
-	
-	
-	
-	
+
+	/**
+	 * @return the DATATYPE-DEFINITION-* element name this datatype was read
+	 *         from, or null when it was not created from a document. Needed to
+	 *         write back datatypes the parser does not model explicitly.
+	 */
+	public String getSourceElementName() {
+		return this.sourceElementName;
+	}
+
+
+
+
 	public Datatype(String id, String name, String type) {
-		
+
 		this.id = id;
 		this.name = name;
 		this.type = type;
+	}
+
+	public Datatype(String id, String name, String type, String sourceElementName) {
+
+		this(id, name, type);
+		this.sourceElementName = sourceElementName;
 	}
 
 }

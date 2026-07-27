@@ -1,6 +1,7 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,17 @@ public class SpecObject {
 	public String getSpecType() {
 		return this.specType.getType();
 	}
-	
+
 	public String getSpecTypeName() {
 		return this.specType.getName();
+	}
+
+	/**
+	 * @return the IDENTIFIER of the spec type this object refers to, or null if
+	 *         the reference could not be resolved
+	 */
+	public String getSpecTypeID() {
+		return this.specType == null ? null : this.specType.getID();
 	}
 	
 	public Map<String, AttributeValue> getAttributes() {
@@ -82,6 +91,30 @@ public class SpecObject {
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 	}
 	
+	/**
+	 * Creates a spec object from plain values, for documents that are generated
+	 * instead of parsed. The content category is derived by the classifier, as
+	 * when reading.
+	 */
+	public SpecObject(String id, SpecType specType, Collection<AttributeValue> attributeValues,
+			TypeClassifier typeClassifier) {
+
+		this.id = id;
+		this.specType = specType;
+		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
+
+		if(attributeValues != null) {
+			for(AttributeValue attributeValue: attributeValues) {
+				this.attributeValues.put(attributeValue.getName(), attributeValue);
+			}
+		}
+		this.type = this.typeClassifier.classify(this);
+	}
+
+	public SpecObject(String id, SpecType specType, Collection<AttributeValue> attributeValues) {
+		this(id, specType, attributeValues, TypeClassifier.defaultClassifier());
+	}
+
 	public SpecObject(Node specObject, SpecType specType) {
 		this(specObject, specType, TypeClassifier.defaultClassifier());
 	}
@@ -91,6 +124,21 @@ public class SpecObject {
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.specType = specType;
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
+
+		readAttributeValues(specObject, specType);
+
+		// Classify only after all attribute values are available, so an
+		// attribute-based classifier (e.g. the ReqIF Implementation Guide
+		// profile) can inspect them.
+		this.type = this.typeClassifier.classify(this);
+	}
+
+	/**
+	 * Reads all attribute values of the given node and fills in default values
+	 * for attribute definitions that carry no explicit value. Shared by
+	 * {@link SpecObject} and {@link SpecRelation}.
+	 */
+	protected void readAttributeValues(Node specObject, SpecType specType) {
 
 		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
 				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
@@ -215,11 +263,6 @@ public class SpecObject {
 				}
 			}
 		}
-
-		// Classify only after all attribute values are available, so an
-		// attribute-based classifier (e.g. the ReqIF Implementation Guide
-		// profile) can inspect them.
-		this.type = this.typeClassifier.classify(this);
 	}
 
 }

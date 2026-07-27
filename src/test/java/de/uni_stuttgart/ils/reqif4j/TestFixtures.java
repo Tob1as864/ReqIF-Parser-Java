@@ -82,6 +82,13 @@ public final class TestFixtures {
 			            </ATTRIBUTE-DEFINITION-XHTML>
 			          </SPEC-ATTRIBUTES>
 			        </SPEC-OBJECT-TYPE>
+			        <SPEC-RELATION-TYPE IDENTIFIER="st-rel" LONG-NAME="satisfies">
+			          <SPEC-ATTRIBUTES>
+			            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="ad-linkcomment" LONG-NAME="LinkComment">
+			              <TYPE><DATATYPE-DEFINITION-STRING-REF>dt-string</DATATYPE-DEFINITION-STRING-REF></TYPE>
+			            </ATTRIBUTE-DEFINITION-STRING>
+			          </SPEC-ATTRIBUTES>
+			        </SPEC-RELATION-TYPE>
 			        <SPECIFICATION-TYPE IDENTIFIER="st-spec" LONG-NAME="Spec Type">
 			          <SPEC-ATTRIBUTES>
 			            <ATTRIBUTE-DEFINITION-DATE IDENTIFIER="ad-review" LONG-NAME="ReviewDate">
@@ -110,7 +117,7 @@ public final class TestFixtures {
 			            <ATTRIBUTE-VALUE-XHTML>
 			              <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>ad-desc</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
 			              <THE-VALUE>
-			                <xhtml:div>Intro <xhtml:p>Text with <xhtml:span>span content</xhtml:span></xhtml:p><xhtml:object data="files/image.png" type="image/png">alternative text</xhtml:object></xhtml:div>
+			                <xhtml:div>Intro <xhtml:p>Text with <xhtml:span>span content</xhtml:span></xhtml:p><xhtml:object data="files/image.png" type="image/png">alternative text</xhtml:object><xhtml:table><xhtml:thead><xhtml:tr><xhtml:th>Header A</xhtml:th><xhtml:th>Header B</xhtml:th></xhtml:tr></xhtml:thead><xhtml:tbody><xhtml:tr><xhtml:td><xhtml:p>First para</xhtml:p><xhtml:p>Second para</xhtml:p></xhtml:td><xhtml:td><xhtml:object data="files/cell.png" type="image/png">cell image</xhtml:object></xhtml:td></xhtml:tr></xhtml:tbody></xhtml:table><xhtml:ul><xhtml:li>Outer item<xhtml:ul><xhtml:li>Inner item</xhtml:li></xhtml:ul></xhtml:li></xhtml:ul><xhtml:ol><xhtml:li>Numbered item</xhtml:li></xhtml:ol></xhtml:div>
 			              </THE-VALUE>
 			            </ATTRIBUTE-VALUE-XHTML>
 			          </VALUES>
@@ -124,7 +131,18 @@ public final class TestFixtures {
 			          </VALUES>
 			        </SPEC-OBJECT>
 			      </SPEC-OBJECTS>
-			      <SPEC-RELATIONS/>
+			      <SPEC-RELATIONS>
+			        <SPEC-RELATION IDENTIFIER="sr-1">
+			          <VALUES>
+			            <ATTRIBUTE-VALUE-STRING THE-VALUE="derived during review">
+			              <DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>ad-linkcomment</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>
+			            </ATTRIBUTE-VALUE-STRING>
+			          </VALUES>
+			          <TYPE><SPEC-RELATION-TYPE-REF>st-rel</SPEC-RELATION-TYPE-REF></TYPE>
+			          <SOURCE><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF></SOURCE>
+			          <TARGET><SPEC-OBJECT-REF>so-2</SPEC-OBJECT-REF></TARGET>
+			        </SPEC-RELATION>
+			      </SPEC-RELATIONS>
 			      <SPECIFICATIONS>
 			        <SPECIFICATION IDENTIFIER="spec-1" LONG-NAME="Main Spec">
 			          <TYPE><SPECIFICATION-TYPE-REF>st-spec</SPECIFICATION-TYPE-REF></TYPE>

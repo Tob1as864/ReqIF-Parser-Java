@@ -34,7 +34,6 @@ public class Specification {
 	private Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
 	private List<SpecHierarchy> allSpecHierarchies = new ArrayList<SpecHierarchy>();
-	//private Map<Integer, List<SpecObject>> allSpecObjects = new HashMap<Integer, List<SpecObject>>();		//		TODO
 	
 	
 	
@@ -43,12 +42,14 @@ public class Specification {
 		return this.id;
 	}
 	
-	///
+	/**
+	 * @return the value of an attribute named "Description", or null if the
+	 *         specification has no such attribute
+	 */
 	public String getDescription() {
 		AttributeValue description = this.attributeValues.get("Description");
 		return description == null ? null : (String) description.getValue();
 	}
-	//*/
 	
 	public String getName() {
 		return this.name;
@@ -60,6 +61,14 @@ public class Specification {
 	
 	public String getSpecTypeName() {
 		return this.type.getName();
+	}
+
+	/**
+	 * @return the IDENTIFIER of the specification type, or null if the
+	 *         reference could not be resolved
+	 */
+	public String getSpecTypeID() {
+		return this.type == null ? null : this.type.getID();
 	}
 	
 	public Map<String, AttributeValue> getAttributes() {
@@ -101,6 +110,39 @@ public class Specification {
 	
 	
 	
+	/**
+	 * Creates a specification from plain values, for documents that are
+	 * generated instead of parsed.
+	 */
+	public Specification(String id, String name, SpecType specType,
+			java.util.Collection<AttributeValue> attributeValues, List<SpecHierarchy> children) {
+
+		this.id = id;
+		this.name = name;
+		this.type = specType;
+
+		if(attributeValues != null) {
+			for(AttributeValue attributeValue: attributeValues) {
+				this.attributeValues.put(attributeValue.getName(), attributeValue);
+			}
+		}
+
+		if(children != null) {
+			for(SpecHierarchy child: children) {
+				this.children.put(child.getSpecHierarchyID(), child);
+				this.sectionCounter++;
+			}
+		}
+
+		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
+		for(SpecHierarchy specHierarchy: this.children.values()) {
+			allChildren.add(specHierarchy);
+			allChildren.addAll(specHierarchy.getAllChildren());
+		}
+		this.allSpecHierarchies.addAll(allChildren);
+		this.numberOfSpecObjects = allChildren.size();
+	}
+
 	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects) {
 		
 		this.id = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();

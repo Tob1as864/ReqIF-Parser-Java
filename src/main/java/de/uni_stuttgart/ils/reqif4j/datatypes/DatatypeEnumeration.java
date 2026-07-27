@@ -49,6 +49,20 @@ public class DatatypeEnumeration extends Datatype {
 	}
 
 
+	/**
+	 * Creates an enumeration datatype from plain values, for documents that are
+	 * generated instead of parsed.
+	 */
+	public DatatypeEnumeration(String id, String name, java.util.List<DatatypeEnumerationValue> values) {
+		super(id, name, ReqIFConst.ENUMERATION);
+
+		if (values != null) {
+			for (DatatypeEnumerationValue value : values) {
+				this.enumValues.put(value.getID(), value);
+			}
+		}
+	}
+
 	public DatatypeEnumeration(String id, String name, Node enumeration) {
 		super(id, name, ReqIFConst.ENUMERATION);
 

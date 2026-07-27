@@ -101,3 +101,136 @@ TypeClassifier classifier = new TypeClassifier() {
 ReqIF reqif = new ReqIF("spec.reqif", classifier);          // .reqif
 ReqIFz reqifz = new ReqIFz("archive.reqifz", classifier);   // .reqifz
 ```
+
+# Spec relations
+`SpecRelation` extends `SpecObject`, but a relation has no *content*
+category, so the inherited `getType()` returns `ReqIFConst.UNDEFINED`.
+The relation's own type and its endpoints are exposed separately:
+
+```java
+SpecRelation rel = reqif.getReqIFCoreContent().getSpecRelation("sr-1");
+
+rel.getSourceObjID();        // "so-1"
+rel.getTargetObjID();        // "so-2"
+rel.getRelationTypeRef();    // "st-rel"     (SPEC-RELATION-TYPE-REF)
+rel.getRelationTypeName();   // "satisfies"  (resolved LONG-NAME)
+rel.getSpecType();           // "SPEC-RELATION-TYPE"
+rel.getAttribute("LinkComment");  // relation attribute values are parsed
+```
+
+`isReq()`, `isSubReq()`, `isHeadline()` and `isText()` all return `false`
+for relations.
+
+# XHTML content
+XHTML attribute values are available in two representations that are always
+in sync — the token list is derived from the node tree:
+
+```java
+AttributeValueXHTML desc = (AttributeValueXHTML) specObject.getAttributes().get("Description");
+
+desc.getDivValue();     // typed node tree (XHTMLElementTbl, XHTMLElementTh, ...)
+desc.getElementList();  // flat token list
+desc.getValue();        // rendered XHTML string
+```
+
+Token grammar of `getElementList()`:
+
+| element type | content tokens |
+|---|---|
+| `P` / `H` | `TXT` text \| `VAR` name [guid] \| `BR` \| `OBJ` path |
+| `TBL` | `TR` ( (`TH`\|`TC`) text (`OBJ` path)* )* |
+| `L` | `LE` ( inline \| `L` … `/L` \| `TBL` … )* |
+| `OBJ` | path |
+
+Header cells are reported as `TH`, data cells as `TC`; the cell text holds
+the complete cell content and images inside a cell follow as `OBJ` pairs.
+Nested lists use balanced `L` / `/L` markers. Ordered lists (`ol`) are
+treated like unordered ones.
+
+## Rendering (`getValue()`)
+
+`getValue()` returns the XHTML as a string. Text and attribute values are
+escaped, so the result is well-formed and can be parsed again or embedded
+safely. All XML attributes are preserved, void elements are self-closing,
+and elements without a dedicated node class (`a`, `em`, `strong`, …) keep
+their content:
+
+```html
+<div><p style="color:red">a &lt; b &amp; c</p>
+<p>Siehe <a href="http://x.y">diesen Link</a> und <em>Betonung</em>.</p>
+<br/><table><tr><td colspan="2">merged</td></tr></table></div>
+```
+
+Namespace declarations are omitted because tag names are rendered without
+their prefix.
+
+# Writing ReqIF (experimental)
+Beyond reading, the library can serialize the object model back to ReqIF
+XML. This is the foundation for generating documents; it works on the
+model, so a document read from a file and one modified programmatically
+are written the same way.
+
+```java
+ReqIF reqif = new ReqIF("in.reqif");
+
+new ReqIFWriter().write(reqif.getReqIFDocument(), Path.of("out.reqif"));
+String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+```
+
+Round-tripping (parse -> write -> parse) preserves the header, all
+datatypes including enumerations, spec types with attribute definitions
+and defaults, spec objects with all attribute value kinds (multiselect
+enumerations and XHTML included), spec relations with their attributes,
+and the specification hierarchy. Attribute values are written sorted by
+definition id so the output is reproducible.
+
+Indenting is **off by default**: the XML indenter inserts whitespace into
+mixed content, which would change XHTML attribute values. Enable it with
+`new ReqIFWriter().setIndent(true)` only when readable output matters more
+than exact XHTML content.
+
+## Creating documents from scratch
+
+`ReqIFBuilder` assembles the same object model the parser produces, so a
+generated document is written exactly like a parsed one. Identifiers are
+validated while building: referencing an unknown datatype, spec type,
+spec object, attribute definition or enum value fails immediately with a
+`ReqIFBuildException` instead of producing a broken document.
+
+```java
+ReqIFDocument document = ReqIFBuilder.create()
+        .header(h -> h.id("hdr-1").title("My Spec").toolID("reqif4j")
+                      .creationTime("2026-07-23T10:00:00Z"))
+        .stringDatatype("dt-string", "String", 4096)
+        .xhtmlDatatype("dt-xhtml", "XHTML")
+        .enumerationDatatype("dt-enum", "Color", e -> e
+                .value("ev-red", "Red", "1", "#ff0000")
+                .value("ev-blue", "Blue", "2"))
+        .specObjectType("st-req", "Requirement Type", t -> t
+                .stringAttribute("ad-title", "ReqIF.Name", "dt-string")
+                .xhtmlAttribute("ad-text", "ReqIF.Text", "dt-xhtml")
+                .enumerationAttribute("ad-color", "Colors", "dt-enum",
+                                      true, List.of("ev-blue")))
+        .specificationType("st-spec", "Specification Type", t -> {})
+        .specRelationType("st-rel", "satisfies", t -> {})
+        .specObject("so-1", "st-req", o -> o
+                .set("ad-title", "First requirement")
+                .setEnum("ad-color", "ev-red", "ev-blue")   // multiselect
+                .setXhtml("ad-text", "<p>The system shall boot.</p>"))
+        .specObject("so-2", "st-req")
+        .specRelation("sr-1", "st-rel", "so-1", "so-2")
+        .specification("spec-1", "Main Spec", "st-spec", s -> s
+                .child("sh-1", "so-1", c -> c.child("sh-2", "so-2")))
+        .build();
+
+new ReqIFWriter().write(document, Path.of("out.reqif"));
+```
+
+XHTML values may be passed with or without a surrounding `div`; the
+markup is parsed, so the node tree and the token list work on generated
+values too. The content category of generated spec objects is derived by
+the same `TypeClassifier` used when reading (`typeClassifier(...)` to
+override).
+
+Not covered yet: writing .reqifz archives and ReqIF elements the parser
+does not model (alternative ids, relation groups, tool extensions).

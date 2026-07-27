@@ -40,6 +40,18 @@ public class AttributeDefinition {
 	
 	
 	
+	/**
+	 * Creates an attribute definition from plain values, for documents that are
+	 * generated instead of parsed.
+	 */
+	public AttributeDefinition(String id, String name, Datatype type, String defaultValue) {
+
+		this.id = id;
+		this.name = name;
+		this.type = type;
+		this.defaultValue = defaultValue;
+	}
+
 	public AttributeDefinition(Node attributeDefinition, Map<String, Datatype> dataTypes) {
 		
 		this.id = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();

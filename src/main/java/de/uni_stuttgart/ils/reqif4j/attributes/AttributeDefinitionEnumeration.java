@@ -19,6 +19,25 @@ public class AttributeDefinitionEnumeration extends AttributeDefinition {
 	private final List<String> defaultValues = new ArrayList<String>();
 	private final boolean multiValued;
 
+	/**
+	 * Creates an enumeration attribute definition from plain values, for
+	 * documents that are generated instead of parsed.
+	 *
+	 * @param defaultValueRefs IDENTIFIERs of the default enum values
+	 */
+	public AttributeDefinitionEnumeration(String id, String name, Datatype type, boolean multiValued,
+			List<String> defaultValueRefs) {
+		super(id, name, type, null);
+
+		this.multiValued = multiValued;
+		if (defaultValueRefs != null) {
+			for (String ref : defaultValueRefs) {
+				this.defaultValueRefs.add(ref);
+				this.defaultValues.add(resolveName(ref));
+			}
+		}
+	}
+
 	public AttributeDefinitionEnumeration(Node attributeDefinition, Map<String, Datatype> dataTypes) {
 		super(attributeDefinition, dataTypes);
 

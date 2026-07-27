@@ -81,6 +81,39 @@ public class ReqIFCoreContent {
     }
 
 
+    /**
+     * Creates empty content, to be filled for documents that are generated
+     * instead of parsed.
+     */
+    public ReqIFCoreContent() {
+    }
+
+    public ReqIFCoreContent addDatatype(Datatype datatype) {
+        this.dataTypes.put(datatype.getID(), datatype);
+        return this;
+    }
+
+    public ReqIFCoreContent addSpecType(SpecType specType) {
+        this.specTypes.put(specType.getID(), specType);
+        return this;
+    }
+
+    public ReqIFCoreContent addSpecObject(SpecObject specObject) {
+        this.specObjects.put(specObject.getID(), specObject);
+        return this;
+    }
+
+    public ReqIFCoreContent addSpecRelation(SpecRelation relation) {
+        this.specRelation.put(relation.getID(), relation);
+        return this;
+    }
+
+    public ReqIFCoreContent addSpecification(Specification specification) {
+        this.specifications.put(specification.getID(), specification);
+        return this;
+    }
+
+
     public ReqIFCoreContent(Element coreContent) {
         this(coreContent, TypeClassifier.defaultClassifier());
     }
@@ -143,7 +176,7 @@ public class ReqIFCoreContent {
                         default:
                             // Register unknown datatypes under their ID (formerly the
                             // key was null, making them unresolvable).
-                            this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED));
+                            this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED, dataTypeNodeName));
                             break;
                     }
                 }

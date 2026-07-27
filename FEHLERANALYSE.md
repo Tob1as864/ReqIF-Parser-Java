@@ -15,6 +15,10 @@ die bei jedem Push in der GitHub-Actions-Pipeline (`.github/workflows/ci.yml`, `
 | Crash-/Robustheitsfehler (Abschnitt 3 + 4.1) | "Fix crash bugs and robustness issues" | `RobustnessTest` |
 | LONG-NAME-Heuristik (4.2) → konfigurierbare Strategie | "Make spec object type classification pluggable" | `TypeClassifierTest` |
 | Attributbasierte Klassifizierung (Implementor-Guide-Profil) | "Add attribute-based ReqIF Implementation Guide classifier" | `ImplementationGuideClassifierTest` |
+| `SpecRelation`-Typsemantik + Relationsattribute (4.3) | "Fix SpecRelation type semantics and parse relation attributes" | `SpecRelationTest` |
+| Tabellen-/Listen-Deconstruction (4.7) | "Derive XHTML token list from the node tree" | `XHTMLDeconstructionTest` |
+| XHTML-Ausgabe: Escaping, Attribute, Inhaltsverlust (4.8) | "Fix XHTML rendering" | `XHTMLRenderingTest` |
+| Code-Qualität (Abschnitt 5) | "Clean up code quality issues" | `CodeQualityFixesTest` |
 
 Zur Heuristik (4.2): Die Klassifizierung ist jetzt eine Strategie (`TypeClassifier`),
 die das fertig geparste `SpecObject` (inkl. Attributwerte) erhält.
@@ -30,10 +34,55 @@ Hinweis: `REQ`/`SUB-REQ`/`HEADLINE`/`TEXT` sind **keine** offiziellen ReqIF-Type
 sondern parserinterne Inhaltskategorien. Der OMG-Standard definiert nur strukturelle
 Typen (`SPEC-OBJECT-TYPE` usw.) mit frei vergebenen Namen/Attributen.
 
-Bewusst (noch) nicht angefasst, da Verhaltensänderungen für bestehende Nutzer:
-die `type`-Semantik von `SpecRelation` (4.3),
-HTML-Escaping/Attribut-Erhalt in `toString()` (4.8) sowie die kosmetischen Punkte aus Abschnitt 5
-(bis auf den entfernten `javax.xml.crypto.Data`-Import).
+Zu `SpecRelation` (4.3): Das geerbte Feld `type` trägt eine Inhaltskategorie und wurde
+mit der Relationstyp-Referenz überschrieben. Es enthält jetzt `UNDEFINED` (eine Relation
+hat keine Inhaltskategorie); die Referenz liegt in `getRelationTypeRef()`, der aufgelöste
+Name in `getRelationTypeName()`, die strukturelle Information weiterhin in `getSpecType()`
+(`SPEC-RELATION-TYPE`). Die Attributwerte der Relation werden jetzt geparst.
+**Breaking Change:** `getType()` liefert für Relationen `"UNDEFINED"` statt der Referenz-ID.
+
+Zur Deconstruction (4.7): Die Token-Liste wird jetzt aus dem bereits geparsten
+Knotenbaum erzeugt statt ein zweites Mal aus dem rohen DOM. Damit entfällt die
+doppelte Parse-Logik, und die Liste erbt die Namespace-Korrektheit des Baums.
+Behoben: Zellen mit mehreren Kindelementen verlieren keinen Inhalt mehr (der letzte
+`item(1)`-Fehler), Kopfzellen werden als `TH` ausgewiesen, Bilder in Zellen bleiben
+erhalten, `L`/`/L`-Marker sind ausbalanciert, `ol`-Listen werden nicht mehr ignoriert.
+Die Token-Grammatik ist im Javadoc von `AttributeValueXHTML` dokumentiert.
+
+Zur XHTML-Ausgabe (4.8): Der Punkt war in der Erstanalyse als reine Ausgabetreue
+beschrieben — tatsächlich lag **Inhaltsverlust** vor. Behoben:
+1. Text und Attributwerte werden escaped; die Ausgabe war zuvor **nicht wohlgeformt**
+   (aus `&lt;` wurde `<`) und damit weder erneut parsebar noch sicher einbettbar.
+2. Alle XML-Attribute bleiben erhalten (`style`, `colspan`, `href` …); Namespace-
+   Deklarationen werden ausgelassen, da Tag-Namen ohne Präfix ausgegeben werden.
+3. Void-Elemente werden selbstschließend gerendert (`<br/>` statt `<br></br>`,
+   das HTML5-Parser als zwei Umbrüche lesen).
+4. Elemente ohne eigene Klasse (`a`, `em`, `strong`, `b`, `i`, …) verloren zuvor
+   ihren **kompletten Inhalt**, weil der `default`-Zweig ein blattartiges `XHTMLNode`
+   erzeugte; sie werden jetzt als `XHTMLElement` mit Kindern geparst.
+5. Inline-Abstände bleiben erhalten (vorher lief „Siehe <a>Link</a>" zu „SieheLink"
+   zusammen); `getTextContent()` liefert weiterhin den getrimmten Text.
+
+**Breaking Change:** `getValue()` liefert für XHTML-Attribute einen anderen (korrekten)
+String als zuvor. Baum (`getDivValue()`) und Token-Liste sind nicht betroffen.
+
+Zu Abschnitt 5: alle Punkte erledigt.
+- 5.1 Feld-Verschattung in `DatatypeBoolean`/`DatatypeXHTML` entfernt (die Getter der
+  Basisklasse liefern dieselben Werte).
+- 5.2 unbenutzter `javax.xml.crypto.Data`-Import entfernt.
+- 5.3 `ExceptionSpecObject`: lesbare Meldung mit Zeilenumbrüchen, Datentyp als Name
+  statt Objekt-Dump, verträgt eine fehlende Definition.
+- 5.4 durch das Java-17-Target gegenstandslos.
+- 5.5 `AttributeValueDate` parst den Wert zusätzlich nach `OffsetDateTime`
+  (`getDateTime()`, `getDate()`); `getValue()` liefert unverändert den Rohstring,
+  unparsbare Werte ergeben `null` statt einer Exception.
+- 5.6 `_Template`-Hack entfernt: `getTitle()` liefert den Titel wie im Dokument.
+  **Breaking Change** für Nutzer, die sich auf das Abschneiden verlassen haben.
+- 5.7 auskommentierter Code entfernt; `getComment()` ist reaktiviert (der `COMMENT`
+  wurde ohnehin gelesen). Die Tippfehler in den Methodennamen sind mit der
+  Neuimplementierung der Deconstruction entfallen.
+
+Damit sind alle Punkte der Analyse abgearbeitet.
 
 Die ursprüngliche Analyse folgt unverändert. Datei- und Zeilenangaben beziehen sich auf den
 Stand **vor** den Fixes (Quellen liegen inzwischen unter `src/main/java/`).
