@@ -232,5 +232,48 @@ values too. The content category of generated spec objects is derived by
 the same `TypeClassifier` used when reading (`typeClassifier(...)` to
 override).
 
-Not covered yet: writing .reqifz archives and ReqIF elements the parser
-does not model (alternative ids, relation groups, tool extensions).
+## Writing .reqifz archives
+
+Images travel with the document, stored under the path the XHTML
+`object` elements reference:
+
+```java
+Map<String, byte[]> pictures = Map.of("files/diagram.png", pngBytes);
+new ReqIFzWriter().write(document, "spec.reqif", pictures, Path.of("spec.reqifz"));
+```
+
+An archive that was read can be re-packed - the documents are serialized
+from the model (so modifications are included) while the images are
+copied from the extracted files, without consuming the one-shot streams:
+
+```java
+try (ReqIFz source = new ReqIFz("in.reqifz")) {
+    new ReqIFzWriter().write(source, Path.of("out.reqifz"));
+}
+```
+
+# Validation
+
+`ReqIFValidator` checks a document before it is written: identifiers
+present and globally unique, resolvable datatype and spec type
+references, attribute values matching their spec type, enum value
+references, relation endpoints, spec hierarchy targets and relation
+group references.
+
+```java
+new ReqIFValidator().validate(document).throwIfInvalid();
+new ReqIFWriter().write(document, Path.of("out.reqif"));
+```
+
+This is a model-level check. The OMG ReqIF XSD is **not bundled** with
+this library for licensing reasons; if you have it, run a full XML
+Schema validation on top:
+
+```java
+ValidationResult schemaIssues =
+        new ReqIFValidator().validateAgainstSchema(document, Path.of("reqif.xsd"));
+```
+
+Not covered yet: identifiers duplicated within one category (the parser
+keys its maps by identifier, so a duplicate has already replaced its
+predecessor by the time the model exists).
