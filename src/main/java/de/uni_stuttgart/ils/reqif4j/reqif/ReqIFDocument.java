@@ -25,6 +25,7 @@ public class ReqIFDocument {
 
 	private ReqIFHeader header;
 	private ReqIFCoreContent content;
+	private final java.util.List<org.w3c.dom.Node> toolExtensions = new java.util.ArrayList<>();
 
 
 	public String getFilePath() {
@@ -41,6 +42,16 @@ public class ReqIFDocument {
 
 	public ReqIFCoreContent getCoreContent() {
 		return this.content;
+	}
+
+	/**
+	 * Tool-specific extensions of the document. They are not interpreted, only
+	 * kept as their original nodes so they survive a round trip.
+	 *
+	 * @return the TOOL-EXTENSIONS nodes, empty if the document declares none
+	 */
+	public java.util.List<org.w3c.dom.Node> getToolExtensions() {
+		return this.toolExtensions;
 	}
 
 
@@ -154,6 +165,12 @@ public class ReqIFDocument {
 			throw new ReqIFParseException("Document contains no " + ReqIFConst.CORE_CONTENT + " element: " + this.fileName);
 		}
 		this.content = new ReqIFCoreContent((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0), this.typeClassifier);
+
+		// Tool extensions are kept verbatim; the parser does not interpret them.
+		org.w3c.dom.NodeList extensions = this.reqifDocument.getElementsByTagName(ReqIFConst.TOOL_EXTENSIONS);
+		for (int extension = 0; extension < extensions.getLength(); extension++) {
+			this.toolExtensions.add(extensions.item(extension));
+		}
 	}
 
 	private static String extractFileName(String path) {

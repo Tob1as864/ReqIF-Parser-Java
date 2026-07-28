@@ -25,6 +25,16 @@ public class ReqIFConst {
 	public final static String DEFINITION = "DEFINITION";
 	public final static String SPEC_TYPES = "SPEC-TYPES";
 	public final static String SPEC_ATTRIBUTES = "SPEC-ATTRIBUTES";
+	public final static String ALTERNATIVE_ID = "ALTERNATIVE-ID";
+	public final static String TOOL_EXTENSIONS = "TOOL-EXTENSIONS";
+	public final static String SPEC_RELATION_GROUPS = "SPEC-RELATION-GROUPS";
+	public final static String RELATION_GROUP = "RELATION-GROUP";
+	public final static String RELATION_GROUP_TYPE = "RELATION-GROUP-TYPE";
+	public final static String RELATION_GROUP_TYPE_REF = "RELATION-GROUP-TYPE-REF";
+	public final static String SOURCE_SPECIFICATION = "SOURCE-SPECIFICATION";
+	public final static String TARGET_SPECIFICATION = "TARGET-SPECIFICATION";
+	public final static String SPECIFICATION_REF = "SPECIFICATION-REF";
+	public final static String SPEC_RELATION_REF = "SPEC-RELATION-REF";
 	public final static String SPEC_OBJECTS = "SPEC-OBJECTS";
 	public final static String SPEC_OBJECT = "SPEC-OBJECT";
 	public final static String SPEC_RELATIONS = "SPEC-RELATIONS";

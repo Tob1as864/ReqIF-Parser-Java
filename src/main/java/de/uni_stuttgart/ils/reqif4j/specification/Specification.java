@@ -28,6 +28,7 @@ public class Specification {
 	
 	private String id;
 	private String name;
+	private String alternativeID;
 	private SpecType type;
 	private int numberOfSpecObjects;
 	private int sectionCounter = 0;
@@ -40,6 +41,13 @@ public class Specification {
 	
 	public String getID() {
 		return this.id;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
 	}
 	
 	/**
@@ -147,6 +155,7 @@ public class Specification {
 		
 		this.id = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = specification.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specification);
 		this.type = specType;
 		
 		if(			((Element)specification).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0

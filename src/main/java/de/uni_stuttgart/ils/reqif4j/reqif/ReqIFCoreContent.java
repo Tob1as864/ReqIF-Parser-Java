@@ -20,6 +20,7 @@ public class ReqIFCoreContent {
     private Map<String, SpecObject> specObjects = new LinkedHashMap<String, SpecObject>();
     private Map<String, SpecRelation> specRelation = new LinkedHashMap<>();
     private Map<String, Specification> specifications = new LinkedHashMap<String, Specification>();
+    private Map<String, RelationGroup> relationGroups = new LinkedHashMap<String, RelationGroup>();
 
 
     public Map<String, Datatype> getDatatypes() {
@@ -60,6 +61,19 @@ public class ReqIFCoreContent {
 
     public Specification getSpecification(String id) {
         return this.specifications.get(id);
+    }
+
+    public Map<String, RelationGroup> getRelationGroups() {
+        return this.relationGroups;
+    }
+
+    public RelationGroup getRelationGroup(String id) {
+        return this.relationGroups.get(id);
+    }
+
+    public ReqIFCoreContent addRelationGroup(RelationGroup relationGroup) {
+        this.relationGroups.put(relationGroup.getID(), relationGroup);
+        return this;
     }
 
     public List<Specification> getSpecificationsList() {
@@ -136,6 +150,7 @@ public class ReqIFCoreContent {
 
                     String dataTypeID = dataType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
                     String dataTypeName = dataType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
+                    String dataTypeAlternativeID = XmlUtils.alternativeID(dataType);
 
                     switch (dataTypeNodeName.substring(dataTypeNodeName.lastIndexOf("-") + 1)) {
 
@@ -179,6 +194,9 @@ public class ReqIFCoreContent {
                             this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED, dataTypeNodeName));
                             break;
                     }
+                    if (this.dataTypes.get(dataTypeID) != null) {
+                        this.dataTypes.get(dataTypeID).setAlternativeID(dataTypeAlternativeID);
+                    }
                 }
             }
         }
@@ -207,6 +225,10 @@ public class ReqIFCoreContent {
 
                         case ReqIFConst.SPEC_RELATION_TYPE:
                             this.specTypes.put(specTypeID, new SpecRelationType(specType, this.dataTypes));
+                            break;
+
+                        case ReqIFConst.RELATION_GROUP_TYPE:
+                            this.specTypes.put(specTypeID, new RelationGroupType(specType, this.dataTypes));
                             break;
 
                         default:
@@ -243,6 +265,12 @@ public class ReqIFCoreContent {
 
                 this.specRelation.put(specRelID, new SpecRelation(specRelation, this.specTypes.get(specRelTypeRef)));
             }
+        }
+
+
+        for (Element relationGroup : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.RELATION_GROUP)) {
+            RelationGroup group = new RelationGroup(relationGroup);
+            this.relationGroups.put(group.getID(), group);
         }
 
 

@@ -7,6 +7,7 @@ public class Datatype {
 	private String name;
 	private String type;
 	private String sourceElementName;
+	private String alternativeID;
 
 
 
@@ -30,6 +31,18 @@ public class Datatype {
 	 */
 	public String getSourceElementName() {
 		return this.sourceElementName;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
+	}
+
+	public Datatype setAlternativeID(String alternativeID) {
+		this.alternativeID = alternativeID;
+		return this;
 	}
 
 

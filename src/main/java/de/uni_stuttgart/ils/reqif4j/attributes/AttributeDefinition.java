@@ -17,6 +17,7 @@ public class AttributeDefinition {
 	private String name;
 	private Datatype type;
 	private String defaultValue;
+	private String alternativeID;
 	
 	
 	
@@ -35,6 +36,13 @@ public class AttributeDefinition {
 	
 	public String getDefaultValue() {
 		return this.defaultValue;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
 	}
 	
 	
@@ -56,6 +64,7 @@ public class AttributeDefinition {
 		
 		this.id = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(attributeDefinition);
 		
 		// Navigate by element (not by fixed child index) so both pretty-printed
 		// and minified ReqIF files are handled.

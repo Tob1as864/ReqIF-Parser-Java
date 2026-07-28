@@ -19,12 +19,20 @@ public class SpecType {
 	private String id;
 	protected String name;
 	protected String type;
+	protected String alternativeID;
 	
 	
 	
 	
 	public String getID() {
 		return this.id;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
 	}
 	
 	public String getName() {
@@ -126,6 +134,7 @@ public class SpecType {
 		
 		this.id = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = specType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specType);
 		this.type = ReqIFConst.UNDEFINED;
 
 		//Doors relationship definitionen habe keine ChildNodes

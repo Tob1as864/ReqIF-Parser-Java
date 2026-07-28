@@ -20,6 +20,7 @@ public class SpecHierarchy {
 	
 	
 	private String specHierarchyID;
+	private String alternativeID;
 	private int hierarchyLvl;
 	private int section;
 	private SpecObject specObject;
@@ -30,6 +31,13 @@ public class SpecHierarchy {
 	
 	public String getSpecHierarchyID() {
 		return this.specHierarchyID;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
 	}
 	
 	public String getSpecObjectID(){
@@ -176,6 +184,7 @@ public class SpecHierarchy {
 		this.hierarchyLvl = hierarchyLvl;
 		this.section = section;
 		this.specHierarchyID = specHierarchy.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+		this.alternativeID = de.uni_stuttgart.ils.reqif4j.util.XmlUtils.alternativeID(specHierarchy);
 		
 		for(int childnode = 0; childnode < specHierarchy.getChildNodes().getLength(); childnode ++) {
 			Node childNode = specHierarchy.getChildNodes().item(childnode);

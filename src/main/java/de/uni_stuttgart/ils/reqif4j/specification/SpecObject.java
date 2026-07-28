@@ -21,6 +21,7 @@ public class SpecObject {
 	protected String id;
 	protected SpecType specType;
 	protected String type;
+	protected String alternativeID;
 	protected TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
 	protected Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	
@@ -30,7 +31,14 @@ public class SpecObject {
 	public String getID() {
 		return this.id;
 	}
-	
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
+	}
+
 	public String getType() {
 		return this.type;
 	}
@@ -89,6 +97,7 @@ public class SpecObject {
 	
 	public SpecObject(Node specObject){
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specObject);
 	}
 	
 	/**
@@ -122,6 +131,7 @@ public class SpecObject {
 	public SpecObject(Node specObject, SpecType specType, TypeClassifier typeClassifier) {
 
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specObject);
 		this.specType = specType;
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 
