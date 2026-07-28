@@ -16,6 +16,26 @@ public class ReqIFz extends ReqIFFile {
 
     private static final String EXTRACTION_SUFFIX = "_unzipped";
 
+    private final Map<String, File> pictureFiles = new java.util.LinkedHashMap<>();
+    private final Map<String, File> reqifFiles = new java.util.LinkedHashMap<>();
+
+    /**
+     * @return the extracted picture files, keyed by their archive entry name
+     *         (forward slashes, as referenced by xhtml object data attributes).
+     *         Unlike the input streams these can be read repeatedly, which is
+     *         what re-packing an archive needs.
+     */
+    public Map<String, File> getPictureFiles() {
+        return this.pictureFiles;
+    }
+
+    /**
+     * @return the extracted ReqIF files, keyed by their archive entry name
+     */
+    public Map<String, File> getReqIFFiles() {
+        return this.reqifFiles;
+    }
+
     public ReqIFz(String filePath) throws IOException {
         this(filePath, TypeClassifier.defaultClassifier());
     }
@@ -73,12 +93,14 @@ public class ReqIFz extends ReqIFFile {
                     // Process reqif files and associated images
                     if (zipEntry.getName().endsWith("reqif")) {
                         this.numberOfReqIFDocuments++;
+                        this.reqifFiles.put(zipEntry.getName(), newFile);
                         try (InputStream reqifIS = new FileInputStream(newFile)) {
                             this.reqifDocuments.put(zipEntry.getName(), new ReqIFDocument(reqifIS, filePath, zipEntry.getName(), typeClassifier));
                         }
                     } else if (zipEntry.getName().endsWith("png") || zipEntry.getName().endsWith("jpeg") || zipEntry.getName().endsWith("jpg")) {
                         // Keyed by the archive entry path (forward slashes), which is
                         // what xhtml object data attributes reference.
+                        this.pictureFiles.put(zipEntry.getName(), newFile);
                         picturesIS.put(zipEntry.getName(), new FileInputStream(newFile));
                     }
                 }
