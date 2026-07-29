@@ -158,15 +158,13 @@ public class Specification {
 		this.alternativeID = XmlUtils.alternativeID(specification);
 		this.type = specType;
 		
-		if(			((Element)specification).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
-				&&	((Element)specification).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes().getLength() > 0		) {
-			
-			NodeList attributeValues = ((Element)specification).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes();
-			for(int attval = 0; attval < attributeValues.getLength(); attval++) {
-				
-				Node attribute = attributeValues.item(attval);
-				String attValNodeName = attribute.getNodeName();
-				if(!attValNodeName.equals(ReqIFConst._TEXT)) {
+		Element valuesElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.VALUES);
+		if(valuesElement != null) {
+
+			for(Element attribute: XmlUtils.childElements(valuesElement)) {
+
+				String attValNodeName = XmlUtils.localName(attribute);
+				{
 
 					String attributeDefinitionRef = XmlUtils.firstChildElement(
 							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
@@ -291,19 +289,14 @@ public class Specification {
 			}
 		}
 		
-		if(			((Element)specification).getElementsByTagName(ReqIFConst.CHILDREN).getLength() > 0
-				&&	((Element)specification).getElementsByTagName(ReqIFConst.CHILDREN).item(0).getChildNodes().getLength() > 0		) {
-			
-			NodeList children = ((Element)specification).getElementsByTagName(ReqIFConst.CHILDREN).item(0).getChildNodes();
-			for(int child = 0; child < children.getLength(); child++) {
-				
-				Node specHierarchy = children.item(child);
-				if(!specHierarchy.getNodeName().equals(ReqIFConst._TEXT)) {
-					
-					String specHierarchyID = specHierarchy.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-					
-					this.children.put(specHierarchyID, new SpecHierarchy(1, ++this.sectionCounter, specHierarchy, specObjects));
-				}
+		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
+		if(childrenElement != null) {
+
+			for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
+
+				String specHierarchyID = XmlUtils.attribute(specHierarchy, ReqIFConst.IDENTIFIER);
+
+				this.children.put(specHierarchyID, new SpecHierarchy(1, ++this.sectionCounter, specHierarchy, specObjects));
 			}
 		}
 		

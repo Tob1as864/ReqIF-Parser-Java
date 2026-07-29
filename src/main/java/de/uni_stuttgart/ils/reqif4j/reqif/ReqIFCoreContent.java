@@ -139,14 +139,15 @@ public class ReqIFCoreContent {
         }
 
 
-        if (coreContent.getElementsByTagName("DATATYPES").item(0).hasChildNodes()) {
+        // Every element is matched by local name, so documents that put the
+        // ReqIF elements into a prefixed namespace are read as well.
+        Element datatypesElement = XmlUtils.firstDescendantByLocalName(coreContent, ReqIFConst.DATATYPES);
+        if (datatypesElement != null) {
 
-            NodeList dataTypes = coreContent.getElementsByTagName("DATATYPES").item(0).getChildNodes();
-            for (int datatype = 0; datatype < dataTypes.getLength(); datatype++) {
+            for (Element dataType : XmlUtils.childElements(datatypesElement)) {
 
-                Node dataType = dataTypes.item(datatype);
-                String dataTypeNodeName = dataType.getNodeName();
-                if (!dataTypeNodeName.equals(ReqIFConst._TEXT)) {
+                String dataTypeNodeName = XmlUtils.localName(dataType);
+                {
 
                     String dataTypeID = dataType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
                     String dataTypeName = dataType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
@@ -202,14 +203,13 @@ public class ReqIFCoreContent {
         }
 
 
-        if (coreContent.getElementsByTagName(ReqIFConst.SPEC_TYPES).item(0).hasChildNodes()) {
+        Element specTypesElement = XmlUtils.firstDescendantByLocalName(coreContent, ReqIFConst.SPEC_TYPES);
+        if (specTypesElement != null) {
 
-            NodeList specTypes = coreContent.getElementsByTagName(ReqIFConst.SPEC_TYPES).item(0).getChildNodes();
-            for (int spectype = 0; spectype < specTypes.getLength(); spectype++) {
+            for (Element specType : XmlUtils.childElements(specTypesElement)) {
 
-                Node specType = specTypes.item(spectype);
-                String specTypeNodeName = specType.getNodeName();
-                if (!specTypeNodeName.equals(ReqIFConst._TEXT)) {
+                String specTypeNodeName = XmlUtils.localName(specType);
+                {
 
                     String specTypeID = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 
@@ -240,31 +240,23 @@ public class ReqIFCoreContent {
         }
 
 
-        if (coreContent.getElementsByTagName(ReqIFConst.SPEC_OBJECT).getLength() > 0) {
+        for (Element specObj : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.SPEC_OBJECT)) {
 
-            NodeList specObjects = coreContent.getElementsByTagName(ReqIFConst.SPEC_OBJECT);
-            for (int specobj = 0; specobj < specObjects.getLength(); specobj++) {
+            String specObjID = XmlUtils.attribute(specObj, ReqIFConst.IDENTIFIER);
+            Element typeRef = XmlUtils.firstDescendantByLocalName(specObj, ReqIFConst.SPEC_OBJECT_TYPE_REF);
+            String specObjTypeRef = typeRef == null ? null : typeRef.getTextContent().trim();
 
-                Node specObj = specObjects.item(specobj);
-                String specObjID = specObj.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-                String specObjTypeRef = ((Element) specObj).getElementsByTagName(ReqIFConst.SPEC_OBJECT_TYPE_REF).item(0).getTextContent();
-
-                this.specObjects.put(specObjID, new SpecObject(specObj, this.specTypes.get(specObjTypeRef), typeClassifier));
-            }
+            this.specObjects.put(specObjID, new SpecObject(specObj, this.specTypes.get(specObjTypeRef), typeClassifier));
         }
 
 
-        if (coreContent.getElementsByTagName(ReqIFConst.SPEC_RELATION).getLength() > 0) {
-            NodeList specRelations = coreContent.getElementsByTagName(ReqIFConst.SPEC_RELATION);
-            for (int specrelation = 0; specrelation < specRelations.getLength(); specrelation++) {
+        for (Element specRelation : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.SPEC_RELATION)) {
 
-                Node specRelation = specRelations.item(specrelation);
-                String specRelID = specRelation.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-                String specRelTypeRef = ((Element) specRelation).getElementsByTagName(ReqIFConst.SPEC_RELATION_TYPE_REF).item(0).getTextContent();
+            String specRelID = XmlUtils.attribute(specRelation, ReqIFConst.IDENTIFIER);
+            Element typeRef = XmlUtils.firstDescendantByLocalName(specRelation, ReqIFConst.SPEC_RELATION_TYPE_REF);
+            String specRelTypeRef = typeRef == null ? null : typeRef.getTextContent().trim();
 
-
-                this.specRelation.put(specRelID, new SpecRelation(specRelation, this.specTypes.get(specRelTypeRef)));
-            }
+            this.specRelation.put(specRelID, new SpecRelation(specRelation, this.specTypes.get(specRelTypeRef)));
         }
 
 
@@ -274,17 +266,13 @@ public class ReqIFCoreContent {
         }
 
 
-        if (coreContent.getElementsByTagName(ReqIFConst.SPECIFICATION).getLength() > 0) {
+        for (Element specification : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.SPECIFICATION)) {
 
-            NodeList specifications = coreContent.getElementsByTagName(ReqIFConst.SPECIFICATION);
-            for (int spec = 0; spec < specifications.getLength(); spec++) {
+            String specID = XmlUtils.attribute(specification, ReqIFConst.IDENTIFIER);
+            Element typeRef = XmlUtils.firstDescendantByLocalName(specification, ReqIFConst.SPEC_TYPE_REF);
+            String specTypeRef = typeRef == null ? null : typeRef.getTextContent().trim();
 
-                Node specification = specifications.item(spec);
-                String specID = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-                String specTypeRef = ((Element) specification).getElementsByTagName(ReqIFConst.SPEC_TYPE_REF).item(0).getTextContent();
-
-                this.specifications.put(specID, new Specification(specification, this.specTypes.get(specTypeRef), this.specObjects));
-            }
+            this.specifications.put(specID, new Specification(specification, this.specTypes.get(specTypeRef), this.specObjects));
         }
 
 

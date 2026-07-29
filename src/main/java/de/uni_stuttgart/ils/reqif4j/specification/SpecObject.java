@@ -150,15 +150,15 @@ public class SpecObject {
 	 */
 	protected void readAttributeValues(Node specObject, SpecType specType) {
 
-		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
-				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
-			
-			NodeList attributeValues = ((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes();
-			for(int attval = 0; attval < attributeValues.getLength(); attval++) {
-				
-				Node attribute = attributeValues.item(attval);
-				String attValNodeName = attribute.getNodeName();
-				if(!attValNodeName.equals(ReqIFConst._TEXT)) {
+		// VALUES is located by local name so prefixed ReqIF namespaces work too;
+		// only this object's own VALUES is taken, not a nested one.
+		Element valuesElement = XmlUtils.firstChildElementByLocalName(specObject, ReqIFConst.VALUES);
+		if(valuesElement != null) {
+
+			for(Element attribute: XmlUtils.childElements(valuesElement)) {
+
+				String attValNodeName = XmlUtils.localName(attribute);
+				{
 
 					String attributeDefinitionRef = XmlUtils.firstChildElement(
 							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();

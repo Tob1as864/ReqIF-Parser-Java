@@ -11,6 +11,7 @@ import org.xml.sax.SAXException;
 
 import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 public class ReqIFDocument {
 
@@ -129,20 +130,21 @@ public class ReqIFDocument {
 
 	private void readDocument() {
 
-		if (this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).getLength() > 0
-				&& this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0).hasChildNodes()) {
-			this.header = new ReqIFHeader((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0));
+		// Elements are matched by local name, so a document that puts the ReqIF
+		// elements into a prefixed namespace is read just like one using the
+		// default namespace.
+		Element theHeader = XmlUtils.firstDescendantByLocalName(this.reqifDocument, ReqIFConst.THE_HEADER);
+		if (theHeader != null && theHeader.hasChildNodes()) {
+			this.header = new ReqIFHeader(theHeader);
 		}
-		if (this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).getLength() == 0) {
+		Element coreContent = XmlUtils.firstDescendantByLocalName(this.reqifDocument, ReqIFConst.CORE_CONTENT);
+		if (coreContent == null) {
 			throw new ReqIFParseException("Document contains no " + ReqIFConst.CORE_CONTENT + " element: " + this.fileName);
 		}
-		this.content = new ReqIFCoreContent((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0), this.typeClassifier);
+		this.content = new ReqIFCoreContent(coreContent, this.typeClassifier);
 
 		// Tool extensions are kept verbatim; the parser does not interpret them.
-		org.w3c.dom.NodeList extensions = this.reqifDocument.getElementsByTagName(ReqIFConst.TOOL_EXTENSIONS);
-		for (int extension = 0; extension < extensions.getLength(); extension++) {
-			this.toolExtensions.add(extensions.item(extension));
-		}
+		this.toolExtensions.addAll(XmlUtils.descendantsByLocalName(this.reqifDocument, ReqIFConst.TOOL_EXTENSIONS));
 	}
 
 	private static String extractFileName(String path) {

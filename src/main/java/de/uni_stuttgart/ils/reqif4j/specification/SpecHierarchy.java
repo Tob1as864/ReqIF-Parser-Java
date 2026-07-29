@@ -13,6 +13,7 @@ import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTMLElementList;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLNode;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElementDiv;
 
@@ -184,29 +185,22 @@ public class SpecHierarchy {
 		this.hierarchyLvl = hierarchyLvl;
 		this.section = section;
 		this.specHierarchyID = specHierarchy.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.alternativeID = de.uni_stuttgart.ils.reqif4j.util.XmlUtils.alternativeID(specHierarchy);
+		this.alternativeID = XmlUtils.alternativeID(specHierarchy);
 		
-		for(int childnode = 0; childnode < specHierarchy.getChildNodes().getLength(); childnode ++) {
-			Node childNode = specHierarchy.getChildNodes().item(childnode);
-			if(childNode.getNodeName().equals(ReqIFConst.OBJECT)) {
-				String specObjectRef = ((Element)childNode).getElementsByTagName(ReqIFConst.SPEC_OBJECT_REF).item(0).getTextContent();
-				this.specObject = specObjects.get(specObjectRef);
-			}
+		Element object = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.OBJECT);
+		Element specObjectRef = XmlUtils.firstDescendantByLocalName(object, ReqIFConst.SPEC_OBJECT_REF);
+		if(specObjectRef != null) {
+			this.specObject = specObjects.get(specObjectRef.getTextContent().trim());
 		}
-		
-		if(			((Element)specHierarchy).getElementsByTagName(ReqIFConst.CHILDREN).getLength() > 0
-				&&	((Element)specHierarchy).getElementsByTagName(ReqIFConst.CHILDREN).item(0).getChildNodes().getLength() > 0		) {
-			
-			NodeList children = ((Element)specHierarchy).getElementsByTagName(ReqIFConst.CHILDREN).item(0).getChildNodes();
-			for(int child = 0; child < children.getLength(); child++) {
-				
-				Node newSpecHierarchy = children.item(child);
-				if(!newSpecHierarchy.getNodeName().equals(ReqIFConst._TEXT)) {
-					
-					String specHierarchyID = newSpecHierarchy.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-					
-					this.children.put(specHierarchyID, new SpecHierarchy(this.hierarchyLvl+1, section, newSpecHierarchy, specObjects));
-				}
+
+		Element childrenElement = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.CHILDREN);
+		if(childrenElement != null) {
+
+			for(Element newSpecHierarchy: XmlUtils.childElements(childrenElement)) {
+
+				String specHierarchyID = XmlUtils.attribute(newSpecHierarchy, ReqIFConst.IDENTIFIER);
+
+				this.children.put(specHierarchyID, new SpecHierarchy(this.hierarchyLvl+1, section, newSpecHierarchy, specObjects));
 			}
 		}
 	}

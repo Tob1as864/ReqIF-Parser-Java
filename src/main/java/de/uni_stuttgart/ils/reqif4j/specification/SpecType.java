@@ -153,13 +153,10 @@ public class SpecType {
 		Node specAttributes = XmlUtils.firstChildElementByLocalName(specType, ReqIFConst.SPEC_ATTRIBUTES);
 		if(specAttributes != null) {
 
-			NodeList attributeDefinitions = specAttributes.getChildNodes();
+			for(Node attributeDefinition: XmlUtils.childElements(specAttributes)) {
 
-			for(int specatt = 0; specatt < attributeDefinitions.getLength(); specatt++) {
-				
-				Node attributeDefinition = attributeDefinitions.item(specatt);
-				String attDefNodeName = attributeDefinition.getNodeName();
-				if(!attDefNodeName.equals(ReqIFConst._TEXT)) {
+				String attDefNodeName = XmlUtils.localName(attributeDefinition);
+				{
 					
 					String attDefID = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 					

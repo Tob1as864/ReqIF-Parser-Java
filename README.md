@@ -10,6 +10,11 @@ This fork is based on https://github.com/bfriebel/requirements-interchange-forma
 # Supported Formats
 ReqIF file extensions .reqif and .reqifz (compressed).
 
+Elements are matched by their local name, so it does not matter whether a
+document puts the ReqIF elements into the default namespace
+(`<REQ-IF xmlns="...">`) or into a prefixed one (`<rif:REQ-IF xmlns:rif="...">`).
+The same holds for the embedded XHTML (`xhtml:div`, `reqif-xhtml:div`, ...).
+
 # Build & Test
 The project builds with Maven (Java 17+):
 
