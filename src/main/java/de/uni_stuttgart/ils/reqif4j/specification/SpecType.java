@@ -20,6 +20,7 @@ public class SpecType {
 	protected String name;
 	protected String type;
 	protected String alternativeID;
+	protected String sourceElementName;
 	
 	
 	
@@ -33,6 +34,16 @@ public class SpecType {
 	 */
 	public String getAlternativeID() {
 		return this.alternativeID;
+	}
+
+	/**
+	 * @return the SPEC-TYPE element name this type was read from, or null when
+	 *         it was not created from a document. Needed to write back spec type
+	 *         kinds the parser does not model explicitly, instead of silently
+	 *         turning them into a SPEC-OBJECT-TYPE.
+	 */
+	public String getSourceElementName() {
+		return this.sourceElementName;
 	}
 	
 	public String getName() {
@@ -135,6 +146,7 @@ public class SpecType {
 		this.id = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = specType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
 		this.alternativeID = XmlUtils.alternativeID(specType);
+		this.sourceElementName = XmlUtils.localName(specType);
 		this.type = ReqIFConst.UNDEFINED;
 
 		//Doors relationship definitionen habe keine ChildNodes

@@ -282,8 +282,14 @@ public class ReqIFWriter {
 
 	private Element specType(Document xml, SpecType specType) {
 
+		// A spec type kind the parser does not model must keep its original
+		// element name; writing it as a SPEC-OBJECT-TYPE would silently change
+		// the document's meaning.
 		String elementName = specType.getType();
 		if (elementName == null || ReqIFConst.UNDEFINED.equals(elementName)) {
+			elementName = specType.getSourceElementName();
+		}
+		if (elementName == null) {
 			elementName = ReqIFConst.SPEC_OBJECT_TYPE;
 		}
 
@@ -312,6 +318,10 @@ public class ReqIFWriter {
 		}
 		String elementName = ReqIFElements.attributeDefinition(datatype.getType());
 		if (elementName == null) {
+			// datatype kinds the parser does not model: keep the original name
+			elementName = definition.getSourceElementName();
+		}
+		if (elementName == null) {
 			return null;
 		}
 
@@ -326,8 +336,11 @@ public class ReqIFWriter {
 		}
 
 		Element type = element(xml, ReqIFConst.TYPE);
-		Element datatypeRef = element(xml, ReqIFElements.datatypeDefinitionRef(
-				ReqIFElements.datatypeDefinition(datatype.getType())));
+		String datatypeElement = ReqIFElements.datatypeDefinition(datatype.getType());
+		if (datatypeElement == null) {
+			datatypeElement = datatype.getSourceElementName();
+		}
+		Element datatypeRef = element(xml, ReqIFElements.datatypeDefinitionRef(datatypeElement));
 		datatypeRef.setTextContent(nullToEmpty(datatype.getID()));
 		type.appendChild(datatypeRef);
 		attributeDefinition.appendChild(type);
@@ -479,6 +492,10 @@ public class ReqIFWriter {
 
 		String elementName = ReqIFElements.attributeValue(datatypeCategory);
 		if (elementName == null) {
+			// datatype kinds the parser does not model: keep the original name
+			elementName = attributeValue.getSourceElementName();
+		}
+		if (elementName == null) {
 			return null;
 		}
 		Object value = attributeValue.getValue();
@@ -561,7 +578,11 @@ public class ReqIFWriter {
 	private Element definitionRef(Document xml, AttributeDefinition definition) {
 
 		Element definitionElement = element(xml, ReqIFConst.DEFINITION);
-		Element ref = element(xml, ReqIFElements.attributeDefinitionRef(definition.getDataType().getType()));
+		String refName = ReqIFElements.attributeDefinitionRef(definition.getDataType().getType());
+		if (refName == null && definition.getSourceElementName() != null) {
+			refName = definition.getSourceElementName() + "-REF";
+		}
+		Element ref = element(xml, refName);
 		ref.setTextContent(nullToEmpty(definition.getID()));
 		definitionElement.appendChild(ref);
 		return definitionElement;

@@ -221,8 +221,19 @@ public class SpecObject {
 														}
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
 														break;
-												
-						default:						break;
+
+						// Values of datatype kinds the parser does not model are
+						// kept generically instead of being dropped, so they
+						// survive a round trip.
+						default:						if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName,
+																new AttributeValue(attributeValue, attributeDefinition)
+																		.setSourceElementName(XmlUtils.localName(attribute)));
+														break;
 					}
 				}
 			}

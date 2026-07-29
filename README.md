@@ -277,3 +277,17 @@ ValidationResult schemaIssues =
 Not covered yet: identifiers duplicated within one category (the parser
 keys its maps by identifier, so a duplicate has already replaced its
 predecessor by the time the model exists).
+
+# Unmodelled ReqIF kinds
+
+The parser models the datatype and spec type kinds of the standard. Kinds
+it does not know - vendor extensions or later ReqIF revisions - are kept
+generically rather than dropped: the original element name is remembered
+and written back unchanged, and values are carried as their raw
+`THE-VALUE`. This applies to datatype definitions, attribute definitions,
+attribute values and spec types, so a document round-trips without losing
+or altering them.
+
+Limitation: a value of an unknown kind is only preserved when it is
+carried in a `THE-VALUE` attribute. Kinds that store their value in child
+elements are not covered.

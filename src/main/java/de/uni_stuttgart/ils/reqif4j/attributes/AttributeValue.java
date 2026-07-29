@@ -6,6 +6,7 @@ public class AttributeValue {
 	private String name;
 	protected Object value;
 	private AttributeDefinition type;
+	private String sourceElementName;
 	
 	
 	
@@ -24,6 +25,20 @@ public class AttributeValue {
 	
 	public String getDatatype() {
 		return this.type.getDataType().getType();
+	}
+
+	/**
+	 * @return the ATTRIBUTE-VALUE-* element name this value was read from, or
+	 *         null when it was not created from a document. Needed to write back
+	 *         values of datatype kinds the parser does not model explicitly.
+	 */
+	public String getSourceElementName() {
+		return this.sourceElementName;
+	}
+
+	public AttributeValue setSourceElementName(String sourceElementName) {
+		this.sourceElementName = sourceElementName;
+		return this;
 	}
 	
 	
