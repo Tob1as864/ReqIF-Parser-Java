@@ -30,6 +30,7 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecRelation;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
+import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
 import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
 
 /**
@@ -316,7 +317,7 @@ public class ReqIFValidator {
 
 		ValidationResult result = new ValidationResult();
 		try {
-			SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+			SchemaFactory factory = SecureXml.newSchemaFactory(XMLConstants.W3C_XML_SCHEMA_NS_URI);
 			Schema xsd = factory.newSchema(schema.toFile());
 
 			Validator validator = xsd.newValidator();

@@ -3,9 +3,6 @@ package de.uni_stuttgart.ils.reqif4j.reqif;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
@@ -13,6 +10,7 @@ import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
 import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
+import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
 
 public class ReqIFDocument {
 
@@ -78,7 +76,7 @@ public class ReqIFDocument {
 		setTypeClassifier(typeClassifier);
 
 		try {
-			this.reqifDocument = newDocumentBuilder().parse(this.filePath);
+			this.reqifDocument = SecureXml.newDocumentBuilder().parse(this.filePath);
 			readDocument();
 
 		} catch (SAXException | IOException | ParserConfigurationException e) {
@@ -97,7 +95,7 @@ public class ReqIFDocument {
 		setTypeClassifier(typeClassifier);
 
 		try {
-			this.reqifDocument = newDocumentBuilder().parse(is);
+			this.reqifDocument = SecureXml.newDocumentBuilder().parse(is);
 			readDocument();
 
 		} catch (SAXException | IOException | ParserConfigurationException e) {
@@ -116,7 +114,7 @@ public class ReqIFDocument {
 		setTypeClassifier(typeClassifier);
 
 		try {
-			this.reqifDocument = newDocumentBuilder().parse(is);
+			this.reqifDocument = SecureXml.newDocumentBuilder().parse(is);
 			readDocument();
 
 		} catch (SAXException | IOException | ParserConfigurationException e) {
@@ -128,32 +126,6 @@ public class ReqIFDocument {
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 	}
 
-
-	/**
-	 * Creates a namespace-aware, XXE-hardened document builder. Namespace
-	 * awareness is required so XHTML content with namespace prefixes
-	 * (e.g. {@code xhtml:div}) can be matched by local name.
-	 */
-	private static DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
-
-		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		factory.setNamespaceAware(true);
-
-		// Harden against XXE / entity expansion attacks
-		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-		factory.setXIncludeAware(false);
-		factory.setExpandEntityReferences(false);
-		try {
-			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-		} catch (IllegalArgumentException ignored) {
-			// parser implementation does not support these attributes
-		}
-
-		return factory.newDocumentBuilder();
-	}
 
 	private void readDocument() {
 

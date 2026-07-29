@@ -1,6 +1,5 @@
 package de.uni_stuttgart.ils.reqif4j.write;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
@@ -11,20 +10,16 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.xml.sax.SAXException;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
@@ -46,6 +41,8 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecRelation;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
+import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
+import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
 
 /**
  * Serializes a parsed {@link ReqIFDocument} back to ReqIF XML.
@@ -555,25 +552,8 @@ public class ReqIFWriter {
 		if (value == null || value.toString().isEmpty()) {
 			return null;
 		}
-		return xml.importNode(parseXhtml(value.toString()), true);
+		return xml.importNode(XhtmlParser.parseDiv(value.toString()), true);
 	}
-
-	private Node parseXhtml(String markup) {
-
-		String namespaced = markup.startsWith("<div")
-				? markup.replaceFirst("<div", "<div xmlns=\"" + XHTML_NAMESPACE + "\"")
-				: "<div xmlns=\"" + XHTML_NAMESPACE + "\">" + markup + "</div>";
-		try {
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			factory.setNamespaceAware(true);
-			return factory.newDocumentBuilder()
-					.parse(new ByteArrayInputStream(namespaced.getBytes(StandardCharsets.UTF_8)))
-					.getDocumentElement();
-		} catch (SAXException | IOException | ParserConfigurationException e) {
-			throw new ReqIFWriteException("XHTML attribute value is not well-formed: " + markup, e);
-		}
-	}
-
 
 	private Element definitionRef(Document xml, AttributeDefinition definition) {
 
@@ -674,10 +654,7 @@ public class ReqIFWriter {
 
 	private Document newDocument() {
 		try {
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			factory.setNamespaceAware(true);
-			DocumentBuilder builder = factory.newDocumentBuilder();
-			return builder.newDocument();
+			return SecureXml.newDocumentBuilder().newDocument();
 		} catch (ParserConfigurationException e) {
 			throw new ReqIFWriteException("Failed to create an XML document", e);
 		}
@@ -685,7 +662,7 @@ public class ReqIFWriter {
 
 	private Transformer transformer() {
 		try {
-			Transformer transformer = TransformerFactory.newInstance().newTransformer();
+			Transformer transformer = SecureXml.newTransformer();
 			transformer.setOutputProperty(OutputKeys.ENCODING, StandardCharsets.UTF_8.name());
 			transformer.setOutputProperty(OutputKeys.INDENT, this.indent ? "yes" : "no");
 			if (this.indent) {

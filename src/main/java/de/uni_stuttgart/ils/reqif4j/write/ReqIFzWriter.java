@@ -86,15 +86,21 @@ public class ReqIFzWriter {
 			throw new ReqIFWriteException("A .reqifz archive must contain at least one ReqIF document");
 		}
 
-		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
-
-			for (Map.Entry<String, ReqIFDocument> document : documents.entrySet()) {
-				writeEntry(zip, normalizeEntryName(document.getKey()), documentBytes(document.getValue()));
+		// Collect and check the names first: a zip cannot hold the same entry
+		// twice, and the raw ZipException would not say which name clashed.
+		Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
+		for (Map.Entry<String, ReqIFDocument> document : documents.entrySet()) {
+			addEntry(entries, normalizeEntryName(document.getKey()), documentBytes(document.getValue()));
+		}
+		if (pictures != null) {
+			for (Map.Entry<String, byte[]> picture : pictures.entrySet()) {
+				addEntry(entries, normalizeEntryName(picture.getKey()), picture.getValue());
 			}
-			if (pictures != null) {
-				for (Map.Entry<String, byte[]> picture : pictures.entrySet()) {
-					writeEntry(zip, normalizeEntryName(picture.getKey()), picture.getValue());
-				}
+		}
+
+		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+			for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+				writeEntry(zip, entry.getKey(), entry.getValue());
 			}
 		}
 	}
@@ -113,6 +119,15 @@ public class ReqIFzWriter {
 		write(source.getReqIFDocuments(), pictures, archive);
 	}
 
+
+	private static void addEntry(Map<String, byte[]> entries, String name, byte[] content) {
+
+		if (entries.containsKey(name)) {
+			throw new ReqIFWriteException("Archive entry '" + name + "' is added twice; "
+					+ "document and picture names must be unique within the archive");
+		}
+		entries.put(name, content);
+	}
 
 	private byte[] documentBytes(ReqIFDocument document) throws IOException {
 

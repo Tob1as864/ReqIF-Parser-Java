@@ -18,10 +18,13 @@ public class SpecTypeBuilder {
 
 	private final SpecType specType;
 	private final Map<String, Datatype> datatypes;
+	private final java.util.function.BiConsumer<String, String> claim;
 
-	SpecTypeBuilder(SpecType specType, Map<String, Datatype> datatypes) {
+	SpecTypeBuilder(SpecType specType, Map<String, Datatype> datatypes,
+			java.util.function.BiConsumer<String, String> claim) {
 		this.specType = specType;
 		this.datatypes = datatypes;
+		this.claim = claim;
 	}
 
 
@@ -63,6 +66,7 @@ public class SpecTypeBuilder {
 			List<String> defaultValueRefs) {
 
 		Datatype datatype = requireDatatype(datatypeID, ReqIFConst.ENUMERATION);
+		this.claim.accept(id, "attribute definition");
 		this.specType.addAttributeDefinition(
 				new AttributeDefinitionEnumeration(id, name, datatype, multiValued, defaultValueRefs));
 		return this;
@@ -76,6 +80,7 @@ public class SpecTypeBuilder {
 	public SpecTypeBuilder attribute(String id, String name, String datatypeID, String defaultValue) {
 
 		Datatype datatype = requireDatatype(datatypeID, null);
+		this.claim.accept(id, "attribute definition");
 		this.specType.addAttributeDefinition(new AttributeDefinition(id, name, datatype, defaultValue));
 		return this;
 	}
@@ -85,6 +90,7 @@ public class SpecTypeBuilder {
 			String defaultValue) {
 
 		Datatype datatype = requireDatatype(datatypeID, expectedCategory);
+		this.claim.accept(id, "attribute definition");
 		this.specType.addAttributeDefinition(new AttributeDefinition(id, name, datatype, defaultValue));
 		return this;
 	}
