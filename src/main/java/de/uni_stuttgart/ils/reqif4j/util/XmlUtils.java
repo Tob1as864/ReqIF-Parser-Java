@@ -123,6 +123,18 @@ public final class XmlUtils {
 	}
 
 	/**
+	 * Reads the optional ALTERNATIVE-ID of an identifiable element.
+	 *
+	 * @return the IDENTIFIER of the ALTERNATIVE-ID child, or null if the element
+	 *         declares none
+	 */
+	public static String alternativeID(Node identifiable) {
+
+		Element alternativeID = firstChildElementByLocalName(identifiable, "ALTERNATIVE-ID");
+		return alternativeID == null ? null : attribute(alternativeID, "IDENTIFIER");
+	}
+
+	/**
 	 * @return the text content of the named attribute, or null if the node has no
 	 *         such attribute.
 	 */

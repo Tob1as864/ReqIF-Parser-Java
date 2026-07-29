@@ -28,6 +28,7 @@ public class Specification {
 	
 	private String id;
 	private String name;
+	private String alternativeID;
 	private SpecType type;
 	private int numberOfSpecObjects;
 	private int sectionCounter = 0;
@@ -40,6 +41,13 @@ public class Specification {
 	
 	public String getID() {
 		return this.id;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
 	}
 	
 	/**
@@ -147,17 +155,16 @@ public class Specification {
 		
 		this.id = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = specification.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specification);
 		this.type = specType;
 		
-		if(			((Element)specification).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
-				&&	((Element)specification).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes().getLength() > 0		) {
-			
-			NodeList attributeValues = ((Element)specification).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes();
-			for(int attval = 0; attval < attributeValues.getLength(); attval++) {
-				
-				Node attribute = attributeValues.item(attval);
-				String attValNodeName = attribute.getNodeName();
-				if(!attValNodeName.equals(ReqIFConst._TEXT)) {
+		Element valuesElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.VALUES);
+		if(valuesElement != null) {
+
+			for(Element attribute: XmlUtils.childElements(valuesElement)) {
+
+				String attValNodeName = XmlUtils.localName(attribute);
+				{
 
 					String attributeDefinitionRef = XmlUtils.firstChildElement(
 							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
@@ -222,7 +229,17 @@ public class Specification {
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
 														break;
 
-						default:						break;
+						// Values of datatype kinds the parser does not model are
+						// kept generically instead of being dropped.
+						default:						if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName,
+																new AttributeValue(attributeValue, attributeDefinition)
+																		.setSourceElementName(XmlUtils.localName(attribute)));
+														break;
 					}
 				}
 			}
@@ -272,19 +289,14 @@ public class Specification {
 			}
 		}
 		
-		if(			((Element)specification).getElementsByTagName(ReqIFConst.CHILDREN).getLength() > 0
-				&&	((Element)specification).getElementsByTagName(ReqIFConst.CHILDREN).item(0).getChildNodes().getLength() > 0		) {
-			
-			NodeList children = ((Element)specification).getElementsByTagName(ReqIFConst.CHILDREN).item(0).getChildNodes();
-			for(int child = 0; child < children.getLength(); child++) {
-				
-				Node specHierarchy = children.item(child);
-				if(!specHierarchy.getNodeName().equals(ReqIFConst._TEXT)) {
-					
-					String specHierarchyID = specHierarchy.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-					
-					this.children.put(specHierarchyID, new SpecHierarchy(1, ++this.sectionCounter, specHierarchy, specObjects));
-				}
+		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
+		if(childrenElement != null) {
+
+			for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
+
+				String specHierarchyID = XmlUtils.attribute(specHierarchy, ReqIFConst.IDENTIFIER);
+
+				this.children.put(specHierarchyID, new SpecHierarchy(1, ++this.sectionCounter, specHierarchy, specObjects));
 			}
 		}
 		

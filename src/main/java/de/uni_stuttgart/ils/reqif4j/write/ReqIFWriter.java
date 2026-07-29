@@ -1,6 +1,5 @@
 package de.uni_stuttgart.ils.reqif4j.write;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
@@ -11,20 +10,16 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.xml.sax.SAXException;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
@@ -40,11 +35,14 @@ import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFHeader;
+import de.uni_stuttgart.ils.reqif4j.specification.RelationGroup;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecHierarchy;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecRelation;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
+import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
+import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
 
 /**
  * Serializes a parsed {@link ReqIFDocument} back to ReqIF XML.
@@ -138,6 +136,11 @@ public class ReqIFWriter {
 		}
 		root.appendChild(coreContent(xml, document.getCoreContent()));
 
+		// tool extensions are copied verbatim
+		for (Node extension : document.getToolExtensions()) {
+			root.appendChild(xml.importNode(extension, true));
+		}
+
 		return xml;
 	}
 
@@ -199,6 +202,14 @@ public class ReqIFWriter {
 		}
 		reqifContent.appendChild(specRelations);
 
+		if (!content.getRelationGroups().isEmpty()) {
+			Element relationGroups = element(xml, ReqIFConst.SPEC_RELATION_GROUPS);
+			for (RelationGroup relationGroup : content.getRelationGroups().values()) {
+				relationGroups.appendChild(relationGroup(xml, relationGroup));
+			}
+			reqifContent.appendChild(relationGroups);
+		}
+
 		Element specifications = element(xml, ReqIFConst.SPECIFICATIONS);
 		for (Specification specification : content.getSpecifications().values()) {
 			specifications.appendChild(specification(xml, specification));
@@ -224,6 +235,7 @@ public class ReqIFWriter {
 		Element definition = element(xml, elementName);
 		definition.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(datatype.getID()));
 		definition.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(datatype.getName()));
+		appendAlternativeID(xml, definition, datatype.getAlternativeID());
 
 		if (datatype instanceof DatatypeInteger) {
 			DatatypeInteger integer = (DatatypeInteger) datatype;
@@ -267,14 +279,21 @@ public class ReqIFWriter {
 
 	private Element specType(Document xml, SpecType specType) {
 
+		// A spec type kind the parser does not model must keep its original
+		// element name; writing it as a SPEC-OBJECT-TYPE would silently change
+		// the document's meaning.
 		String elementName = specType.getType();
 		if (elementName == null || ReqIFConst.UNDEFINED.equals(elementName)) {
+			elementName = specType.getSourceElementName();
+		}
+		if (elementName == null) {
 			elementName = ReqIFConst.SPEC_OBJECT_TYPE;
 		}
 
 		Element type = element(xml, elementName);
 		type.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specType.getID()));
 		type.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(specType.getName()));
+		appendAlternativeID(xml, type, specType.getAlternativeID());
 
 		Element specAttributes = element(xml, ReqIFConst.SPEC_ATTRIBUTES);
 		for (AttributeDefinition definition : specType.getAttributeDefinitions().values()) {
@@ -296,12 +315,17 @@ public class ReqIFWriter {
 		}
 		String elementName = ReqIFElements.attributeDefinition(datatype.getType());
 		if (elementName == null) {
+			// datatype kinds the parser does not model: keep the original name
+			elementName = definition.getSourceElementName();
+		}
+		if (elementName == null) {
 			return null;
 		}
 
 		Element attributeDefinition = element(xml, elementName);
 		attributeDefinition.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(definition.getID()));
 		attributeDefinition.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(definition.getName()));
+		appendAlternativeID(xml, attributeDefinition, definition.getAlternativeID());
 
 		if (definition instanceof AttributeDefinitionEnumeration
 				&& ((AttributeDefinitionEnumeration) definition).isMultiValued()) {
@@ -309,8 +333,11 @@ public class ReqIFWriter {
 		}
 
 		Element type = element(xml, ReqIFConst.TYPE);
-		Element datatypeRef = element(xml, ReqIFElements.datatypeDefinitionRef(
-				ReqIFElements.datatypeDefinition(datatype.getType())));
+		String datatypeElement = ReqIFElements.datatypeDefinition(datatype.getType());
+		if (datatypeElement == null) {
+			datatypeElement = datatype.getSourceElementName();
+		}
+		Element datatypeRef = element(xml, ReqIFElements.datatypeDefinitionRef(datatypeElement));
 		datatypeRef.setTextContent(nullToEmpty(datatype.getID()));
 		type.appendChild(datatypeRef);
 		attributeDefinition.appendChild(type);
@@ -357,6 +384,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, ReqIFConst.SPEC_OBJECT);
 		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specObject.getID()));
+		appendAlternativeID(xml, element, specObject.getAlternativeID());
 		element.appendChild(values(xml, specObject.getAttributes()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_OBJECT_TYPE, specObject.getSpecTypeID()));
 		return element;
@@ -366,6 +394,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, ReqIFConst.SPEC_RELATION);
 		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specRelation.getID()));
+		appendAlternativeID(xml, element, specRelation.getAlternativeID());
 		element.appendChild(values(xml, specRelation.getAttributes()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_RELATION_TYPE, specRelation.getRelationTypeRef()));
 		element.appendChild(objectRef(xml, ReqIFConst.SOURCE, specRelation.getSourceObjID()));
@@ -378,6 +407,7 @@ public class ReqIFWriter {
 		Element element = element(xml, ReqIFConst.SPECIFICATION);
 		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specification.getID()));
 		element.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(specification.getName()));
+		appendAlternativeID(xml, element, specification.getAlternativeID());
 		element.appendChild(values(xml, specification.getAttributes()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPECIFICATION_TYPE, specification.getSpecTypeID()));
 
@@ -401,6 +431,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, ReqIFConst.SPEC_HIERARCHY);
 		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(hierarchy.getSpecHierarchyID()));
+		appendAlternativeID(xml, element, hierarchy.getAlternativeID());
 
 		if (hierarchy.getSpecObject() != null) {
 			element.appendChild(objectRef(xml, ReqIFConst.OBJECT, hierarchy.getSpecObjectID()));
@@ -457,6 +488,10 @@ public class ReqIFWriter {
 		}
 
 		String elementName = ReqIFElements.attributeValue(datatypeCategory);
+		if (elementName == null) {
+			// datatype kinds the parser does not model: keep the original name
+			elementName = attributeValue.getSourceElementName();
+		}
 		if (elementName == null) {
 			return null;
 		}
@@ -517,30 +552,17 @@ public class ReqIFWriter {
 		if (value == null || value.toString().isEmpty()) {
 			return null;
 		}
-		return xml.importNode(parseXhtml(value.toString()), true);
+		return xml.importNode(XhtmlParser.parseDiv(value.toString()), true);
 	}
-
-	private Node parseXhtml(String markup) {
-
-		String namespaced = markup.startsWith("<div")
-				? markup.replaceFirst("<div", "<div xmlns=\"" + XHTML_NAMESPACE + "\"")
-				: "<div xmlns=\"" + XHTML_NAMESPACE + "\">" + markup + "</div>";
-		try {
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			factory.setNamespaceAware(true);
-			return factory.newDocumentBuilder()
-					.parse(new ByteArrayInputStream(namespaced.getBytes(StandardCharsets.UTF_8)))
-					.getDocumentElement();
-		} catch (SAXException | IOException | ParserConfigurationException e) {
-			throw new ReqIFWriteException("XHTML attribute value is not well-formed: " + markup, e);
-		}
-	}
-
 
 	private Element definitionRef(Document xml, AttributeDefinition definition) {
 
 		Element definitionElement = element(xml, ReqIFConst.DEFINITION);
-		Element ref = element(xml, ReqIFElements.attributeDefinitionRef(definition.getDataType().getType()));
+		String refName = ReqIFElements.attributeDefinitionRef(definition.getDataType().getType());
+		if (refName == null && definition.getSourceElementName() != null) {
+			refName = definition.getSourceElementName() + "-REF";
+		}
+		Element ref = element(xml, refName);
 		ref.setTextContent(nullToEmpty(definition.getID()));
 		definitionElement.appendChild(ref);
 		return definitionElement;
@@ -564,6 +586,54 @@ public class ReqIFWriter {
 		return element;
 	}
 
+	private Element relationGroup(Document xml, RelationGroup relationGroup) {
+
+		Element element = element(xml, ReqIFConst.RELATION_GROUP);
+		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(relationGroup.getID()));
+		element.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(relationGroup.getName()));
+		appendAlternativeID(xml, element, relationGroup.getAlternativeID());
+
+		element.appendChild(wrappedRef(xml, ReqIFConst.TYPE, ReqIFConst.RELATION_GROUP_TYPE_REF,
+				relationGroup.getRelationGroupTypeRef()));
+		element.appendChild(wrappedRef(xml, ReqIFConst.SOURCE_SPECIFICATION, ReqIFConst.SPECIFICATION_REF,
+				relationGroup.getSourceSpecificationRef()));
+		element.appendChild(wrappedRef(xml, ReqIFConst.TARGET_SPECIFICATION, ReqIFConst.SPECIFICATION_REF,
+				relationGroup.getTargetSpecificationRef()));
+
+		if (!relationGroup.getSpecRelationRefs().isEmpty()) {
+			Element relations = element(xml, ReqIFConst.SPEC_RELATIONS);
+			for (String ref : relationGroup.getSpecRelationRefs()) {
+				Element relationRef = element(xml, ReqIFConst.SPEC_RELATION_REF);
+				relationRef.setTextContent(ref);
+				relations.appendChild(relationRef);
+			}
+			element.appendChild(relations);
+		}
+		return element;
+	}
+
+	private Element wrappedRef(Document xml, String wrapper, String refName, String id) {
+
+		Element element = element(xml, wrapper);
+		Element ref = element(xml, refName);
+		ref.setTextContent(nullToEmpty(id));
+		element.appendChild(ref);
+		return element;
+	}
+
+	/**
+	 * ALTERNATIVE-ID is the first child of an identifiable element.
+	 */
+	private void appendAlternativeID(Document xml, Element parent, String alternativeID) {
+
+		if (alternativeID == null || alternativeID.isEmpty()) {
+			return;
+		}
+		Element element = element(xml, ReqIFConst.ALTERNATIVE_ID);
+		element.setAttribute(ReqIFConst.IDENTIFIER, alternativeID);
+		parent.appendChild(element);
+	}
+
 	private Element element(Document xml, String name) {
 		return xml.createElementNS(REQIF_NAMESPACE, name);
 	}
@@ -584,10 +654,7 @@ public class ReqIFWriter {
 
 	private Document newDocument() {
 		try {
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			factory.setNamespaceAware(true);
-			DocumentBuilder builder = factory.newDocumentBuilder();
-			return builder.newDocument();
+			return SecureXml.newDocumentBuilder().newDocument();
 		} catch (ParserConfigurationException e) {
 			throw new ReqIFWriteException("Failed to create an XML document", e);
 		}
@@ -595,7 +662,7 @@ public class ReqIFWriter {
 
 	private Transformer transformer() {
 		try {
-			Transformer transformer = TransformerFactory.newInstance().newTransformer();
+			Transformer transformer = SecureXml.newTransformer();
 			transformer.setOutputProperty(OutputKeys.ENCODING, StandardCharsets.UTF_8.name());
 			transformer.setOutputProperty(OutputKeys.INDENT, this.indent ? "yes" : "no");
 			if (this.indent) {

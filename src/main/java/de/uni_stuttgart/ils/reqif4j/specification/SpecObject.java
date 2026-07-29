@@ -21,6 +21,7 @@ public class SpecObject {
 	protected String id;
 	protected SpecType specType;
 	protected String type;
+	protected String alternativeID;
 	protected TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
 	protected Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	
@@ -30,7 +31,14 @@ public class SpecObject {
 	public String getID() {
 		return this.id;
 	}
-	
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
+	}
+
 	public String getType() {
 		return this.type;
 	}
@@ -89,6 +97,7 @@ public class SpecObject {
 	
 	public SpecObject(Node specObject){
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specObject);
 	}
 	
 	/**
@@ -122,6 +131,7 @@ public class SpecObject {
 	public SpecObject(Node specObject, SpecType specType, TypeClassifier typeClassifier) {
 
 		this.id = specObject.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specObject);
 		this.specType = specType;
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 
@@ -140,15 +150,15 @@ public class SpecObject {
 	 */
 	protected void readAttributeValues(Node specObject, SpecType specType) {
 
-		if(			((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).getLength() > 0
-				&&	((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).hasChildNodes()		) {
-			
-			NodeList attributeValues = ((Element)specObject).getElementsByTagName(ReqIFConst.VALUES).item(0).getChildNodes();
-			for(int attval = 0; attval < attributeValues.getLength(); attval++) {
-				
-				Node attribute = attributeValues.item(attval);
-				String attValNodeName = attribute.getNodeName();
-				if(!attValNodeName.equals(ReqIFConst._TEXT)) {
+		// VALUES is located by local name so prefixed ReqIF namespaces work too;
+		// only this object's own VALUES is taken, not a nested one.
+		Element valuesElement = XmlUtils.firstChildElementByLocalName(specObject, ReqIFConst.VALUES);
+		if(valuesElement != null) {
+
+			for(Element attribute: XmlUtils.childElements(valuesElement)) {
+
+				String attValNodeName = XmlUtils.localName(attribute);
+				{
 
 					String attributeDefinitionRef = XmlUtils.firstChildElement(
 							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
@@ -211,8 +221,19 @@ public class SpecObject {
 														}
 														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
 														break;
-												
-						default:						break;
+
+						// Values of datatype kinds the parser does not model are
+						// kept generically instead of being dropped, so they
+						// survive a round trip.
+						default:						if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
+															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+														}else{
+															attributeValue = "";
+														}
+														this.attributeValues.put(attributeDefinitionName,
+																new AttributeValue(attributeValue, attributeDefinition)
+																		.setSourceElementName(XmlUtils.localName(attribute)));
+														break;
 					}
 				}
 			}

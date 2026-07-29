@@ -2,6 +2,8 @@ package de.uni_stuttgart.ils.reqif4j.reqif;
 
 import org.w3c.dom.Element;
 
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
+
 public class ReqIFHeader {
 	
 	
@@ -67,29 +69,46 @@ public class ReqIFHeader {
 	
 	
 	public ReqIFHeader(Element theHeader) {
-		
-		this.id = theHeader.getElementsByTagName(ReqIFConst.REQ_IF_HEADER).item(0).getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.toolID = theHeader.getElementsByTagName(ReqIFConst.REQ_IF_TOOL_ID).item(0).getTextContent();
-		
-		if(theHeader.getElementsByTagName(ReqIFConst.SOURCE_TOOL_ID).getLength() > 0) {
-			this.sourceToolID = theHeader.getElementsByTagName(ReqIFConst.SOURCE_TOOL_ID).item(0).getTextContent();
+
+		Element reqifHeader = XmlUtils.firstDescendantByLocalName(theHeader, ReqIFConst.REQ_IF_HEADER);
+		this.id = reqifHeader == null ? null : XmlUtils.attribute(reqifHeader, ReqIFConst.IDENTIFIER);
+		this.toolID = textOf(theHeader, ReqIFConst.REQ_IF_TOOL_ID);
+
+		String sourceToolID = textOf(theHeader, ReqIFConst.SOURCE_TOOL_ID);
+		if(sourceToolID != null) {
+			this.sourceToolID = sourceToolID;
 		}
-		if(theHeader.getElementsByTagName(ReqIFConst.REQ_IF_VERSION).getLength() > 0) {
-			this.reqifVersion = theHeader.getElementsByTagName(ReqIFConst.REQ_IF_VERSION).item(0).getTextContent();
+		String reqifVersion = textOf(theHeader, ReqIFConst.REQ_IF_VERSION);
+		if(reqifVersion != null) {
+			this.reqifVersion = reqifVersion;
 		}
-		if(theHeader.getElementsByTagName(ReqIFConst.COMMENT).getLength() > 0) {
-			this.comment = theHeader.getElementsByTagName(ReqIFConst.COMMENT).item(0).getTextContent();
-			this.author = authorOf(this.comment);
+		String comment = textOf(theHeader, ReqIFConst.COMMENT);
+		if(comment != null) {
+			this.comment = comment;
+			this.author = authorOf(comment);
 		}
-		if(theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).getLength() > 0) {
-			this.creationTime = theHeader.getElementsByTagName(ReqIFConst.CREATION_TIME).item(0).getTextContent();
-			this.creationDate = creationDateOf(this.creationTime);
+		String creationTime = textOf(theHeader, ReqIFConst.CREATION_TIME);
+		if(creationTime != null) {
+			this.creationTime = creationTime;
+			this.creationDate = creationDateOf(creationTime);
 		}
-		if(theHeader.getElementsByTagName(ReqIFConst.TITLE).getLength() > 0) {
+		String title = textOf(theHeader, ReqIFConst.TITLE);
+		if(title != null) {
 			// The title is returned as written in the document; stripping a
 			// "_Template" suffix was a tool-specific hack in a generic parser.
-			this.title = theHeader.getElementsByTagName(ReqIFConst.TITLE).item(0).getTextContent();
+			this.title = title;
 		}
+	}
+
+	/**
+	 * @return the text of the first descendant with that local name, or null.
+	 *         Matching by local name keeps documents readable that put the ReqIF
+	 *         elements into a prefixed namespace.
+	 */
+	private static String textOf(Element parent, String localName) {
+
+		Element element = XmlUtils.firstDescendantByLocalName(parent, localName);
+		return element == null ? null : element.getTextContent();
 	}
 
 	/**

@@ -65,6 +65,7 @@ public class ReqIFBuilder {
 	private final List<SpecRelation> specRelations = new ArrayList<SpecRelation>();
 	private final List<Specification> specifications = new ArrayList<Specification>();
 
+	private final Map<String, String> identifiers = new LinkedHashMap<String, String>();
 	private final HeaderBuilder headerBuilder = new HeaderBuilder();
 	private TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
 
@@ -92,6 +93,7 @@ public class ReqIFBuilder {
 
 	/** Adds a datatype the builder has no shorthand for. */
 	public ReqIFBuilder datatype(Datatype datatype) {
+		claim(datatype.getID(), "datatype");
 		this.datatypes.put(datatype.getID(), datatype);
 		return this;
 	}
@@ -145,7 +147,8 @@ public class ReqIFBuilder {
 
 	private ReqIFBuilder specType(SpecType specType, Consumer<SpecTypeBuilder> attributes) {
 
-		attributes.accept(new SpecTypeBuilder(specType, this.datatypes));
+		claim(specType.getID(), "spec type");
+		attributes.accept(new SpecTypeBuilder(specType, this.datatypes, this::claim));
 		this.specTypes.put(specType.getID(), specType);
 		return this;
 	}
@@ -155,6 +158,7 @@ public class ReqIFBuilder {
 
 	public ReqIFBuilder specObject(String id, String specTypeID, Consumer<ValuesBuilder> values) {
 
+		claim(id, "spec object");
 		SpecType specType = requireSpecType(specTypeID);
 		ValuesBuilder builder = new ValuesBuilder(specType);
 		values.accept(builder);
@@ -173,6 +177,7 @@ public class ReqIFBuilder {
 	public ReqIFBuilder specRelation(String id, String specTypeID, String sourceID, String targetID,
 			Consumer<ValuesBuilder> values) {
 
+		claim(id, "spec relation");
 		SpecType specType = requireSpecType(specTypeID);
 		requireSpecObject(sourceID);
 		requireSpecObject(targetID);
@@ -194,6 +199,7 @@ public class ReqIFBuilder {
 	public ReqIFBuilder specification(String id, String name, String specTypeID,
 			Consumer<SpecificationBuilder> content) {
 
+		claim(id, "specification");
 		SpecType specType = requireSpecType(specTypeID);
 		SpecificationBuilder builder = new SpecificationBuilder(specType);
 		content.accept(builder);
@@ -230,6 +236,22 @@ public class ReqIFBuilder {
 	}
 
 
+	/**
+	 * ReqIF identifiers must be unique across the whole document, so a clash is
+	 * refused instead of silently replacing the earlier element.
+	 */
+	void claim(String id, String kind) {
+
+		if (id == null || id.isBlank()) {
+			throw new ReqIFBuildException("A " + kind + " needs an identifier");
+		}
+		String previousKind = this.identifiers.put(id, kind);
+		if (previousKind != null) {
+			throw new ReqIFBuildException("Identifier '" + id + "' is already used by a " + previousKind
+					+ "; identifiers must be unique across the document");
+		}
+	}
+
 	private SpecType requireSpecType(String specTypeID) {
 
 		SpecType specType = this.specTypes.get(specTypeID);
@@ -259,6 +281,11 @@ public class ReqIFBuilder {
 		}
 
 		public EnumerationBuilder value(String id, String name, String key, String otherContent) {
+			for (DatatypeEnumerationValue existing : this.values) {
+				if (existing.getID().equals(id)) {
+					throw new ReqIFBuildException("Enum value '" + id + "' is declared twice");
+				}
+			}
 			this.values.add(new DatatypeEnumerationValue(id, name, key, otherContent));
 			return this;
 		}
@@ -287,6 +314,7 @@ public class ReqIFBuilder {
 		public SpecificationBuilder child(String hierarchyID, String specObjectID,
 				Consumer<HierarchyBuilder> children) {
 
+			claim(hierarchyID, "spec hierarchy");
 			HierarchyBuilder hierarchy = new HierarchyBuilder(hierarchyID, specObjectID);
 			children.accept(hierarchy);
 			this.hierarchies.add(hierarchy);
@@ -323,6 +351,7 @@ public class ReqIFBuilder {
 		public HierarchyBuilder child(String hierarchyID, String specObjectID,
 				Consumer<HierarchyBuilder> children) {
 
+			claim(hierarchyID, "spec hierarchy");
 			HierarchyBuilder hierarchy = new HierarchyBuilder(hierarchyID, specObjectID);
 			children.accept(hierarchy);
 			this.children.add(hierarchy);

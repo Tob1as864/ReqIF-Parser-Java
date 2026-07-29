@@ -31,7 +31,9 @@ public final class TestFixtures {
 			  <CORE-CONTENT>
 			    <REQ-IF-CONTENT>
 			      <DATATYPES>
-			        <DATATYPE-DEFINITION-STRING IDENTIFIER="dt-string" LONG-NAME="String" MAX-LENGTH="255"/>
+			        <DATATYPE-DEFINITION-STRING IDENTIFIER="dt-string" LONG-NAME="String" MAX-LENGTH="255">
+			          <ALTERNATIVE-ID IDENTIFIER="alt-dt-string"/>
+			        </DATATYPE-DEFINITION-STRING>
 			        <DATATYPE-DEFINITION-BOOLEAN IDENTIFIER="dt-bool" LONG-NAME="Bool"/>
 			        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int" LONG-NAME="Int" MIN="0" MAX="9223372036854775807"/>
 			        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int-unbounded" LONG-NAME="IntUnbounded"/>
@@ -61,6 +63,7 @@ public final class TestFixtures {
 			      </DATATYPES>
 			      <SPEC-TYPES>
 			        <SPEC-OBJECT-TYPE IDENTIFIER="st-req" LONG-NAME="Requirement Type">
+			          <ALTERNATIVE-ID IDENTIFIER="alt-st-req"/>
 			          <SPEC-ATTRIBUTES>
 			            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="ad-title" LONG-NAME="Title">
 			              <TYPE><DATATYPE-DEFINITION-STRING-REF>dt-string</DATATYPE-DEFINITION-STRING-REF></TYPE>
@@ -89,6 +92,9 @@ public final class TestFixtures {
 			            </ATTRIBUTE-DEFINITION-STRING>
 			          </SPEC-ATTRIBUTES>
 			        </SPEC-RELATION-TYPE>
+			        <RELATION-GROUP-TYPE IDENTIFIER="st-relgroup" LONG-NAME="Traceability">
+			          <SPEC-ATTRIBUTES/>
+			        </RELATION-GROUP-TYPE>
 			        <SPECIFICATION-TYPE IDENTIFIER="st-spec" LONG-NAME="Spec Type">
 			          <SPEC-ATTRIBUTES>
 			            <ATTRIBUTE-DEFINITION-DATE IDENTIFIER="ad-review" LONG-NAME="ReviewDate">
@@ -99,6 +105,7 @@ public final class TestFixtures {
 			      </SPEC-TYPES>
 			      <SPEC-OBJECTS>
 			        <SPEC-OBJECT IDENTIFIER="so-1">
+			          <ALTERNATIVE-ID IDENTIFIER="alt-so-1"/>
 			          <TYPE><SPEC-OBJECT-TYPE-REF>st-req</SPEC-OBJECT-TYPE-REF></TYPE>
 			          <VALUES>
 			            <ATTRIBUTE-VALUE-STRING THE-VALUE="First requirement">
@@ -143,8 +150,18 @@ public final class TestFixtures {
 			          <TARGET><SPEC-OBJECT-REF>so-2</SPEC-OBJECT-REF></TARGET>
 			        </SPEC-RELATION>
 			      </SPEC-RELATIONS>
+			      <SPEC-RELATION-GROUPS>
+			        <RELATION-GROUP IDENTIFIER="rg-1" LONG-NAME="System to Software">
+			          <ALTERNATIVE-ID IDENTIFIER="alt-rg-1"/>
+			          <TYPE><RELATION-GROUP-TYPE-REF>st-relgroup</RELATION-GROUP-TYPE-REF></TYPE>
+			          <SOURCE-SPECIFICATION><SPECIFICATION-REF>spec-1</SPECIFICATION-REF></SOURCE-SPECIFICATION>
+			          <TARGET-SPECIFICATION><SPECIFICATION-REF>spec-1</SPECIFICATION-REF></TARGET-SPECIFICATION>
+			          <SPEC-RELATIONS><SPEC-RELATION-REF>sr-1</SPEC-RELATION-REF></SPEC-RELATIONS>
+			        </RELATION-GROUP>
+			      </SPEC-RELATION-GROUPS>
 			      <SPECIFICATIONS>
 			        <SPECIFICATION IDENTIFIER="spec-1" LONG-NAME="Main Spec">
+			          <ALTERNATIVE-ID IDENTIFIER="alt-spec-1"/>
 			          <TYPE><SPECIFICATION-TYPE-REF>st-spec</SPECIFICATION-TYPE-REF></TYPE>
 			          <VALUES>
 			            <ATTRIBUTE-VALUE-DATE THE-VALUE="2026-01-01">
@@ -165,6 +182,11 @@ public final class TestFixtures {
 			      </SPECIFICATIONS>
 			    </REQ-IF-CONTENT>
 			  </CORE-CONTENT>
+			  <TOOL-EXTENSIONS>
+			    <REQ-IF-TOOL-EXTENSION>
+			      <myTool:settings xmlns:myTool="http://example.com/mytool" view="table"/>
+			    </REQ-IF-TOOL-EXTENSION>
+			  </TOOL-EXTENSIONS>
 			</REQ-IF>
 			""";
 

@@ -10,6 +10,11 @@ This fork is based on https://github.com/bfriebel/requirements-interchange-forma
 # Supported Formats
 ReqIF file extensions .reqif and .reqifz (compressed).
 
+Elements are matched by their local name, so it does not matter whether a
+document puts the ReqIF elements into the default namespace
+(`<REQ-IF xmlns="...">`) or into a prefixed one (`<rif:REQ-IF xmlns:rif="...">`).
+The same holds for the embedded XHTML (`xhtml:div`, `reqif-xhtml:div`, ...).
+
 # Build & Test
 The project builds with Maven (Java 17+):
 
@@ -232,5 +237,62 @@ values too. The content category of generated spec objects is derived by
 the same `TypeClassifier` used when reading (`typeClassifier(...)` to
 override).
 
-Not covered yet: writing .reqifz archives and ReqIF elements the parser
-does not model (alternative ids, relation groups, tool extensions).
+## Writing .reqifz archives
+
+Images travel with the document, stored under the path the XHTML
+`object` elements reference:
+
+```java
+Map<String, byte[]> pictures = Map.of("files/diagram.png", pngBytes);
+new ReqIFzWriter().write(document, "spec.reqif", pictures, Path.of("spec.reqifz"));
+```
+
+An archive that was read can be re-packed - the documents are serialized
+from the model (so modifications are included) while the images are
+copied from the extracted files, without consuming the one-shot streams:
+
+```java
+try (ReqIFz source = new ReqIFz("in.reqifz")) {
+    new ReqIFzWriter().write(source, Path.of("out.reqifz"));
+}
+```
+
+# Validation
+
+`ReqIFValidator` checks a document before it is written: identifiers
+present and globally unique, resolvable datatype and spec type
+references, attribute values matching their spec type, enum value
+references, relation endpoints, spec hierarchy targets and relation
+group references.
+
+```java
+new ReqIFValidator().validate(document).throwIfInvalid();
+new ReqIFWriter().write(document, Path.of("out.reqif"));
+```
+
+This is a model-level check. The OMG ReqIF XSD is **not bundled** with
+this library for licensing reasons; if you have it, run a full XML
+Schema validation on top:
+
+```java
+ValidationResult schemaIssues =
+        new ReqIFValidator().validateAgainstSchema(document, Path.of("reqif.xsd"));
+```
+
+Not covered yet: identifiers duplicated within one category (the parser
+keys its maps by identifier, so a duplicate has already replaced its
+predecessor by the time the model exists).
+
+# Unmodelled ReqIF kinds
+
+The parser models the datatype and spec type kinds of the standard. Kinds
+it does not know - vendor extensions or later ReqIF revisions - are kept
+generically rather than dropped: the original element name is remembered
+and written back unchanged, and values are carried as their raw
+`THE-VALUE`. This applies to datatype definitions, attribute definitions,
+attribute values and spec types, so a document round-trips without losing
+or altering them.
+
+Limitation: a value of an unknown kind is only preserved when it is
+carried in a `THE-VALUE` attribute. Kinds that store their value in child
+elements are not covered.

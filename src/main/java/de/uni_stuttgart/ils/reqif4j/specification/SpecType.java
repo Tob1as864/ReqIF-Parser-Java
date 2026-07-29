@@ -19,12 +19,31 @@ public class SpecType {
 	private String id;
 	protected String name;
 	protected String type;
+	protected String alternativeID;
+	protected String sourceElementName;
 	
 	
 	
 	
 	public String getID() {
 		return this.id;
+	}
+
+	/**
+	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 */
+	public String getAlternativeID() {
+		return this.alternativeID;
+	}
+
+	/**
+	 * @return the SPEC-TYPE element name this type was read from, or null when
+	 *         it was not created from a document. Needed to write back spec type
+	 *         kinds the parser does not model explicitly, instead of silently
+	 *         turning them into a SPEC-OBJECT-TYPE.
+	 */
+	public String getSourceElementName() {
+		return this.sourceElementName;
 	}
 	
 	public String getName() {
@@ -126,19 +145,18 @@ public class SpecType {
 		
 		this.id = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 		this.name = specType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
+		this.alternativeID = XmlUtils.alternativeID(specType);
+		this.sourceElementName = XmlUtils.localName(specType);
 		this.type = ReqIFConst.UNDEFINED;
 
 		//Doors relationship definitionen habe keine ChildNodes
 		Node specAttributes = XmlUtils.firstChildElementByLocalName(specType, ReqIFConst.SPEC_ATTRIBUTES);
 		if(specAttributes != null) {
 
-			NodeList attributeDefinitions = specAttributes.getChildNodes();
+			for(Node attributeDefinition: XmlUtils.childElements(specAttributes)) {
 
-			for(int specatt = 0; specatt < attributeDefinitions.getLength(); specatt++) {
-				
-				Node attributeDefinition = attributeDefinitions.item(specatt);
-				String attDefNodeName = attributeDefinition.getNodeName();
-				if(!attDefNodeName.equals(ReqIFConst._TEXT)) {
+				String attDefNodeName = XmlUtils.localName(attributeDefinition);
+				{
 					
 					String attDefID = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
 					

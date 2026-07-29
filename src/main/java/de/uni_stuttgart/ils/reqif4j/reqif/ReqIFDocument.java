@@ -3,9 +3,6 @@ package de.uni_stuttgart.ils.reqif4j.reqif;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
@@ -13,6 +10,8 @@ import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
 import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
+import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 public class ReqIFDocument {
 
@@ -25,6 +24,7 @@ public class ReqIFDocument {
 
 	private ReqIFHeader header;
 	private ReqIFCoreContent content;
+	private final java.util.List<org.w3c.dom.Node> toolExtensions = new java.util.ArrayList<>();
 
 
 	public String getFilePath() {
@@ -41,6 +41,16 @@ public class ReqIFDocument {
 
 	public ReqIFCoreContent getCoreContent() {
 		return this.content;
+	}
+
+	/**
+	 * Tool-specific extensions of the document. They are not interpreted, only
+	 * kept as their original nodes so they survive a round trip.
+	 *
+	 * @return the TOOL-EXTENSIONS nodes, empty if the document declares none
+	 */
+	public java.util.List<org.w3c.dom.Node> getToolExtensions() {
+		return this.toolExtensions;
 	}
 
 
@@ -67,7 +77,7 @@ public class ReqIFDocument {
 		setTypeClassifier(typeClassifier);
 
 		try {
-			this.reqifDocument = newDocumentBuilder().parse(this.filePath);
+			this.reqifDocument = SecureXml.newDocumentBuilder().parse(this.filePath);
 			readDocument();
 
 		} catch (SAXException | IOException | ParserConfigurationException e) {
@@ -86,7 +96,7 @@ public class ReqIFDocument {
 		setTypeClassifier(typeClassifier);
 
 		try {
-			this.reqifDocument = newDocumentBuilder().parse(is);
+			this.reqifDocument = SecureXml.newDocumentBuilder().parse(is);
 			readDocument();
 
 		} catch (SAXException | IOException | ParserConfigurationException e) {
@@ -105,7 +115,7 @@ public class ReqIFDocument {
 		setTypeClassifier(typeClassifier);
 
 		try {
-			this.reqifDocument = newDocumentBuilder().parse(is);
+			this.reqifDocument = SecureXml.newDocumentBuilder().parse(is);
 			readDocument();
 
 		} catch (SAXException | IOException | ParserConfigurationException e) {
@@ -118,42 +128,23 @@ public class ReqIFDocument {
 	}
 
 
-	/**
-	 * Creates a namespace-aware, XXE-hardened document builder. Namespace
-	 * awareness is required so XHTML content with namespace prefixes
-	 * (e.g. {@code xhtml:div}) can be matched by local name.
-	 */
-	private static DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
-
-		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		factory.setNamespaceAware(true);
-
-		// Harden against XXE / entity expansion attacks
-		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-		factory.setXIncludeAware(false);
-		factory.setExpandEntityReferences(false);
-		try {
-			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-		} catch (IllegalArgumentException ignored) {
-			// parser implementation does not support these attributes
-		}
-
-		return factory.newDocumentBuilder();
-	}
-
 	private void readDocument() {
 
-		if (this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).getLength() > 0
-				&& this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0).hasChildNodes()) {
-			this.header = new ReqIFHeader((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.THE_HEADER).item(0));
+		// Elements are matched by local name, so a document that puts the ReqIF
+		// elements into a prefixed namespace is read just like one using the
+		// default namespace.
+		Element theHeader = XmlUtils.firstDescendantByLocalName(this.reqifDocument, ReqIFConst.THE_HEADER);
+		if (theHeader != null && theHeader.hasChildNodes()) {
+			this.header = new ReqIFHeader(theHeader);
 		}
-		if (this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).getLength() == 0) {
+		Element coreContent = XmlUtils.firstDescendantByLocalName(this.reqifDocument, ReqIFConst.CORE_CONTENT);
+		if (coreContent == null) {
 			throw new ReqIFParseException("Document contains no " + ReqIFConst.CORE_CONTENT + " element: " + this.fileName);
 		}
-		this.content = new ReqIFCoreContent((Element) this.reqifDocument.getElementsByTagName(ReqIFConst.CORE_CONTENT).item(0), this.typeClassifier);
+		this.content = new ReqIFCoreContent(coreContent, this.typeClassifier);
+
+		// Tool extensions are kept verbatim; the parser does not interpret them.
+		this.toolExtensions.addAll(XmlUtils.descendantsByLocalName(this.reqifDocument, ReqIFConst.TOOL_EXTENSIONS));
 	}
 
 	private static String extractFileName(String path) {
