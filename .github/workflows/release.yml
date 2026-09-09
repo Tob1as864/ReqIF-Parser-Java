@@ -51,9 +51,28 @@ jobs:
         run: |
           if [ -z "$DEPLOY_KEY" ]; then
             echo "::error::Secret MAVEN_REPO_DEPLOY_KEY is not set. See the README" \
-                 "section 'Publishing a new version' for how to create it."
+                 "section 'One-time setup of the publishing credentials'."
             exit 1
           fi
+          # A wrong key format fails much later with an opaque SSH error, so
+          # reject the common mistakes here with an actionable message.
+          case "$(printf '%s' "$DEPLOY_KEY" | head -n1)" in
+            '-----BEGIN '*'PRIVATE KEY-----')
+              ;;
+            'PuTTY-User-Key-File'*)
+              echo "::error::MAVEN_REPO_DEPLOY_KEY holds a PuTTY .ppk key, which OpenSSH" \
+                   "cannot read. In PuTTYgen use Conversions -> Export OpenSSH key and" \
+                   "store that file's full contents instead."
+              exit 1
+              ;;
+            *)
+              echo "::error::MAVEN_REPO_DEPLOY_KEY is not an OpenSSH private key. It must" \
+                   "contain the complete key file, starting with a line" \
+                   "'-----BEGIN OPENSSH PRIVATE KEY-----' - not a single line copied out" \
+                   "of it."
+              exit 1
+              ;;
+          esac
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           # printf keeps the trailing newline OpenSSH requires; a here-string would not.

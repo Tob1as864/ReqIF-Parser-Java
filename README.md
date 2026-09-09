@@ -97,9 +97,17 @@ grants write access to that one repository only:
 2. In **Tob1as864/maven-repo** -> *Settings -> Deploy keys -> Add deploy key*:
    paste the contents of `maven-repo-key.pub` and tick **Allow write access**.
 3. In **this** repository -> *Settings -> Secrets and variables -> Actions ->
-   New repository secret*: name `MAVEN_REPO_DEPLOY_KEY`, value the contents of
-   the private key file `maven-repo-key` (including the BEGIN/END lines).
+   New repository secret* (a repository secret, not an environment secret):
+   name `MAVEN_REPO_DEPLOY_KEY`, value the **complete** contents of the private
+   key file `maven-repo-key`, from `-----BEGIN OPENSSH PRIVATE KEY-----` through
+   `-----END OPENSSH PRIVATE KEY-----`.
 4. Delete both local key files.
+
+The secret must hold an OpenSSH private key in its original multi-line form;
+the workflow rejects anything else before it starts publishing. PuTTY's own
+`.ppk` format does not work - if you generate the key with PuTTYgen, use
+*Conversions -> Export OpenSSH key* and store that exported file's contents.
+The key must not have a passphrase, because the workflow runs unattended.
 
 The same deploy key setup is repeated per library that publishes into
 `maven-repo`; each library repository gets its own key.
