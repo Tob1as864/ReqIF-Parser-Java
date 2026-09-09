@@ -1,0 +1,55 @@
+name: Publish to Maven repo
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. 1.2.0. Leave empty to publish the current pom version (SNAPSHOT).'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+# The job rewrites the maven-repo branch, so never run two of them at once.
+concurrency:
+  group: maven-repo-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # A full clone; the publish script fetches and pushes the maven-repo branch.
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Tag v1.2.0 publishes version 1.2.0.
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Publish
+        run: .github/scripts/publish-maven-repo.sh "${{ steps.version.outputs.value }}"

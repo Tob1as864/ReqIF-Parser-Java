@@ -15,6 +15,66 @@ document puts the ReqIF elements into the default namespace
 (`<REQ-IF xmlns="...">`) or into a prefixed one (`<rif:REQ-IF xmlns:rif="...">`).
 The same holds for the embedded XHTML (`xhtml:div`, `reqif-xhtml:div`, ...).
 
+# Using reqif4j as a dependency
+
+Released artifacts are published into the
+[`maven-repo`](https://github.com/Tob1as864/ReqIF-Parser-Java/tree/maven-repo)
+branch of this repository and served over `raw.githubusercontent.com`.
+No GitHub token and no `settings.xml` entry is needed.
+
+Maven:
+
+```xml
+<repositories>
+  <repository>
+    <id>reqif4j</id>
+    <url>https://raw.githubusercontent.com/Tob1as864/ReqIF-Parser-Java/maven-repo</url>
+    <snapshots><enabled>true</enabled></snapshots>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>de.uni_stuttgart.ils</groupId>
+    <artifactId>reqif4j</artifactId>
+    <version>1.1.0</version>
+  </dependency>
+</dependencies>
+```
+
+Gradle:
+
+```kotlin
+repositories {
+    maven { url = uri("https://raw.githubusercontent.com/Tob1as864/ReqIF-Parser-Java/maven-repo") }
+}
+
+dependencies {
+    implementation("de.uni_stuttgart.ils:reqif4j:1.1.0")
+}
+```
+
+Sources and javadoc jars are published alongside every version, so IDEs can
+show the API documentation. Note that raw.githubusercontent.com is CDN-cached
+for a few minutes, so a freshly published version may not resolve immediately.
+
+## Publishing a new version
+
+`.github/workflows/release.yml` builds the artifacts and commits them into the
+`maven-repo` branch. It runs when a `v*` tag is pushed (tag `v1.2.0` publishes
+version `1.2.0`), or on demand via *Actions -> Publish to Maven repo -> Run
+workflow*, where an empty version input publishes the current SNAPSHOT.
+
+Release versions are immutable: publishing a version that already exists in the
+branch fails instead of overwriting it. The pom version is only changed for the
+build, so no version bump is committed to the source branch.
+
+The same publish step can be run locally, without pushing:
+
+```
+PUSH=false .github/scripts/publish-maven-repo.sh 1.2.0
+```
+
 # Build & Test
 The project builds with Maven (Java 17+):
 
