@@ -15,6 +15,103 @@ document puts the ReqIF elements into the default namespace
 (`<REQ-IF xmlns="...">`) or into a prefixed one (`<rif:REQ-IF xmlns:rif="...">`).
 The same holds for the embedded XHTML (`xhtml:div`, `reqif-xhtml:div`, ...).
 
+# Using reqif4j as a dependency
+
+Released artifacts are published into the separate, public repository
+[Tob1as864/maven-repo](https://github.com/Tob1as864/maven-repo), which holds a
+plain Maven repository layout and is served over `raw.githubusercontent.com`.
+No GitHub token and no `settings.xml` entry is needed.
+
+Maven:
+
+```xml
+<repositories>
+  <repository>
+    <id>tob1as864</id>
+    <url>https://raw.githubusercontent.com/Tob1as864/maven-repo/main</url>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>de.uni_stuttgart.ils</groupId>
+    <artifactId>reqif4j</artifactId>
+    <version>1.1.0</version>
+  </dependency>
+</dependencies>
+```
+
+The repository `<id>` is just a local name for the declaration — pick any name
+that is unique inside your own pom; it is unrelated to the library's
+`artifactId`. Its only technical purpose is linking a repository to matching
+`<server>` credentials or mirrors in `settings.xml`, neither of which this
+repository needs.
+
+To use a development build, additionally allow snapshots for the repository.
+Maven enables them by default, so this is only needed if you switched them off:
+
+```xml
+<snapshots><enabled>true</enabled></snapshots>
+```
+
+Gradle:
+
+```kotlin
+repositories {
+    maven { url = uri("https://raw.githubusercontent.com/Tob1as864/maven-repo/main") }
+}
+
+dependencies {
+    implementation("de.uni_stuttgart.ils:reqif4j:1.1.0")
+}
+```
+
+Sources and javadoc jars are published alongside every version, so IDEs can
+show the API documentation. Note that raw.githubusercontent.com is CDN-cached
+for a few minutes, so a freshly published version may not resolve immediately.
+
+## Publishing a new version
+
+`.github/workflows/release.yml` builds the artifacts and commits them into the
+`maven-repo` repository. It runs when a `v*` tag is pushed (tag `v1.2.0`
+publishes version `1.2.0`), or on demand via *Actions -> Publish to Maven repo
+-> Run workflow*, where an empty version input publishes the current SNAPSHOT.
+
+Release versions are immutable: publishing a version that already exists there
+fails instead of overwriting it. The pom version is only changed for the build,
+so no version bump is committed to this repository.
+
+The same publish step can be run locally, without pushing:
+
+```
+PUSH=false .github/scripts/publish-maven-repo.sh 1.2.0
+```
+
+### One-time setup of the publishing credentials
+
+The workflow authenticates against `maven-repo` with an SSH deploy key, which
+grants write access to that one repository only:
+
+1. Create the key pair locally, without a passphrase:
+   `ssh-keygen -t ed25519 -C "reqif4j release workflow" -f maven-repo-key -N ""`
+2. In **Tob1as864/maven-repo** -> *Settings -> Deploy keys -> Add deploy key*:
+   paste the contents of `maven-repo-key.pub` and tick **Allow write access**.
+3. In **this** repository -> *Settings -> Secrets and variables -> Actions ->
+   New repository secret* (a repository secret, not an environment secret):
+   name `MAVEN_REPO_DEPLOY_KEY`, value the **complete** contents of the private
+   key file `maven-repo-key`, from `-----BEGIN OPENSSH PRIVATE KEY-----` through
+   `-----END OPENSSH PRIVATE KEY-----`.
+4. Delete both local key files.
+
+The secret must hold an OpenSSH private key in its original multi-line form;
+the workflow rejects anything else before it starts publishing. PuTTY's own
+`.ppk` format does not work - if you generate the key with PuTTYgen, use
+*Conversions -> Export OpenSSH key* and store that exported file's contents.
+The key must not have a passphrase, because the workflow runs unattended.
+
+The same deploy key setup is repeated per library that publishes into
+`maven-repo`; each library repository gets its own key.
+
 # Build & Test
 The project builds with Maven (Java 17+):
 

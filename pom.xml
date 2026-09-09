@@ -11,12 +11,46 @@
 
     <name>reqif4j</name>
     <description>Java parser for ReqIF (Requirements Interchange Format) documents</description>
+    <url>https://github.com/Tob1as864/ReqIF-Parser-Java</url>
+
+    <licenses>
+        <license>
+            <name>GNU General Public License, version 3</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/Tob1as864/ReqIF-Parser-Java.git</connection>
+        <developerConnection>scm:git:git@github.com:Tob1as864/ReqIF-Parser-Java.git</developerConnection>
+        <url>https://github.com/Tob1as864/ReqIF-Parser-Java</url>
+    </scm>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
+        <!--
+          Target directory of `mvn deploy`. The artifacts are written as a plain
+          Maven repository layout into this directory; the release workflow points
+          it at a checkout of the `maven-repo` branch and commits the result.
+        -->
+        <maven.repo.dir>${project.build.directory}/maven-repo</maven.repo.dir>
     </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>git-maven-repo</id>
+            <name>Git-hosted Maven repository (maven-repo branch)</name>
+            <url>file://${maven.repo.dir}</url>
+        </repository>
+        <snapshotRepository>
+            <id>git-maven-repo</id>
+            <name>Git-hosted Maven repository (maven-repo branch)</name>
+            <url>file://${maven.repo.dir}</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <dependencies>
         <dependency>
@@ -34,6 +68,66 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>3.1.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>3.1.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.16.2</version>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Activated by the release workflow. Attaches the sources and javadoc jars
+          so that IDEs of consuming projects can resolve them. Keeping this out of
+          the default build leaves `mvn verify` on CI fast.
+        -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.6.3</version>
+                        <configuration>
+                            <doclint>none</doclint>
+                            <quiet>true</quiet>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

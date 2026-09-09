@@ -1,0 +1,89 @@
+name: Publish to Maven repo
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. 1.2.0. Leave empty to publish the current pom version (SNAPSHOT).'
+        required: false
+        default: ''
+
+# Only the checkout of this repository is needed; writing to the Maven
+# repository goes through the deploy key, not through GITHUB_TOKEN.
+permissions:
+  contents: read
+
+# The job pushes to a shared repository, so never run two of them at once.
+concurrency:
+  group: maven-repo-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Tag v1.2.0 publishes version 1.2.0.
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up deploy key for the Maven repository
+        env:
+          DEPLOY_KEY: ${{ secrets.MAVEN_REPO_DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::error::Secret MAVEN_REPO_DEPLOY_KEY is not set. See the README" \
+                 "section 'One-time setup of the publishing credentials'."
+            exit 1
+          fi
+          # A wrong key format fails much later with an opaque SSH error, so
+          # reject the common mistakes here with an actionable message.
+          case "$(printf '%s' "$DEPLOY_KEY" | head -n1)" in
+            '-----BEGIN '*'PRIVATE KEY-----')
+              ;;
+            'PuTTY-User-Key-File'*)
+              echo "::error::MAVEN_REPO_DEPLOY_KEY holds a PuTTY .ppk key, which OpenSSH" \
+                   "cannot read. In PuTTYgen use Conversions -> Export OpenSSH key and" \
+                   "store that file's full contents instead."
+              exit 1
+              ;;
+            *)
+              echo "::error::MAVEN_REPO_DEPLOY_KEY is not an OpenSSH private key. It must" \
+                   "contain the complete key file, starting with a line" \
+                   "'-----BEGIN OPENSSH PRIVATE KEY-----' - not a single line copied out" \
+                   "of it."
+              exit 1
+              ;;
+          esac
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          # printf keeps the trailing newline OpenSSH requires; a here-string would not.
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Configure git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Publish
+        run: .github/scripts/publish-maven-repo.sh "${{ steps.version.outputs.value }}"
