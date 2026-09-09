@@ -42,6 +42,14 @@ Maven:
 </dependencies>
 ```
 
+The repository `<id>` is just a local name for the declaration — pick any name
+that is unique inside your own pom; it is unrelated to the library's
+`artifactId`. Its only technical purpose is linking a repository to matching
+`<server>` credentials or mirrors in `settings.xml`, neither of which this
+repository needs. The `<snapshots>` element is optional too: Maven resolves
+snapshots from a self-declared repository by default, so it is only needed to
+switch them *off* (`<enabled>false</enabled>`).
+
 Gradle:
 
 ```kotlin
