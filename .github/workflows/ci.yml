@@ -2,9 +2,6 @@ name: CI
 
 on:
   push:
-    branches-ignore:
-      # Generated branch holding the published Maven artifacts, nothing to build.
-      - maven-repo
   pull_request:
 
 jobs:
