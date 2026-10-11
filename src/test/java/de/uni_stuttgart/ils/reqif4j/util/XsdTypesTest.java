@@ -10,13 +10,29 @@ class XsdTypesTest {
 
 	@Test
 	void ncNames() {
-		for (String valid : new String[] { "so-1", "_x", "REQ.1", "Anforderung-ä", "a·b", "_1" }) {
+		for (String valid : new String[] { "so-1", "_x", "REQ.1", "Anforderung-\u00E4", "a\u00B7b", "_1", "\u03A9mega" }) {
 			assertTrue(XsdTypes.isNCName(valid), valid);
 		}
-		for (String invalid : new String[] { "", "1-req", "-a", ".a", "a b", "a:b", "a/b", "a#b" }) {
+		for (String invalid : new String[] { "", "1-req", "-a", ".a", "a b", "a:b", "a/b", "a#b", "\u00E4 b", "\u00E4\u0001" }) {
 			assertFalse(XsdTypes.isNCName(invalid), invalid);
 		}
 		assertFalse(XsdTypes.isNCName(null));
+	}
+
+	@Test
+	void nonAsciiNamesFollowTheJdkSchemaValidator() {
+		// Glagolitic was added to Unicode after the name tables the JDK's schema
+		// validator uses; XML 1.0 fifth edition would allow it
+		assertFalse(XsdTypes.isNCName("\u2C00x"));
+	}
+
+	@Test
+	void xmlText() {
+		assertTrue(XsdTypes.isXmlText("tab\tnewline\n\u00E4\uD83D\uDE00"));
+		assertTrue(XsdTypes.isXmlText(null));
+		assertFalse(XsdTypes.isXmlText("a\u0001b"));
+		assertFalse(XsdTypes.isXmlText("lone \uD800 surrogate"));
+		assertFalse(XsdTypes.isXmlText("\uFFFE"));
 	}
 
 	@Test

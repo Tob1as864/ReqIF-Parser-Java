@@ -1,6 +1,7 @@
 package de.uni_stuttgart.ils.reqif4j;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -11,9 +12,11 @@ import org.junit.jupiter.api.Test;
 
 import de.uni_stuttgart.ils.reqif4j.build.ReqIFBuilder;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
+import de.uni_stuttgart.ils.reqif4j.specification.RelationGroup;
 import de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationIssue;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationResult;
+import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
 
 /**
  * The model validator reports what would make the written file
@@ -125,6 +128,62 @@ class ValidatorSchemaRulesTest {
 				.build();
 
 		assertEquals(List.of(), issues(document), "two emoji are two characters");
+	}
+
+	@Test
+	void enumerationDefaultGivenAsTextIsAnErrorAndNotWritten() {
+
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr"))
+				.enumerationDatatype("dt-enum", "Color", e -> e.value("ev-red", "Red", "1"))
+				.specObjectType("st", "Type", t -> t.attribute("ad-color", "Color", "dt-enum", "ev-red"))
+				.build();
+
+		assertEquals(List.of("ERROR [ad-color]: Default value of an enumeration must be given as enum value "
+				+ "references (an enumeration attribute definition), not as text"), issues(document));
+		assertFalse(new ReqIFWriter().toXml(document).contains("<DEFAULT-VALUE>"));
+	}
+
+	@Test
+	void malformedXhtmlDefaultIsAnError() {
+
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr"))
+				.xhtmlDatatype("dt-xhtml", "XHTML")
+				.specObjectType("st", "Type", t -> t.attribute("ad-text", "Text", "dt-xhtml", "a < b"))
+				.build();
+
+		assertEquals(List.of("ERROR [ad-text]: Default value is not well-formed XHTML"), issues(document));
+	}
+
+	@Test
+	void relationGroupNeedsTypeSourceAndTarget() {
+
+		ReqIFDocument document = document(b -> { });
+		document.getCoreContent().addRelationGroup(new RelationGroup("rg-1", "Group", null, null, null, null));
+
+		assertEquals(List.of(
+				"ERROR [rg-1]: Relation group has no type reference",
+				"ERROR [rg-1]: Relation group has no source specification",
+				"ERROR [rg-1]: Relation group has no target specification"), issues(document));
+	}
+
+	@Test
+	void textXmlCannotHoldIsAnError() {
+
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr").title("bell\u0007"))
+				.stringDatatype("dt-string", "String", 100)
+				.specObjectType("st", "Type", t -> t.stringAttribute("ad-name", "Name", "dt-string"))
+				.specObject("so-1", "st", o -> o.set("ad-name", "a\u0001b"))
+				.build();
+		document.getCoreContent().getSpecObject("so-1").setDesc("lone \uD800");
+
+		assertEquals(List.of(
+				"ERROR [hdr]: TITLE contains characters XML does not allow (control characters)",
+				"ERROR [so-1]: DESC of SPEC-OBJECT contains characters XML does not allow (control characters)",
+				"ERROR [so-1]: Attribute 'Name' contains characters XML does not allow (control characters)"),
+				issues(document));
 	}
 
 	@Test

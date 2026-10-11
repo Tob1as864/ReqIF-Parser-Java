@@ -339,7 +339,9 @@ new ReqIFWriter().setClock(Clock.fixed(Instant.parse("2026-10-11T12:00:00Z"), Zo
 What no default can fix - a missing header, missing or invalid
 identifiers, malformed dates - is reported by `ReqIFValidator` (see
 below). A document the validator accepts without errors is written
-schema-valid.
+schema-valid, with one exception: which XHTML elements a value may use
+(ReqIF allows a subset, e.g. no `font` or `img`) is only checked by
+`validateAgainstSchema`, against the official schema.
 
 Indenting is **off by default**: the XML indenter inserts whitespace into
 mixed content, which would change XHTML attribute values. Enable it with
@@ -424,6 +426,8 @@ Values the schema constrains are errors when they do not fit:
 schema notation (`true`/`false`, `1.5`, `INF`). Values outside the
 limits of their datatype (`MAX-LENGTH`, `MIN`/`MAX`) are warnings: the
 schema cannot express those limits, but importing tools may reject them.
+Text with characters XML cannot hold (control characters) is an error,
+as are relation groups without type, source or target specification.
 
 ```java
 new ReqIFValidator().validate(document).throwIfInvalid();

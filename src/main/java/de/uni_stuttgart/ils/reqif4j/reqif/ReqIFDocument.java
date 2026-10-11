@@ -144,7 +144,13 @@ public class ReqIFDocument {
 		this.content = new ReqIFCoreContent(coreContent, this.typeClassifier);
 
 		// Tool extensions are kept verbatim; the parser does not interpret them.
-		this.toolExtensions.addAll(XmlUtils.descendantsByLocalName(this.reqifDocument, ReqIFConst.TOOL_EXTENSIONS));
+		// Only the TOOL-EXTENSIONS of REQ-IF itself; a vendor extension may well
+		// contain an element of that name, and the schema allows one only.
+		for (Element child : XmlUtils.childElements(this.reqifDocument.getDocumentElement())) {
+			if (ReqIFConst.TOOL_EXTENSIONS.equals(XmlUtils.localName(child))) {
+				this.toolExtensions.add(child);
+			}
+		}
 	}
 
 	private static String extractFileName(String path) {

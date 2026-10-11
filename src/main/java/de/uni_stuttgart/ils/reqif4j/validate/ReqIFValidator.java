@@ -48,6 +48,7 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecRelation;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
+import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
 import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
 
@@ -71,7 +72,9 @@ import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
  *
  * Required values the writer fills in when the model lacks them (see
  * {@link ReqIFWriter#buildDocument(ReqIFDocument)}) are not reported. A
- * document without errors is written schema-valid.
+ * document without errors is written schema-valid, except for the XHTML
+ * content model: which XHTML elements a value may use is only checked by
+ * {@link #validateAgainstSchema(ReqIFDocument, Path)}.
  *
  * This is a model-level check, not a schema check. The OMG ReqIF XSD is not
  * bundled with this library; if you have it, pass it to
@@ -129,6 +132,10 @@ public class ReqIFValidator {
 		} else {
 			checkIdentifier(header.getID(), "REQ-IF-HEADER", result, identifiers);
 		}
+		checkText(header.getID(), "TITLE", header.getTitle(), result);
+		checkText(header.getID(), "COMMENT", header.getComment(), result);
+		checkText(header.getID(), "REQ-IF-TOOL-ID", header.getToolID(), result);
+		checkText(header.getID(), "SOURCE-TOOL-ID", header.getSourceToolID(), result);
 		if (!isBlank(header.getCreationTime()) && !XsdTypes.isDateTime(header.getCreationTime())) {
 			result.error(header.getID(), "CREATION-TIME '" + header.getCreationTime() + "' is not an xsd:dateTime");
 		}
@@ -154,6 +161,7 @@ public class ReqIFValidator {
 			} else if (datatype instanceof DatatypeEnumeration) {
 				for (DatatypeEnumerationValue value : ((DatatypeEnumeration) datatype).getEnumValues().values()) {
 					checkIdentifiable(value, "ENUM-VALUE", result, identifiers);
+					checkText(value.getID(), "OTHER-CONTENT of enum value", value.getOtherContent(), result);
 					if (isBlank(value.getKey())) {
 						result.error(value.getID(), "Enum value '" + value.getName() + "' has no KEY");
 					} else if (!XsdTypes.isInteger(value.getKey())) {
@@ -179,10 +187,8 @@ public class ReqIFValidator {
 
 			for (AttributeDefinition definition : specType.getAttributeDefinitions().values()) {
 				checkIdentifiable(definition, "ATTRIBUTE-DEFINITION", result, identifiers);
-				// written verbatim, so it must already be in schema notation; XHTML
-				// defaults are markup and written as such
-				if (definition.getDefaultValue() != null && !(definition instanceof AttributeDefinitionEnumeration)
-						&& !(definition.getDataType() != null && ReqIFConst.XHTML.equals(definition.getDataType().getType()))) {
+				// written verbatim, so it must already be in schema notation
+				if (definition.getDefaultValue() != null && !(definition instanceof AttributeDefinitionEnumeration)) {
 					checkScalar(definition.getID(), "Default value", definition, definition.getDefaultValue(), result);
 				}
 
@@ -291,8 +297,9 @@ public class ReqIFValidator {
 		for (RelationGroup group : content.getRelationGroups().values()) {
 			checkIdentifiable(group, "RELATION-GROUP", result, identifiers);
 
-			if (group.getRelationGroupTypeRef() != null
-					&& content.getSpecType(group.getRelationGroupTypeRef()) == null) {
+			if (isBlank(group.getRelationGroupTypeRef())) {
+				result.error(group.getID(), "Relation group has no type reference");
+			} else if (content.getSpecType(group.getRelationGroupTypeRef()) == null) {
 				result.error(group.getID(), "Relation group references type " + group.getRelationGroupTypeRef()
 						+ ", which is not declared in SPEC-TYPES");
 			}
@@ -311,7 +318,9 @@ public class ReqIFValidator {
 	private void checkSpecificationRef(ReqIFCoreContent content, RelationGroup group, String specificationRef,
 			String role, ValidationResult result) {
 
-		if (specificationRef != null && content.getSpecification(specificationRef) == null) {
+		if (isBlank(specificationRef)) {
+			result.error(group.getID(), "Relation group has no " + role + " specification");
+		} else if (content.getSpecification(specificationRef) == null) {
 			result.error(group.getID(), "Relation group " + role + " specification " + specificationRef
 					+ " is not declared in SPECIFICATIONS");
 		}
@@ -395,8 +404,25 @@ public class ReqIFValidator {
 			return;
 		}
 		String category = datatype.getType();
+		if (!XsdTypes.isXmlText(text)) {
+			result.error(ownerID, what + " contains characters XML does not allow (control characters)");
+			return;
+		}
 
-		if (ReqIFConst.DATE.equals(category)) {
+		if (ReqIFConst.ENUMERATION.equals(category)) {
+			// only reachable for a default of a definition that is not an
+			// AttributeDefinitionEnumeration; enum values are references
+			result.error(ownerID, what + " of an enumeration must be given as enum value references "
+					+ "(an enumeration attribute definition), not as text");
+
+		} else if (ReqIFConst.XHTML.equals(category)) {
+			try {
+				XhtmlParser.parseDiv(text);
+			} catch (IllegalArgumentException e) {
+				result.error(ownerID, what + " is not well-formed XHTML");
+			}
+
+		} else if (ReqIFConst.DATE.equals(category)) {
 			if (!XsdTypes.isDateTime(text)) {
 				result.error(ownerID, what + ": '" + text + "' is not an xsd:dateTime");
 			}
@@ -438,6 +464,15 @@ public class ReqIFValidator {
 		}
 	}
 
+	/**
+	 * Text with characters XML does not allow cannot be written at all.
+	 */
+	private void checkText(String ownerID, String what, String text, ValidationResult result) {
+		if (!XsdTypes.isXmlText(text)) {
+			result.error(ownerID, what + " contains characters XML does not allow (control characters)");
+		}
+	}
+
 	private static boolean outside(BigInteger value, long min, long max) {
 		return value.compareTo(BigInteger.valueOf(min)) < 0 || value.compareTo(BigInteger.valueOf(max)) > 0;
 	}
@@ -450,6 +485,8 @@ public class ReqIFValidator {
 			Map<String, String> identifiers) {
 
 		checkIdentifier(identifiable.getID(), kind, result, identifiers);
+		checkText(identifiable.getID(), "LONG-NAME of " + kind, identifiable.getName(), result);
+		checkText(identifiable.getID(), "DESC of " + kind, identifiable.getDesc(), result);
 
 		String lastChange = identifiable.getLastChange();
 		if (!isBlank(lastChange) && !XsdTypes.isDateTime(lastChange)) {
@@ -585,13 +622,14 @@ public class ReqIFValidator {
 	 * fatal errors are errors.
 	 *
 	 * After a fatal error the parser throws a new exception for the same
-	 * problem, so findings are told apart by position and message, not by
-	 * object identity.
+	 * problem; that one must not be reported again. Errors and warnings are
+	 * never merged: findings on a DOM source carry no position, so equal
+	 * messages may well be different problems.
 	 */
 	private static final class IssueCollector implements ErrorHandler {
 
 		private final ValidationResult result;
-		private final Set<String> reported = new HashSet<String>();
+		private final Set<String> fatalErrors = new HashSet<String>();
 
 		IssueCollector(ValidationResult result) {
 			this.result = result;
@@ -599,23 +637,26 @@ public class ReqIFValidator {
 
 		@Override
 		public void warning(SAXParseException exception) {
-			if (this.reported.add(fingerprint(exception))) {
-				this.result.warning(null, message(exception));
-			}
+			this.result.warning(null, message(exception));
 		}
 
 		@Override
 		public void error(SAXParseException exception) {
-			reportUnlessReported(exception);
+			this.result.error(null, message(exception));
 		}
 
 		@Override
 		public void fatalError(SAXParseException exception) {
-			reportUnlessReported(exception);
+			this.fatalErrors.add(fingerprint(exception));
+			this.result.error(null, message(exception));
 		}
 
+		/**
+		 * For an exception that ended parsing: reports it unless it repeats a
+		 * fatal error the handler has seen already.
+		 */
 		void reportUnlessReported(SAXException exception) {
-			if (this.reported.add(fingerprint(exception))) {
+			if (!this.fatalErrors.contains(fingerprint(exception))) {
 				this.result.error(null, exception instanceof SAXParseException
 						? message((SAXParseException) exception)
 						: exception.getMessage());

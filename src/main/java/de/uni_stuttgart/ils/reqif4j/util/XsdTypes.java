@@ -1,8 +1,17 @@
 package de.uni_stuttgart.ils.reqif4j.util;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.xml.XMLConstants;
+import javax.xml.transform.stream.StreamSource;
+import javax.xml.validation.Schema;
+
+import org.xml.sax.SAXException;
 
 /**
  * The lexical rules of the XML Schema types ReqIF uses, for checks and
@@ -11,18 +20,15 @@ import java.util.regex.Pattern;
 public final class XsdTypes {
 
 	/**
-	 * xsd:NCName (the lexical space of xsd:ID), following the name characters
-	 * of XML 1.0 fifth edition without the colon. The JDK's schema validator
-	 * uses the older, stricter character tables, so a few exotic characters
-	 * pass here but not there; ASCII and common letters agree.
+	 * xsd:NCName restricted to ASCII, where all editions of XML agree on the
+	 * name characters.
 	 */
-	private static final Pattern NC_NAME = Pattern.compile(
-			"[A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF"
-			+ "\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD"
-			+ "\\x{10000}-\\x{EFFFF}]"
-			+ "[A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF"
-			+ "\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD"
-			+ "\\x{10000}-\\x{EFFFF}\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*");
+	private static final Pattern ASCII_NC_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9._-]*");
+
+	private static final Pattern ASCII = Pattern.compile("\\p{ASCII}*");
+
+	/** compiled on first use; only needed for identifiers with non-ASCII characters */
+	private static Schema ncNameSchema;
 
 	/**
 	 * xsd:dateTime: year with at least four digits, optional fraction of
@@ -52,9 +58,76 @@ public final class XsdTypes {
 
 	/**
 	 * @return true if the text is a valid xsd:ID / xsd:NCName
+	 *
+	 * The editions of XML differ in which non-ASCII characters a name may
+	 * contain, and the JDK's schema validator follows an older one than the
+	 * current specification. Identifiers with non-ASCII characters are
+	 * therefore checked by that validator itself, so this method and
+	 * schema validation always agree.
 	 */
 	public static boolean isNCName(String text) {
-		return text != null && NC_NAME.matcher(text).matches();
+
+		if (text == null || text.isEmpty()) {
+			return false;
+		}
+		if (ASCII.matcher(text).matches()) {
+			return ASCII_NC_NAME.matcher(text).matches();
+		}
+		// the schema collapses whitespace before checking, an identifier
+		// written to a file must not contain any
+		if (!isXmlText(text) || text.codePoints().anyMatch(Character::isWhitespace)) {
+			return false;
+		}
+		try {
+			String document = "<n>" + text.replace("&", "&amp;").replace("<", "&lt;") + "</n>";
+			ncNameSchema().newValidator().validate(new StreamSource(new StringReader(document)));
+			return true;
+		} catch (SAXException notAName) {
+			return false;
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	private static synchronized Schema ncNameSchema() {
+
+		if (ncNameSchema == null) {
+			String xsd = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">"
+					+ "<xs:element name=\"n\" type=\"xs:NCName\"/></xs:schema>";
+			try {
+				ncNameSchema = SecureXml.newSchemaFactory(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+						.newSchema(new StreamSource(new StringReader(xsd)));
+			} catch (SAXException e) {
+				throw new IllegalStateException("Built-in NCName schema does not compile", e);
+			}
+		}
+		return ncNameSchema;
+	}
+
+	/**
+	 * @return true if every character of the text may appear in an XML 1.0
+	 *         document; control characters (except tab, line feed, carriage
+	 *         return), unpaired surrogates and U+FFFE/U+FFFF may not
+	 */
+	public static boolean isXmlText(String text) {
+
+		if (text == null) {
+			return true;
+		}
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (Character.isHighSurrogate(c) && i + 1 < text.length() && Character.isLowSurrogate(text.charAt(i + 1))) {
+				i++;
+				continue;
+			}
+			boolean allowed = c == 0x9 || c == 0xA || c == 0xD
+					|| (c >= 0x20 && c <= 0xD7FF)
+					|| (c >= 0xE000 && c <= 0xFFFD);
+			if (!allowed) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**

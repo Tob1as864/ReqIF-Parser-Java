@@ -66,6 +66,28 @@ class SchemaConformanceTest {
 	}
 
 	@Test
+	void documentAndFileValidationReportTheSameFindings(@TempDir Path tempDir) throws Exception {
+
+		// two objects with the same disallowed XHTML element: on a DOM source
+		// the findings have no position, but they are still two findings
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr"))
+				.xhtmlDatatype("dt-xhtml", "XHTML")
+				.specObjectType("st", "Type", t -> t.xhtmlAttribute("ad-text", "Text", "dt-xhtml"))
+				.specObject("so-1", "st", o -> o.setXhtml("ad-text", "<font>x</font>"))
+				.specObject("so-2", "st", o -> o.setXhtml("ad-text", "<font>x</font>"))
+				.build();
+		Path file = tempDir.resolve("out.reqif");
+		new ReqIFWriter().write(document, file);
+
+		ValidationResult ofDocument = new ReqIFValidator().validateAgainstSchema(document, OfficialReqIFSchema.reqifXsd());
+		ValidationResult ofFile = new ReqIFValidator().validateAgainstSchema(file, OfficialReqIFSchema.reqifXsd());
+
+		assertFalse(ofFile.isValid());
+		assertEquals(ofFile.getErrors().size(), ofDocument.getErrors().size(), ofDocument.toString());
+	}
+
+	@Test
 	void roundTripOfASchemaValidDocumentStaysSchemaValid(@TempDir Path tempDir) throws Exception {
 
 		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "in.reqif", TestFixtures.SCHEMA_VALID_REQIF).toString());

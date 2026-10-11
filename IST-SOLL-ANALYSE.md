@@ -29,16 +29,20 @@ bei Enum-Werten `""`). `DatatypeEnumeration.getEnumValueName()` liefert weiterhi
 |---|---|---|
 | **2.1** `LAST-CHANGE`-Default | ✅ erledigt | Der Writer setzt fehlendes `LAST-CHANGE` auf die `CREATION-TIME` des Headers bzw. den Schreibzeitpunkt (Clock injizierbar). Das Modell bleibt unverändert. |
 | **2.2** Pflichtattribute | ✅ erledigt | `MULTI-VALUED` und `OTHER-CONTENT` werden immer geschrieben, REAL behält `ACCURACY`/`MIN`/`MAX` (Defaults 15 / voller double-Bereich), Header-Pflichtfelder bekommen Defaults, der Builder vergibt eine freie Header-ID. Unendlich wird als `INF`/`-INF` geschrieben und gelesen, XHTML-Defaults werden als Markup geschrieben. |
-| **2.3** Modellvalidator | ✅ erledigt | Fehler bei allem, was die Ausgabe schemaungültig machen würde: ungültige `xsd:ID`, kein `xsd:dateTime` (`LAST-CHANGE`, `CREATION-TIME`, DATE-Werte), `REQ-IF-VERSION` ≠ `1.0`, nicht ganzzahliger Enum-`KEY`, Defaults nicht in Schema-Notation, fehlender Header. Warnungen bei Verstößen gegen `MAX-LENGTH` und `MIN`/`MAX`. Vertrag: Ein Dokument ohne Fehler wird schemagültig geschrieben. |
+| **2.3** Modellvalidator | ✅ erledigt | Fehler bei allem, was die Ausgabe schemaungültig machen würde: ungültige `xsd:ID`, kein `xsd:dateTime` (`LAST-CHANGE`, `CREATION-TIME`, DATE-Werte), `REQ-IF-VERSION` ≠ `1.0`, nicht ganzzahliger Enum-`KEY`, Defaults nicht in Schema-Notation, fehlender Header. Warnungen bei Verstößen gegen `MAX-LENGTH` und `MIN`/`MAX`. Außerdem Fehler bei Zeichen, die XML nicht aufnehmen kann, Enum-Defaults als Text und Relationsgruppen ohne Typ/Quelle/Ziel. Vertrag: Ein Dokument ohne Fehler wird schemagültig geschrieben, mit Ausnahme des XHTML-Vokabulars (z. B. `font`, `img` sind in ReqIF nicht erlaubt), das nur `validateAgainstSchema` prüft (siehe 5.2). |
 
 Ergebnis von Phase 2: Mit dem Builder erzeugte Dokumente (das README-Beispiel) und der Round-Trip einer
 schemagültigen Datei mit REAL-Grenzen, `MULTI-VALUED="false"` und leerem `OTHER-CONTENT` bestehen das
 offizielle OMG-Schema. Die Tests prüfen das in der CI gegen das echte XSD.
 
-Bekannte Grenzen: Die xsd:ID-Prüfung folgt den Namenszeichen von XML 1.0 (5. Ausgabe), der
-JDK-Validator den älteren Tabellen. Bei exotischen Unicode-Zeichen können beide abweichen. Ein reines
-Datum (`2026-01-01`) in DATE-Werten liest der Parser weiterhin tolerant ein, der Validator meldet es als
-Fehler.
+Weitere Funde der Review-Runden in Phase 2: Der Parser übernahm auch verschachtelte `TOOL-EXTENSIONS`
+aus Vendor-Erweiterungen (jetzt nur direkte Kinder von `REQ-IF`). Unendliche REAL-Werte konnte die
+Bibliothek nicht mehr einlesen, nachdem sie als `INF` geschrieben wurden (jetzt in beide Richtungen
+xsd-Notation). XHTML-Defaults wurden als ungültiges Attribut geschrieben.
+
+Bekannte Grenzen: IDs mit Nicht-ASCII-Zeichen prüft der Validator mit dem Schemavalidator des JDK, damit
+beide übereinstimmen. Ein reines Datum (`2026-01-01`) in DATE-Werten liest der Parser weiterhin tolerant
+ein, der Validator meldet es als Fehler.
 
 ## 1. Zusammenfassung
 

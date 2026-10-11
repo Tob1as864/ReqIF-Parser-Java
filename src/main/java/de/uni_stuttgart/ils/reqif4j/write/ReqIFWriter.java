@@ -414,7 +414,9 @@ public class ReqIFWriter {
 			return defaultValue;
 		}
 
-		if (definition.getDefaultValue() == null) {
+		// an enumeration default is a list of enum value references, which only
+		// an enumeration definition carries; text would be schema-invalid
+		if (definition.getDefaultValue() == null || ReqIFConst.ENUMERATION.equals(datatype.getType())) {
 			return null;
 		}
 		if (ReqIFConst.XHTML.equals(datatype.getType())) {
