@@ -67,9 +67,16 @@ public class AttributeDefinition extends Identifiable {
 		Element defVal = XmlUtils.firstChildElementByLocalName(attributeDefinition, ReqIFConst.DEFAULT_VALUE);
 		if(defVal != null) {
 
-			Node attDefVal = XmlUtils.firstChildElement(defVal);
-			if(attDefVal != null && attDefVal.hasAttributes() && attDefVal.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) != null) {
-				this.defaultValue = attDefVal.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+			Element attDefVal = XmlUtils.firstChildElement(defVal);
+			String theValue = XmlUtils.attribute(attDefVal, ReqIFConst.THE_VALUE);
+			if(theValue != null) {
+				this.defaultValue = theValue;
+
+			} else if(XmlUtils.firstChildElementByLocalName(attDefVal, ReqIFConst.THE_VALUE) != null) {
+				// an XHTML default carries its markup in a THE-VALUE element; it is
+				// kept as rendered XHTML, like the value of an XHTML attribute
+				String markup = (String) new AttributeValueXHTML(attDefVal, this).getValue();
+				this.defaultValue = markup.isEmpty() ? null : markup;
 			}
 		}
 	}

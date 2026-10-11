@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -341,8 +340,7 @@ public class ReqIFValidator {
 		// sorted by definition id like the writer does, so findings come in a
 		// stable order
 		List<AttributeValue> sorted = new ArrayList<AttributeValue>(attributeValues.values());
-		sorted.sort(Comparator.comparing(value -> value.getAttributeDefinitionType() == null
-				|| value.getAttributeDefinitionType().getID() == null ? "" : value.getAttributeDefinitionType().getID()));
+		sorted.sort(AttributeValue.BY_DEFINITION_ID);
 
 		for (AttributeValue attributeValue : sorted) {
 			AttributeDefinition definition = attributeValue.getAttributeDefinitionType();

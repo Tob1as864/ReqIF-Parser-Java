@@ -9,7 +9,6 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -510,10 +509,7 @@ public class ReqIFWriter {
 
 		List<AttributeValue> sorted = new ArrayList<AttributeValue>(attributeValues.values());
 		// deterministic output regardless of the map implementation
-		sorted.sort(Comparator.comparing(value -> {
-			AttributeDefinition definition = value.getAttributeDefinitionType();
-			return definition == null || definition.getID() == null ? "" : definition.getID();
-		}));
+		sorted.sort(AttributeValue.BY_DEFINITION_ID);
 
 		for (AttributeValue attributeValue : sorted) {
 			Element written = attributeValue(xml, attributeValue);

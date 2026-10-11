@@ -17,11 +17,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueBoolean;
 import de.uni_stuttgart.ils.reqif4j.build.ReqIFBuildException;
 import de.uni_stuttgart.ils.reqif4j.build.ReqIFBuilder;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeDouble;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
+import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
 
 /**
@@ -212,6 +214,31 @@ class RequiredValuesTest {
 				+ "<ATTRIBUTE-DEFINITION-XHTML-REF>ad-text</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>"
 				+ "<THE-VALUE><div xmlns=\"http://www.w3.org/1999/xhtml\"><p>to be written</p></div></THE-VALUE>"), xml);
 		OfficialReqIFSchema.assertSchemaValid(document);
+	}
+
+	@Test
+	void xhtmlAndBooleanDefaultsSurviveARoundTrip(@TempDir Path tempDir) throws Exception {
+
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr"))
+				.xhtmlDatatype("dt-xhtml", "XHTML")
+				.booleanDatatype("dt-bool", "Bool")
+				.specObjectType("st", "Type", t -> t
+						.attribute("ad-text", "Text", "dt-xhtml", "<p>tbd</p>")
+						.attribute("ad-flag", "Flag", "dt-bool", "1"))
+				.build();
+		Path file = tempDir.resolve("out.reqif");
+		new ReqIFWriter().setClock(FIXED).write(document, file);
+
+		ReqIF reqif = new ReqIF(file.toString());
+		SpecType type = reqif.getReqIFCoreContent().getSpecType("st");
+
+		assertEquals("<div><p>tbd</p></div>", type.getAttributeDefinition("ad-text").getDefaultValue());
+		assertEquals("1", type.getAttributeDefinition("ad-flag").getDefaultValue());
+		// xsd:boolean "1" is true
+		assertEquals(true, new AttributeValueBoolean("1", type.getAttributeDefinition("ad-flag")).getValue());
+		// written again, the default is still there
+		assertTrue(new ReqIFWriter().toXml(reqif.getReqIFDocument()).contains("<p>tbd</p>"));
 	}
 
 	@Test

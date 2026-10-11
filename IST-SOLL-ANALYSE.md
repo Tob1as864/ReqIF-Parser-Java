@@ -38,7 +38,9 @@ offizielle OMG-Schema. Die Tests prüfen das in der CI gegen das echte XSD.
 Weitere Funde der Review-Runden in Phase 2: Der Parser übernahm auch verschachtelte `TOOL-EXTENSIONS`
 aus Vendor-Erweiterungen (jetzt nur direkte Kinder von `REQ-IF`). Unendliche REAL-Werte konnte die
 Bibliothek nicht mehr einlesen, nachdem sie als `INF` geschrieben wurden (jetzt in beide Richtungen
-xsd-Notation). XHTML-Defaults wurden als ungültiges Attribut geschrieben.
+xsd-Notation). XHTML-Defaults wurden als ungültiges Attribut geschrieben und nicht gelesen (jetzt beides,
+das Lesen ist aus 3.3 vorgezogen). Ein Boolean-Wert `1` (gültiges xsd:boolean) wurde als `false` gelesen.
+Offen für 3.3 bleibt: Integer-Werte außerhalb des int-Bereichs.
 
 Bekannte Grenzen: IDs mit Nicht-ASCII-Zeichen prüft der Validator mit dem Schemavalidator des JDK, damit
 beide übereinstimmen. Ein reines Datum (`2026-01-01`) in DATE-Werten liest der Parser weiterhin tolerant
@@ -128,7 +130,7 @@ Legende: ✅ unterstützt · ⚠️ teilweise · ❌ fehlt · — nicht anwendba
 | `ATTRIBUTE-DEFINITION-*` `IS-EDITABLE` | ❌ | ❌ | ❌ |
 | `ATTRIBUTE-DEFINITION-ENUMERATION` `MULTI-VALUED` (**Pflicht**) | ✅ | ✅ auch `false` *(2.2)* | ✅ |
 | `DEFAULT-VALUE` (einfache Typen, Enum) | ✅ | ✅ | ✅ |
-| `DEFAULT-VALUE` (XHTML) | ❌ *(3.3)* | ✅ als Markup *(2.2)* | ✅ über `attribute(...)` |
+| `DEFAULT-VALUE` (XHTML) | ✅ *(2.2, aus 3.3 vorgezogen)* | ✅ als Markup *(2.2)* | ✅ über `attribute(...)` |
 | `ATTRIBUTE-VALUE-*` (alle 7 Arten) | ✅ | ✅ | ✅ |
 | `ATTRIBUTE-VALUE-INTEGER` außerhalb des int-Bereichs | ❌ Absturz | — | ⚠️ |
 | `ATTRIBUTE-VALUE-XHTML` `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` | ❌ | ❌ | ❌ |
