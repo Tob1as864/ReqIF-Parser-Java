@@ -35,6 +35,7 @@ import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumerationValue;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeInteger;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeString;
 import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssue;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
@@ -94,6 +95,14 @@ public class ReqIFValidator {
 			result.error(null, "Document is null");
 			return result;
 		}
+		// What the parser had to skip or could not resolve. Warnings: they tell
+		// what happened to the file, while what is still wrong with the model -
+		// an unresolved reference, a value that does not fit - is reported as
+		// an error by the checks below, and stops being reported once fixed.
+		for (ParseIssue issue : document.getParseIssues()) {
+			result.warning(issue.getElementID(), "While reading: " + issue.getMessage());
+		}
+
 		Map<String, String> identifiers = new HashMap<String, String>();
 		if (document.getHeader() == null) {
 			// the schema requires THE-HEADER, and the writer cannot invent its IDENTIFIER

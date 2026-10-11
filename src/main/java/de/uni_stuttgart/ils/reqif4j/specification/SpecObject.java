@@ -1,17 +1,18 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.Collection;
-import java.util.Map;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 
 public class SpecObject extends SpecElementWithAttributes {
 	
 	
 	protected SpecType specType;
+	private String specTypeRef;
 	protected String type;
 	protected TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
 	
@@ -22,20 +23,28 @@ public class SpecObject extends SpecElementWithAttributes {
 		return this.type;
 	}
 	
+	/**
+	 * @return the kind of the spec type (e.g. SPEC-OBJECT-TYPE), or null if
+	 *         the type reference could not be resolved
+	 */
 	public String getSpecType() {
-		return this.specType.getType();
-	}
-
-	public String getSpecTypeName() {
-		return this.specType.getName();
+		return this.specType == null ? null : this.specType.getType();
 	}
 
 	/**
-	 * @return the IDENTIFIER of the spec type this object refers to, or null if
-	 *         the reference could not be resolved
+	 * @return the LONG-NAME of the spec type, or null if the type reference
+	 *         could not be resolved
+	 */
+	public String getSpecTypeName() {
+		return this.specType == null ? null : this.specType.getName();
+	}
+
+	/**
+	 * @return the IDENTIFIER of the spec type this object refers to - also if
+	 *         the reference could not be resolved - or null if it has none
 	 */
 	public String getSpecTypeID() {
-		return this.specType == null ? null : this.specType.getID();
+		return this.specType != null ? this.specType.getID() : this.specTypeRef;
 	}
 	
 	
@@ -100,12 +109,23 @@ public class SpecObject extends SpecElementWithAttributes {
 	}
 
 	public SpecObject(Node specObject, SpecType specType, TypeClassifier typeClassifier) {
+		this(specObject, specType, typeClassifier, ParseIssues.collecting());
+	}
+
+	/**
+	 * @param specType the resolved spec type; if null, the object is kept with
+	 *                 its unresolved type reference, but its values cannot be
+	 *                 interpreted and are reported and skipped
+	 * @param issues   receives the problems found
+	 */
+	public SpecObject(Node specObject, SpecType specType, TypeClassifier typeClassifier, ParseIssues issues) {
 		super(specObject);
 
 		this.specType = specType;
+		this.specTypeRef = typeRef(specObject, ReqIFConst.SPEC_OBJECT_TYPE_REF);
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 
-		readAttributeValues(specObject, specType);
+		readAttributeValues(specObject, specType, issues);
 
 		// Classify only after all attribute values are available, so an
 		// attribute-based classifier (e.g. the ReqIF Implementation Guide
@@ -127,7 +147,15 @@ public class SpecObject extends SpecElementWithAttributes {
 	 * {@link SpecObject} and {@link SpecRelation}.
 	 */
 	protected void readAttributeValues(Node specObject, SpecType specType) {
-		AttributeValueReader.read(specObject, specType, resetValues(specType));
+		readAttributeValues(specObject, specType, ParseIssues.collecting());
+	}
+
+	/**
+	 * Reads the attribute values of the given node; without a spec type they
+	 * cannot be interpreted and are reported and skipped.
+	 */
+	protected void readAttributeValues(Node specObject, SpecType specType, ParseIssues issues) {
+		readValues(specObject, specType, getSpecTypeID(), issues);
 	}
 
 }

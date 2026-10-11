@@ -143,15 +143,32 @@ class IdentifiableTest {
 	}
 
 	@Test
-	void elementWithoutIdentifierIsRejectedWithAClearMessage(@TempDir Path tempDir) throws Exception {
+	void elementWithoutIdentifierIsSkippedAndReported(@TempDir Path tempDir) throws Exception {
 
 		String withoutIdentifier = TestFixtures.SCHEMA_VALID_REQIF
 				.replace("<SPECIFICATION-TYPE IDENTIFIER=\"st-spec\"", "<SPECIFICATION-TYPE");
 		Path file = TestFixtures.write(tempDir, "in.reqif", withoutIdentifier);
 
-		ReqIFParseException failure = assertThrows(ReqIFParseException.class, () -> new ReqIF(file.toString()));
+		ReqIF reqif = new ReqIF(file.toString());
 
-		assertEquals("SPECIFICATION-TYPE without IDENTIFIER", failure.getMessage());
+		assertEquals("SPECIFICATION-TYPE without IDENTIFIER; the spec type is skipped",
+				reqif.getReqIFDocument().getParseIssues().get(0).getMessage());
+		assertNull(reqif.getReqIFCoreContent().getSpecType("st-spec"));
+		// the specification referencing it is kept, with its type reference
+		assertEquals("st-spec", reqif.getReqIFCoreContent().getSpecification("spec-1").getSpecTypeID());
+	}
+
+	@Test
+	void modelConstructorsRejectAnElementWithoutIdentifier() throws Exception {
+
+		org.w3c.dom.Element withoutIdentifier = de.uni_stuttgart.ils.reqif4j.util.SecureXml.newDocumentBuilder()
+				.parse(new org.xml.sax.InputSource(new java.io.StringReader("<SPEC-OBJECT-TYPE LONG-NAME=\"x\"/>")))
+				.getDocumentElement();
+
+		ReqIFParseException failure = assertThrows(ReqIFParseException.class,
+				() -> new de.uni_stuttgart.ils.reqif4j.specification.SpecObjectType(withoutIdentifier, java.util.Map.of()));
+
+		assertEquals("SPEC-OBJECT-TYPE without IDENTIFIER", failure.getMessage());
 	}
 
 	@Test

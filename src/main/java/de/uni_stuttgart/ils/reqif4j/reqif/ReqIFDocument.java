@@ -46,6 +46,16 @@ public class ReqIFDocument {
 	}
 
 	/**
+	 * @return the problems found while reading the document - skipped
+	 *         elements, unresolved references, identifiers used twice - in the
+	 *         order they were found; empty for a document that was not read
+	 *         from a file. {@code ReqIFValidator} reports them as warnings.
+	 */
+	public java.util.List<ParseIssue> getParseIssues() {
+		return this.content == null ? java.util.List.of() : this.content.getParseIssues();
+	}
+
+	/**
 	 * @return the document language (xml:lang of REQ-IF), e.g. "de", or null
 	 *         if the document declares none
 	 */

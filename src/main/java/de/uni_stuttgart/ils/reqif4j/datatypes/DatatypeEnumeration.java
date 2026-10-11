@@ -6,6 +6,7 @@ import java.util.Map;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
@@ -67,17 +68,22 @@ public class DatatypeEnumeration extends Datatype {
 	}
 
 	public DatatypeEnumeration(String id, String name, Node enumeration) {
+		this(id, name, enumeration, ParseIssues.collecting());
+	}
+
+	/**
+	 * @param issues receives enum values that cannot be read (no IDENTIFIER)
+	 *               or are declared twice
+	 */
+	public DatatypeEnumeration(String id, String name, Node enumeration, ParseIssues issues) {
 		super(id, name, ReqIFConst.ENUMERATION);
 
 		// Iterate ENUM-VALUE elements independent of whitespace text nodes,
 		// namespace prefixes and optional attributes.
 		for (Element enumValue : XmlUtils.descendantsByLocalName(enumeration, ReqIFConst.ENUM_VALUE)) {
 
-			if (XmlUtils.attribute(enumValue, ReqIFConst.IDENTIFIER) == null) {
-				continue;
-			}
-			DatatypeEnumerationValue value = new DatatypeEnumerationValue(enumValue);
-			enumValues.put(value.getID(), value);
+			DatatypeEnumerationValue value = issues.readOrSkip("enum value", () -> new DatatypeEnumerationValue(enumValue));
+			issues.put(enumValues, value, "Enum value");
 		}
 	}
 

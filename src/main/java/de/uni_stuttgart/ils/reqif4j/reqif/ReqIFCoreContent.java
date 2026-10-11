@@ -9,8 +9,6 @@ import de.uni_stuttgart.ils.reqif4j.datatypes.*;
 import de.uni_stuttgart.ils.reqif4j.specification.*;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 public class ReqIFCoreContent {
 
@@ -21,6 +19,7 @@ public class ReqIFCoreContent {
     private Map<String, SpecRelation> specRelation = new LinkedHashMap<>();
     private Map<String, Specification> specifications = new LinkedHashMap<String, Specification>();
     private Map<String, RelationGroup> relationGroups = new LinkedHashMap<String, RelationGroup>();
+    private ParseIssues parseIssues = ParseIssues.collecting();
 
 
     public Map<String, Datatype> getDatatypes() {
@@ -133,151 +132,137 @@ public class ReqIFCoreContent {
     }
 
     public ReqIFCoreContent(Element coreContent, TypeClassifier typeClassifier) {
+        this(coreContent, typeClassifier, ParseIssues.collecting());
+    }
 
-        if (typeClassifier == null) {
-            typeClassifier = TypeClassifier.defaultClassifier();
-        }
+    /**
+     * Reads the content of a document. Elements that cannot be read are
+     * skipped and, like every other problem found, reported to {@code issues}
+     * instead of making the whole document unreadable.
+     */
+    public ReqIFCoreContent(Element coreContent, TypeClassifier typeClassifier, ParseIssues issues) {
 
+        TypeClassifier classifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
+        this.parseIssues = issues;
 
         // Every element is matched by local name, so documents that put the
         // ReqIF elements into a prefixed namespace are read as well.
         Element datatypesElement = XmlUtils.firstDescendantByLocalName(coreContent, ReqIFConst.DATATYPES);
-        if (datatypesElement != null) {
-
-            for (Element dataType : XmlUtils.childElements(datatypesElement)) {
-
-                String dataTypeNodeName = XmlUtils.localName(dataType);
-                {
-
-                    String dataTypeID = XmlUtils.attribute(dataType, ReqIFConst.IDENTIFIER);
-                    // LONG-NAME is optional in ReqIF
-                    String dataTypeName = XmlUtils.attribute(dataType, ReqIFConst.LONG_NAME);
-
-                    switch (dataTypeNodeName.substring(dataTypeNodeName.lastIndexOf("-") + 1)) {
-
-                        case ReqIFConst.BOOLEAN:
-                            this.dataTypes.put(dataTypeID, new DatatypeBoolean(dataTypeID, dataTypeName));
-                            break;
-
-                        case ReqIFConst.INTEGER:
-                            // MIN/MAX are optional in ReqIF
-                            String min = XmlUtils.attribute(dataType, ReqIFConst.MIN);
-                            String max = XmlUtils.attribute(dataType, ReqIFConst.MAX);
-                            this.dataTypes.put(dataTypeID, new DatatypeInteger(dataTypeID, dataTypeName, min, max));
-                            break;
-
-                        case ReqIFConst.STRING:
-                            // MAX-LENGTH is optional in ReqIF
-                            String maxLength = XmlUtils.attribute(dataType, ReqIFConst.MAX_LENGTH);
-                            this.dataTypes.put(dataTypeID, new DatatypeString(dataTypeID, dataTypeName, maxLength));
-                            break;
-
-                        case ReqIFConst.ENUMERATION:
-                            Node enumeration = dataType;
-                            this.dataTypes.put(dataTypeID, new DatatypeEnumeration(dataTypeID, dataTypeName, enumeration));
-                            break;
-
-                        case ReqIFConst.XHTML:
-                            this.dataTypes.put(dataTypeID, new DatatypeXHTML(dataTypeID, dataTypeName));
-                            break;
-
-                        case ReqIFConst.DATE:
-                            this.dataTypes.put(dataTypeID, new DatatypeDate(dataTypeID, dataTypeName));
-                            break;
-
-                        case ReqIFConst.DOUBLE, ReqIFConst.REAL:
-                            this.dataTypes.put(dataTypeID, new DatatypeDouble(dataTypeID, dataTypeName,
-                                    XmlUtils.attribute(dataType, ReqIFConst.ACCURACY),
-                                    XmlUtils.attribute(dataType, ReqIFConst.MIN),
-                                    XmlUtils.attribute(dataType, ReqIFConst.MAX)));
-                            break;
-
-                        default:
-                            // Register unknown datatypes under their ID (formerly the
-                            // key was null, making them unresolvable).
-                            this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED, dataTypeNodeName));
-                            break;
-                    }
-                    // DESC, LAST-CHANGE and ALTERNATIVE-ID
-                    this.dataTypes.get(dataTypeID).readIdentifiable(dataType);
-                }
-            }
+        for (Element dataType : XmlUtils.childElements(datatypesElement)) {
+            issues.put(this.dataTypes, issues.readOrSkip("datatype", () -> readDatatype(dataType, issues)), "Datatype");
         }
-
 
         Element specTypesElement = XmlUtils.firstDescendantByLocalName(coreContent, ReqIFConst.SPEC_TYPES);
-        if (specTypesElement != null) {
-
-            for (Element specType : XmlUtils.childElements(specTypesElement)) {
-
-                String specTypeNodeName = XmlUtils.localName(specType);
-                {
-
-                    String specTypeID = XmlUtils.attribute(specType, ReqIFConst.IDENTIFIER);
-
-                    switch (specTypeNodeName) {
-
-                        case ReqIFConst.SPECIFICATION_TYPE:
-                            this.specTypes.put(specTypeID, new SpecificationType(specType, this.dataTypes));
-                            break;
-
-                        case ReqIFConst.SPEC_OBJECT_TYPE:
-                            this.specTypes.put(specTypeID, new SpecObjectType(specType, this.dataTypes));
-                            break;
-
-                        case ReqIFConst.SPEC_RELATION_TYPE:
-                            this.specTypes.put(specTypeID, new SpecRelationType(specType, this.dataTypes));
-                            break;
-
-                        case ReqIFConst.RELATION_GROUP_TYPE:
-                            this.specTypes.put(specTypeID, new RelationGroupType(specType, this.dataTypes));
-                            break;
-
-                        default:
-                            this.specTypes.put(specTypeID, new SpecType(specType, this.dataTypes));
-                            break;
-                    }
-                }
-            }
+        for (Element specType : XmlUtils.childElements(specTypesElement)) {
+            issues.put(this.specTypes, issues.readOrSkip("spec type", () -> readSpecType(specType, issues)), "Spec type");
         }
-
 
         for (Element specObj : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.SPEC_OBJECT)) {
-
-            String specObjID = XmlUtils.attribute(specObj, ReqIFConst.IDENTIFIER);
-            Element typeRef = XmlUtils.firstDescendantByLocalName(specObj, ReqIFConst.SPEC_OBJECT_TYPE_REF);
-            String specObjTypeRef = typeRef == null ? null : typeRef.getTextContent().trim();
-
-            this.specObjects.put(specObjID, new SpecObject(specObj, this.specTypes.get(specObjTypeRef), typeClassifier));
+            SpecType type = resolveType(specObj, ReqIFConst.SPEC_OBJECT_TYPE_REF, issues);
+            issues.put(this.specObjects, issues.readOrSkip("spec object",
+                    () -> new SpecObject(specObj, type, classifier, issues)), "Spec object");
         }
-
 
         for (Element specRelation : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.SPEC_RELATION)) {
-
-            String specRelID = XmlUtils.attribute(specRelation, ReqIFConst.IDENTIFIER);
-            Element typeRef = XmlUtils.firstDescendantByLocalName(specRelation, ReqIFConst.SPEC_RELATION_TYPE_REF);
-            String specRelTypeRef = typeRef == null ? null : typeRef.getTextContent().trim();
-
-            this.specRelation.put(specRelID, new SpecRelation(specRelation, this.specTypes.get(specRelTypeRef)));
+            SpecType type = resolveType(specRelation, ReqIFConst.SPEC_RELATION_TYPE_REF, issues);
+            issues.put(this.specRelation, issues.readOrSkip("spec relation",
+                    () -> new SpecRelation(specRelation, type, issues)), "Spec relation");
         }
-
 
         for (Element relationGroup : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.RELATION_GROUP)) {
-            RelationGroup group = new RelationGroup(relationGroup);
-            this.relationGroups.put(group.getID(), group);
+            issues.put(this.relationGroups, issues.readOrSkip("relation group",
+                    () -> new RelationGroup(relationGroup)), "Relation group");
         }
-
 
         for (Element specification : XmlUtils.descendantsByLocalName(coreContent, ReqIFConst.SPECIFICATION)) {
-
-            String specID = XmlUtils.attribute(specification, ReqIFConst.IDENTIFIER);
-            Element typeRef = XmlUtils.firstDescendantByLocalName(specification, ReqIFConst.SPEC_TYPE_REF);
-            String specTypeRef = typeRef == null ? null : typeRef.getTextContent().trim();
-
-            this.specifications.put(specID, new Specification(specification, this.specTypes.get(specTypeRef), this.specObjects));
+            SpecType type = resolveType(specification, ReqIFConst.SPEC_TYPE_REF, issues);
+            issues.put(this.specifications, issues.readOrSkip("specification",
+                    () -> new Specification(specification, type, this.specObjects, issues)), "Specification");
         }
+    }
+
+    /**
+     * @return the problems found while reading this content; empty for content
+     *         that was not read from a document
+     */
+    public java.util.List<ParseIssue> getParseIssues() {
+        return this.parseIssues.getIssues();
+    }
 
 
+    private static Datatype readDatatype(Element dataType, ParseIssues issues) {
+
+        String dataTypeNodeName = XmlUtils.localName(dataType);
+        String dataTypeID = XmlUtils.attribute(dataType, ReqIFConst.IDENTIFIER);
+        // LONG-NAME is optional in ReqIF
+        String dataTypeName = XmlUtils.attribute(dataType, ReqIFConst.LONG_NAME);
+
+        Datatype datatype;
+        switch (dataTypeNodeName.substring(dataTypeNodeName.lastIndexOf("-") + 1)) {
+
+            case ReqIFConst.BOOLEAN:
+                datatype = new DatatypeBoolean(dataTypeID, dataTypeName);
+                break;
+
+            case ReqIFConst.INTEGER:
+                // MIN/MAX are optional in ReqIF
+                datatype = new DatatypeInteger(dataTypeID, dataTypeName,
+                        XmlUtils.attribute(dataType, ReqIFConst.MIN), XmlUtils.attribute(dataType, ReqIFConst.MAX));
+                break;
+
+            case ReqIFConst.STRING:
+                // MAX-LENGTH is optional in ReqIF
+                datatype = new DatatypeString(dataTypeID, dataTypeName, XmlUtils.attribute(dataType, ReqIFConst.MAX_LENGTH));
+                break;
+
+            case ReqIFConst.ENUMERATION:
+                datatype = new DatatypeEnumeration(dataTypeID, dataTypeName, dataType, issues);
+                break;
+
+            case ReqIFConst.XHTML:
+                datatype = new DatatypeXHTML(dataTypeID, dataTypeName);
+                break;
+
+            case ReqIFConst.DATE:
+                datatype = new DatatypeDate(dataTypeID, dataTypeName);
+                break;
+
+            case ReqIFConst.DOUBLE, ReqIFConst.REAL:
+                datatype = new DatatypeDouble(dataTypeID, dataTypeName,
+                        XmlUtils.attribute(dataType, ReqIFConst.ACCURACY),
+                        XmlUtils.attribute(dataType, ReqIFConst.MIN),
+                        XmlUtils.attribute(dataType, ReqIFConst.MAX));
+                break;
+
+            default:
+                // kinds the parser does not model are kept under their element name
+                datatype = new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED, dataTypeNodeName);
+                break;
+        }
+        // IDENTIFIER (required, checked here), DESC, LAST-CHANGE and ALTERNATIVE-ID
+        datatype.readIdentifiable(dataType);
+        return datatype;
+    }
+
+    private SpecType readSpecType(Element specType, ParseIssues issues) {
+
+        switch (XmlUtils.localName(specType)) {
+            case ReqIFConst.SPECIFICATION_TYPE:		return new SpecificationType(specType, this.dataTypes, issues);
+            case ReqIFConst.SPEC_OBJECT_TYPE:		return new SpecObjectType(specType, this.dataTypes, issues);
+            case ReqIFConst.SPEC_RELATION_TYPE:		return new SpecRelationType(specType, this.dataTypes, issues);
+            case ReqIFConst.RELATION_GROUP_TYPE:	return new RelationGroupType(specType, this.dataTypes, issues);
+            default:								return new SpecType(specType, this.dataTypes, issues);
+        }
+    }
+
+    /**
+     * @return the spec type the element's TYPE refers to, or null if the
+     *         reference cannot be resolved (the element reports that)
+     */
+    private SpecType resolveType(Element element, String refName, ParseIssues issues) {
+
+        Element typeRef = XmlUtils.firstDescendantByLocalName(element, refName);
+        return typeRef == null ? null : this.specTypes.get(typeRef.getTextContent().trim());
     }
 
 }

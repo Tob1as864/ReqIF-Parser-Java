@@ -9,6 +9,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
@@ -16,6 +17,7 @@ public class Specification extends SpecElementWithAttributes {
 	
 	
 	private SpecType type;
+	private String specTypeRef;
 	private int numberOfSpecObjects;
 	private int sectionCounter = 0;
 	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
@@ -36,19 +38,19 @@ public class Specification extends SpecElementWithAttributes {
 	
 	
 	public String getSpecType() {
-		return this.type.getType();
+		return this.type == null ? null : this.type.getType();
 	}
 	
 	public String getSpecTypeName() {
-		return this.type.getName();
+		return this.type == null ? null : this.type.getName();
 	}
 
 	/**
-	 * @return the IDENTIFIER of the specification type, or null if the
-	 *         reference could not be resolved
+	 * @return the IDENTIFIER of the specification type - also if the
+	 *         reference could not be resolved - or null if it has none
 	 */
 	public String getSpecTypeID() {
-		return this.type == null ? null : this.type.getID();
+		return this.type != null ? this.type.getID() : this.specTypeRef;
 	}
 	
 	
@@ -116,21 +118,33 @@ public class Specification extends SpecElementWithAttributes {
 	}
 
 	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects) {
+		this(specification, specType, specObjects, ParseIssues.collecting());
+	}
+
+	/**
+	 * @param specType the resolved specification type; if null, the
+	 *                 specification is kept with its unresolved type reference,
+	 *                 but its values cannot be interpreted and are reported and
+	 *                 skipped
+	 * @param issues   receives the problems found
+	 */
+	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects, ParseIssues issues) {
 		super(specification);
 		
 		this.type = specType;
+		this.specTypeRef = typeRef(specification, ReqIFConst.SPEC_TYPE_REF);
 
-		AttributeValueReader.read(specification, specType, resetValues(specType));
+		readValues(specification, specType, this.specTypeRef, issues);
 
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
-		if(childrenElement != null) {
-
-			for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
-
-				String specHierarchyID = XmlUtils.attribute(specHierarchy, ReqIFConst.IDENTIFIER);
-
-				this.children.put(specHierarchyID, new SpecHierarchy(1, ++this.sectionCounter, specHierarchy, specObjects));
+		for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
+			int section = this.sectionCounter + 1;
+			SpecHierarchy child = issues.readOrSkip("spec hierarchy",
+					() -> new SpecHierarchy(1, section, specHierarchy, specObjects, issues));
+			if(child != null) {
+				this.sectionCounter = section;
 			}
+			issues.put(this.children, child, "Spec hierarchy");
 		}
 		
 		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();

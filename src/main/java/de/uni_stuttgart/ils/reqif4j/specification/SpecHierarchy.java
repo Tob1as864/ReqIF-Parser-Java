@@ -14,6 +14,7 @@ import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.attributes.XHTML;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTMLElementList;
 import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLNode;
@@ -233,6 +234,15 @@ public class SpecHierarchy extends Identifiable {
 	}
 
 	public SpecHierarchy(int hierarchyLvl, int section, Node specHierarchy, Map<String, SpecObject> specObjects) {
+		this(hierarchyLvl, section, specHierarchy, specObjects, ParseIssues.collecting());
+	}
+
+	/**
+	 * @param issues receives nested hierarchy nodes that cannot be read or are
+	 *               declared twice
+	 */
+	public SpecHierarchy(int hierarchyLvl, int section, Node specHierarchy, Map<String, SpecObject> specObjects,
+			ParseIssues issues) {
 		super(specHierarchy);
 		
 		this.hierarchyLvl = hierarchyLvl;
@@ -256,14 +266,10 @@ public class SpecHierarchy extends Identifiable {
 		}
 
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.CHILDREN);
-		if(childrenElement != null) {
-
-			for(Element newSpecHierarchy: XmlUtils.childElements(childrenElement)) {
-
-				String specHierarchyID = XmlUtils.attribute(newSpecHierarchy, ReqIFConst.IDENTIFIER);
-
-				this.children.put(specHierarchyID, new SpecHierarchy(this.hierarchyLvl+1, section, newSpecHierarchy, specObjects));
-			}
+		for(Element newSpecHierarchy: XmlUtils.childElements(childrenElement)) {
+			SpecHierarchy child = issues.readOrSkip("spec hierarchy",
+					() -> new SpecHierarchy(this.hierarchyLvl+1, section, newSpecHierarchy, specObjects, issues));
+			issues.put(this.children, child, "Spec hierarchy");
 		}
 	}
 }

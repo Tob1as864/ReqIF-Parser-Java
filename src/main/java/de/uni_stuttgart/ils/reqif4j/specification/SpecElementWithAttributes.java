@@ -2,10 +2,14 @@ package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.Map;
 
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
 /**
  * An element that carries attribute values: spec objects, spec relations and
@@ -107,5 +111,34 @@ public abstract class SpecElementWithAttributes extends Identifiable {
 	 * Called after a value was set or removed.
 	 */
 	protected void valuesChanged() {
+	}
+
+	/**
+	 * Reads the element's values. Without a resolved spec type there are no
+	 * attribute definitions to interpret them by; that is reported once,
+	 * together with the number of values skipped.
+	 *
+	 * @param typeRef the unresolved type reference, for the report
+	 */
+	void readValues(Node element, SpecType specType, String typeRef, ParseIssues issues) {
+
+		AttributeValues values = resetValues(specType);
+		if (specType != null) {
+			AttributeValueReader.read(element, specType, values, issues);
+			return;
+		}
+		int count = XmlUtils.childElements(XmlUtils.firstChildElementByLocalName(element, ReqIFConst.VALUES)).size();
+		issues.report(getID(), XmlUtils.localName(element)
+				+ (typeRef == null ? " has no type reference" : " references type " + typeRef + ", which is not declared")
+				+ (count == 0 ? "" : "; its " + count + " value" + (count == 1 ? " is" : "s are") + " skipped"));
+	}
+
+	/**
+	 * @return the IDENTIFIER in TYPE/{refName}, or null
+	 */
+	static String typeRef(Node element, String refName) {
+		Element type = XmlUtils.firstChildElementByLocalName(element, ReqIFConst.TYPE);
+		Element ref = XmlUtils.firstChildElementByLocalName(type, refName);
+		return ref == null ? null : ref.getTextContent().trim();
 	}
 }

@@ -503,9 +503,40 @@ schema files on first use into `target/reqif-schema` (or the directory
 in the `REQIF_SCHEMA_DIR` environment variable); without network access
 these tests are skipped locally and fail on CI.
 
-Not covered yet: identifiers duplicated within one category (the parser
-keys its maps by identifier, so a duplicate has already replaced its
-predecessor by the time the model exists).
+Identifiers duplicated within one category cannot be seen in the model
+(maps are keyed by identifier, so the later element has replaced the
+earlier); the parser reports them while reading, see below.
+
+# Reading imperfect documents
+
+Real exports are not always schema-valid. A document with broken parts is
+still read: what cannot be used is skipped, everything else is kept, and
+each problem is recorded instead of stopping the reading with an
+exception:
+
+```java
+ReqIF reqif = new ReqIF("export.reqif");
+for (ParseIssue issue : reqif.getReqIFDocument().getParseIssues()) {
+    System.out.println(issue);   // e.g. "[so-1] Value references attribute definition ad-x, ..."
+}
+```
+
+- elements without `IDENTIFIER` are skipped;
+- an unresolvable type reference keeps the element and its reference (it
+  is written back), only its values cannot be interpreted and are skipped;
+- values of unknown attribute definitions are skipped, the others kept;
+- values that do not fit their datatype (`THE-VALUE="abc"` for an integer)
+  are kept as written and written back unchanged;
+- identifiers used twice within one kind are reported, the later element
+  wins.
+
+`ReqIFValidator.validate` reports these issues as warnings - they say
+what happened while reading - next to its own findings, which report as
+errors what is still wrong with the model (an unresolved reference, a
+value that does not fit its datatype) until it is fixed. The model
+classes' constructors that take no `ParseIssues` read just as tolerantly
+and discard the issues; only an element without IDENTIFIER makes them
+throw a `ReqIFParseException`.
 
 # Unmodelled ReqIF kinds
 
