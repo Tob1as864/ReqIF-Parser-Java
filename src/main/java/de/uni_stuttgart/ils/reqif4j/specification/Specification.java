@@ -1,7 +1,6 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,17 +9,15 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
-import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class Specification extends Identifiable {
+public class Specification extends SpecElementWithAttributes {
 	
 	
 	private SpecType type;
 	private int numberOfSpecObjects;
 	private int sectionCounter = 0;
-	private Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
 	private List<SpecHierarchy> allSpecHierarchies = new ArrayList<SpecHierarchy>();
 	
@@ -33,7 +30,7 @@ public class Specification extends Identifiable {
 	 *         specification has no such attribute
 	 */
 	public String getDescription() {
-		AttributeValue description = this.attributeValues.get("Description");
+		AttributeValue description = getAttributes().get("Description");
 		return description == null ? null : (String) description.getValue();
 	}
 	
@@ -54,14 +51,6 @@ public class Specification extends Identifiable {
 		return this.type == null ? null : this.type.getID();
 	}
 	
-	public Map<String, AttributeValue> getAttributes() {
-		return this.attributeValues;
-	}
-	
-	public Object getAttribute(String attributeName) {
-		AttributeValue attributeValue = this.attributeValues.get(attributeName);
-		return attributeValue == null ? null : attributeValue.getValue();
-	}
 	
 	public int getNumberOfSpecObjects() {
 		return this.numberOfSpecObjects;
@@ -103,9 +92,10 @@ public class Specification extends Identifiable {
 
 		this.type = specType;
 
+		AttributeValues values = resetValues(specType);
 		if(attributeValues != null) {
 			for(AttributeValue attributeValue: attributeValues) {
-				this.attributeValues.put(AttributeValueReader.key(attributeValue.getAttributeDefinitionType()), attributeValue);
+				values.put(attributeValue);
 			}
 		}
 
@@ -130,7 +120,7 @@ public class Specification extends Identifiable {
 		
 		this.type = specType;
 
-		AttributeValueReader.read(specification, specType, this.attributeValues);
+		AttributeValueReader.read(specification, specType, resetValues(specType));
 
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
 		if(childrenElement != null) {

@@ -3,7 +3,6 @@ package de.uni_stuttgart.ils.reqif4j.validate;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -242,7 +241,7 @@ public class ReqIFValidator {
 			checkIdentifiable(specObject, "SPEC-OBJECT", result, identifiers);
 			checkSpecTypeRef(content, specObject.getID(), specObject.getSpecTypeID(), "SPEC-OBJECT", result);
 			checkAttributeValues(specObject.getID(), specObject.getSpecTypeID(), content,
-					specObject.getAttributes(), result);
+					specObject.getValues(), result);
 		}
 	}
 
@@ -262,7 +261,7 @@ public class ReqIFValidator {
 						+ " is not a known spec object");
 			}
 			checkAttributeValues(relation.getID(), relation.getRelationTypeRef(), content,
-					relation.getAttributes(), result);
+					relation.getValues(), result);
 		}
 	}
 
@@ -273,7 +272,7 @@ public class ReqIFValidator {
 			checkIdentifiable(specification, "SPECIFICATION", result, identifiers);
 			checkSpecTypeRef(content, specification.getID(), specification.getSpecTypeID(), "SPECIFICATION", result);
 			checkAttributeValues(specification.getID(), specification.getSpecTypeID(), content,
-					specification.getAttributes(), result);
+					specification.getValues(), result);
 
 			for (SpecHierarchy hierarchy : specification.getAllSpecHierarchies()) {
 				checkIdentifiable(hierarchy, "SPEC-HIERARCHY", result, identifiers);
@@ -337,12 +336,8 @@ public class ReqIFValidator {
 			return;
 		}
 
-		// sorted by definition id like the writer does, so findings come in a
-		// stable order
-		List<AttributeValue> sorted = new ArrayList<AttributeValue>(attributeValues.values());
-		sorted.sort(AttributeValue.BY_DEFINITION_ID);
-
-		for (AttributeValue attributeValue : sorted) {
+		// the explicit values, the ones that are written, in document order
+		for (AttributeValue attributeValue : attributeValues.values()) {
 			AttributeDefinition definition = attributeValue.getAttributeDefinitionType();
 
 			if (definition == null) {

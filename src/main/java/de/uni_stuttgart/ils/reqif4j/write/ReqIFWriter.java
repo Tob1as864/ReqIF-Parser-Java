@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -448,7 +447,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, ReqIFConst.SPEC_OBJECT);
 		identifiable(xml, element, specObject);
-		element.appendChild(values(xml, specObject.getAttributes()));
+		element.appendChild(values(xml, specObject.getValues()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_OBJECT_TYPE, specObject.getSpecTypeID()));
 		return element;
 	}
@@ -457,7 +456,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, ReqIFConst.SPEC_RELATION);
 		identifiable(xml, element, specRelation);
-		element.appendChild(values(xml, specRelation.getAttributes()));
+		element.appendChild(values(xml, specRelation.getValues()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_RELATION_TYPE, specRelation.getRelationTypeRef()));
 		element.appendChild(objectRef(xml, ReqIFConst.SOURCE, specRelation.getSourceObjID()));
 		element.appendChild(objectRef(xml, ReqIFConst.TARGET, specRelation.getTargetObjID()));
@@ -468,7 +467,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, ReqIFConst.SPECIFICATION);
 		identifiable(xml, element, specification);
-		element.appendChild(values(xml, specification.getAttributes()));
+		element.appendChild(values(xml, specification.getValues()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPECIFICATION_TYPE, specification.getSpecTypeID()));
 
 		List<SpecHierarchy> children = specification.getChildren();
@@ -507,11 +506,9 @@ public class ReqIFWriter {
 
 		Element values = element(xml, ReqIFConst.VALUES);
 
-		List<AttributeValue> sorted = new ArrayList<AttributeValue>(attributeValues.values());
-		// deterministic output regardless of the map implementation
-		sorted.sort(AttributeValue.BY_DEFINITION_ID);
-
-		for (AttributeValue attributeValue : sorted) {
+		// only the element's own values, in document order; defaults stay with
+		// their attribute definitions
+		for (AttributeValue attributeValue : attributeValues.values()) {
 			Element written = attributeValue(xml, attributeValue);
 			if (written != null) {
 				values.appendChild(written);
@@ -532,11 +529,10 @@ public class ReqIFWriter {
 			if (!(attributeValue instanceof AttributeValueEnumeration)) {
 				return null;
 			}
-			List<String> refs = ((AttributeValueEnumeration) attributeValue).getValueRefs();
-			if (refs.isEmpty()) {
-				return null;
-			}
-			return enumerationValue(xml, definition, refs);
+			// an empty selection is a value too ("nothing selected"); left out, the
+			// definition's default would apply when the document is read again
+			return enumerationValue(xml, definition,
+					((AttributeValueEnumeration) attributeValue).getValueRefs());
 		}
 
 		if (ReqIFConst.XHTML.equals(datatypeCategory)) {

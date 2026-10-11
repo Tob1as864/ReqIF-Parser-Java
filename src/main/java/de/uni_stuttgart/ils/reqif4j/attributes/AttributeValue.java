@@ -1,16 +1,6 @@
 package de.uni_stuttgart.ils.reqif4j.attributes;
 
-import java.util.Comparator;
-
 public class AttributeValue {
-
-	/**
-	 * Orders values by the IDENTIFIER of their definition; the writer emits
-	 * them in this order so the output is reproducible.
-	 */
-	public static final Comparator<AttributeValue> BY_DEFINITION_ID = Comparator.comparing(value ->
-			value.getAttributeDefinitionType() == null || value.getAttributeDefinitionType().getID() == null
-					? "" : value.getAttributeDefinitionType().getID());
 	
 	
 	private String name;

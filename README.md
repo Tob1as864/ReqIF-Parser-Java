@@ -283,8 +283,34 @@ Round-tripping (parse -> write -> parse) preserves the header, all
 datatypes including enumerations, spec types with attribute definitions
 and defaults, spec objects with all attribute value kinds (multiselect
 enumerations and XHTML included), spec relations with their attributes,
-and the specification hierarchy. Attribute values are written sorted by
-definition id so the output is reproducible.
+and the specification hierarchy. Attribute values are written in
+document order.
+
+## Attribute values
+
+An element's values are available in two views:
+
+```java
+SpecObject specObject = reqif.getReqIFCoreContent().getSpecObject("so-1");
+
+// what the element itself carries - this is what is written back -
+// keyed by attribute definition IDENTIFIER, in document order
+Map<String, AttributeValue> own = specObject.getValues();
+AttributeValue text = specObject.getValue("ad-text");
+
+// effective values by LONG-NAME, including the defaults of attribute
+// definitions the element has no value for (read-only)
+Object priority = specObject.getAttribute("Priority");
+
+// changing values
+specObject.setValue(new AttributeValueString("REQ-1b", definition));
+specObject.removeValue("ad-text");   // the default applies again
+```
+
+Defaults are never turned into values: an attribute the document leaves
+unset stays unset when the document is written, and the default keeps
+applying through its attribute definition. Prefer `getValues()` when
+names may repeat - LONG-NAMEs need not be unique within a spec type.
 
 ## Identity and metadata of elements
 

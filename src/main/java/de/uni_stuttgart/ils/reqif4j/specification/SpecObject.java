@@ -1,22 +1,19 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import org.w3c.dom.Node;
 
-import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 
-public class SpecObject extends Identifiable {
+public class SpecObject extends SpecElementWithAttributes {
 	
 	
 	protected SpecType specType;
 	protected String type;
 	protected TypeClassifier typeClassifier = TypeClassifier.defaultClassifier();
-	protected Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
 	
 	
 	
@@ -41,14 +38,6 @@ public class SpecObject extends Identifiable {
 		return this.specType == null ? null : this.specType.getID();
 	}
 	
-	public Map<String, AttributeValue> getAttributes() {
-		return this.attributeValues;
-	}
-	
-	public Object getAttribute(String attributeName) {
-		AttributeValue attributeValue = this.attributeValues.get(attributeName);
-		return attributeValue == null ? null : attributeValue.getValue();
-	}
 	
 	public boolean isReq() {
 		return this.typeClassifier.isRequirement(this);
@@ -93,9 +82,10 @@ public class SpecObject extends Identifiable {
 		this.specType = specType;
 		this.typeClassifier = typeClassifier == null ? TypeClassifier.defaultClassifier() : typeClassifier;
 
+		AttributeValues values = resetValues(specType);
 		if(attributeValues != null) {
 			for(AttributeValue attributeValue: attributeValues) {
-				this.attributeValues.put(AttributeValueReader.key(attributeValue.getAttributeDefinitionType()), attributeValue);
+				values.put(attributeValue);
 			}
 		}
 		this.type = this.typeClassifier.classify(this);
@@ -124,12 +114,20 @@ public class SpecObject extends Identifiable {
 	}
 
 	/**
-	 * Reads all attribute values of the given node and fills in default values
-	 * for attribute definitions that carry no explicit value. Shared by
+	 * The content category may depend on the values (attribute-based
+	 * classifiers), so it is derived again.
+	 */
+	@Override
+	protected void valuesChanged() {
+		this.type = this.typeClassifier.classify(this);
+	}
+
+	/**
+	 * Reads the attribute values of the given node. Shared by
 	 * {@link SpecObject} and {@link SpecRelation}.
 	 */
 	protected void readAttributeValues(Node specObject, SpecType specType) {
-		AttributeValueReader.read(specObject, specType, this.attributeValues);
+		AttributeValueReader.read(specObject, specType, resetValues(specType));
 	}
 
 }

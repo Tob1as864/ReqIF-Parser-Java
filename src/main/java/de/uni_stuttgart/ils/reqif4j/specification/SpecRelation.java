@@ -87,6 +87,11 @@ public class SpecRelation extends SpecObject {
         return this.specType == null ? null : this.specType.getName();
     }
 
+    // A relation has no content category, whatever its values.
+    @Override
+    protected void valuesChanged() {
+    }
+
     // A relation is none of the content categories.
 
     @Override
