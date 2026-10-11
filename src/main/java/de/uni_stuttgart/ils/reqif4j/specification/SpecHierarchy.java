@@ -11,6 +11,7 @@ import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
+import de.uni_stuttgart.ils.reqif4j.attributes.XHTML;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTMLElementList;
 import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
@@ -24,6 +25,10 @@ public class SpecHierarchy extends Identifiable {
 	private int hierarchyLvl;
 	private int section;
 	private SpecObject specObject;
+	private String specObjectRef;
+	private Boolean tableInternal;
+	private Boolean editable;
+	private final List<Map.Entry<String, String>> editableAttributes = new ArrayList<Map.Entry<String, String>>();
 	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
 	
 	
@@ -36,8 +41,59 @@ public class SpecHierarchy extends Identifiable {
 		return getID();
 	}
 	
+	/**
+	 * @return the IDENTIFIER of the referenced spec object; also when the
+	 *         reference could not be resolved, null if there is none
+	 */
 	public String getSpecObjectID(){
-		return this.specObject.getID();
+		return this.specObject != null ? this.specObject.getID() : this.specObjectRef;
+	}
+
+	/**
+	 * @return IS-TABLE-INTERNAL: whether this node is part of a table in the
+	 *         tool's view, or null if the document does not say
+	 */
+	public Boolean getTableInternal() {
+		return this.tableInternal;
+	}
+
+	public SpecHierarchy setTableInternal(Boolean tableInternal) {
+		this.tableInternal = tableInternal;
+		return this;
+	}
+
+	/**
+	 * @return IS-EDITABLE: whether the referenced object may be edited, or
+	 *         null if the document does not say
+	 */
+	public Boolean getEditable() {
+		return this.editable;
+	}
+
+	public SpecHierarchy setEditable(Boolean editable) {
+		this.editable = editable;
+		return this;
+	}
+
+	/**
+	 * @return the IDENTIFIERs of the attribute definitions listed in
+	 *         EDITABLE-ATTS (editable on this node), in document order
+	 */
+	public List<String> getEditableAttributeIDs() {
+		List<String> ids = new ArrayList<String>();
+		for(Map.Entry<String, String> ref: this.editableAttributes) {
+			ids.add(ref.getKey());
+		}
+		return ids;
+	}
+
+	/**
+	 * @return the EDITABLE-ATTS references as read, in document order:
+	 *         attribute definition IDENTIFIER and the reference element name,
+	 *         e.g. ATTRIBUTE-DEFINITION-STRING-REF (read-only)
+	 */
+	public List<Map.Entry<String, String>> getEditableAttributeRefs() {
+		return java.util.Collections.unmodifiableList(this.editableAttributes);
 	}
 	
 	public int getHierarchyLvl() {
@@ -77,7 +133,8 @@ public class SpecHierarchy extends Identifiable {
 			if(attributeValue instanceof AttributeValueXHTML) {
 				XHTMLElementDiv value = ((AttributeValueXHTML)attributeValue).getDivValue();
 				if(value != null) {
-					return value.getChildren();
+					// a value may consist of a single p instead of a div
+					return XHTML.P.equals(value.getTagName()) ? List.of(value) : value.getChildren();
 				}
 			}
 		}
@@ -184,7 +241,18 @@ public class SpecHierarchy extends Identifiable {
 		Element object = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.OBJECT);
 		Element specObjectRef = XmlUtils.firstDescendantByLocalName(object, ReqIFConst.SPEC_OBJECT_REF);
 		if(specObjectRef != null) {
-			this.specObject = specObjects.get(specObjectRef.getTextContent().trim());
+			// the reference is kept even if it cannot be resolved, so it is not
+			// lost on writing and the validator can report it
+			this.specObjectRef = specObjectRef.getTextContent().trim();
+			this.specObject = specObjects.get(this.specObjectRef);
+		}
+
+		this.tableInternal = XmlUtils.booleanAttribute(specHierarchy, ReqIFConst.IS_TABLE_INTERNAL);
+		this.editable = XmlUtils.booleanAttribute(specHierarchy, ReqIFConst.IS_EDITABLE);
+		Element editableAtts = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.EDITABLE_ATTS);
+		for(Element ref: XmlUtils.childElements(editableAtts)) {
+			this.editableAttributes.add(new java.util.AbstractMap.SimpleImmutableEntry<String, String>(
+					ref.getTextContent().trim(), XmlUtils.localName(ref)));
 		}
 
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.CHILDREN);
@@ -198,5 +266,4 @@ public class SpecHierarchy extends Identifiable {
 			}
 		}
 	}
-	
 }

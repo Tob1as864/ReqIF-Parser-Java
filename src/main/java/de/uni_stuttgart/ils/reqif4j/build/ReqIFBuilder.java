@@ -428,6 +428,7 @@ public class ReqIFBuilder {
 		private String toolID = "";
 		private String sourceToolID = "";
 		private String reqifVersion = "1.0";
+		private String repositoryID;
 
 		public HeaderBuilder id(String id) {
 			this.id = id;
@@ -460,6 +461,11 @@ public class ReqIFBuilder {
 			return this;
 		}
 
+		public HeaderBuilder repositoryID(String repositoryID) {
+			this.repositoryID = repositoryID;
+			return this;
+		}
+
 		public HeaderBuilder reqifVersion(String reqifVersion) {
 			this.reqifVersion = reqifVersion;
 			return this;
@@ -467,7 +473,8 @@ public class ReqIFBuilder {
 
 		private ReqIFHeader build(String defaultID) {
 			return new ReqIFHeader(this.id == null || this.id.isBlank() ? defaultID : this.id, this.title,
-					this.comment, this.creationTime, this.toolID, this.sourceToolID, this.reqifVersion);
+					this.comment, this.creationTime, this.toolID, this.sourceToolID, this.reqifVersion)
+					.setRepositoryID(this.repositoryID);
 		}
 	}
 

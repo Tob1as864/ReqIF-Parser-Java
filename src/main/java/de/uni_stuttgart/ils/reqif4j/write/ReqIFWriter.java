@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
@@ -172,6 +173,9 @@ public class ReqIFWriter {
 
 		Element root = xml.createElementNS(REQIF_NAMESPACE, "REQ-IF");
 		root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:" + XHTML_PREFIX, XHTML_NAMESPACE);
+		if (document.getLang() != null) {
+			root.setAttributeNS(XMLConstants.XML_NS_URI, "xml:lang", document.getLang());
+		}
 		xml.appendChild(root);
 
 		if (document.getHeader() != null) {
@@ -203,6 +207,7 @@ public class ReqIFWriter {
 
 		appendTextIfPresent(xml, reqifHeader, ReqIFConst.COMMENT, header.getComment());
 		appendText(xml, reqifHeader, ReqIFConst.CREATION_TIME, orDefault(header.getCreationTime(), now));
+		appendTextIfPresent(xml, reqifHeader, ReqIFConst.REPOSITORY_ID, header.getRepositoryID());
 		appendText(xml, reqifHeader, ReqIFConst.REQ_IF_TOOL_ID, orDefault(header.getToolID(), DEFAULT_TOOL_ID));
 		appendText(xml, reqifHeader, ReqIFConst.REQ_IF_VERSION, orDefault(header.getReqIFVersion(), REQIF_VERSION));
 		appendText(xml, reqifHeader, ReqIFConst.SOURCE_TOOL_ID, orDefault(header.getSourceToolID(), DEFAULT_TOOL_ID));
@@ -374,6 +379,7 @@ public class ReqIFWriter {
 
 		Element attributeDefinition = element(xml, elementName);
 		identifiable(xml, attributeDefinition, definition);
+		setAttributeIfPresent(attributeDefinition, ReqIFConst.IS_EDITABLE, toString(definition.getEditable()));
 
 		// required on every enumeration attribute definition, "false" included
 		if (ReqIFConst.ENUMERATION.equals(datatype.getType())) {
@@ -420,7 +426,9 @@ public class ReqIFWriter {
 		if (ReqIFConst.XHTML.equals(datatype.getType())) {
 			// an XHTML value carries its content in a THE-VALUE element, not in
 			// an attribute
-			Element value = xhtmlValue(xml, definition, new AttributeValueXHTML(definition.getDefaultValue(), definition));
+			AttributeValueXHTML parsed = definition.getDefaultXhtmlValue();
+			Element value = xhtmlValue(xml, definition,
+					parsed != null ? parsed : new AttributeValueXHTML(definition.getDefaultValue(), definition));
 			if (value == null) {
 				return null;
 			}
@@ -491,7 +499,19 @@ public class ReqIFWriter {
 		Element element = element(xml, ReqIFConst.SPEC_HIERARCHY);
 		identifiable(xml, element, hierarchy);
 
-		if (hierarchy.getSpecObject() != null) {
+		setAttributeIfPresent(element, ReqIFConst.IS_TABLE_INTERNAL, toString(hierarchy.getTableInternal()));
+		setAttributeIfPresent(element, ReqIFConst.IS_EDITABLE, toString(hierarchy.getEditable()));
+		if (!hierarchy.getEditableAttributeRefs().isEmpty()) {
+			Element editableAtts = element(xml, ReqIFConst.EDITABLE_ATTS);
+			for (java.util.Map.Entry<String, String> ref : hierarchy.getEditableAttributeRefs()) {
+				Element refElement = element(xml, ref.getValue());
+				refElement.setTextContent(ref.getKey());
+				editableAtts.appendChild(refElement);
+			}
+			element.appendChild(editableAtts);
+		}
+		// written also when unresolved, so the reference is not lost
+		if (hierarchy.getSpecObjectID() != null) {
 			element.appendChild(objectRef(xml, ReqIFConst.OBJECT, hierarchy.getSpecObjectID()));
 		}
 		List<SpecHierarchy> nested = hierarchy.getChildren();
@@ -589,6 +609,16 @@ public class ReqIFWriter {
 		Element theValue = element(xml, ReqIFConst.THE_VALUE);
 		theValue.appendChild(content);
 		element.appendChild(theValue);
+
+		if (attributeValue instanceof AttributeValueXHTML) {
+			AttributeValueXHTML xhtml = (AttributeValueXHTML) attributeValue;
+			setAttributeIfPresent(element, ReqIFConst.IS_SIMPLIFIED, toString(xhtml.getSimplified()));
+			if (xhtml.getOriginalValue() != null && xhtml.getOriginalValue().getNode() != null) {
+				Element original = element(xml, ReqIFConst.THE_ORIGINAL_VALUE);
+				original.appendChild(xml.importNode(xhtml.getOriginalValue().getNode(), true));
+				element.appendChild(original);
+			}
+		}
 		return element;
 	}
 
@@ -733,6 +763,10 @@ public class ReqIFWriter {
 
 	private static String nullToEmpty(String value) {
 		return value == null ? "" : value;
+	}
+
+	private static String toString(Boolean value) {
+		return value == null ? null : value.toString();
 	}
 
 	private static String orDefault(String value, String fallback) {

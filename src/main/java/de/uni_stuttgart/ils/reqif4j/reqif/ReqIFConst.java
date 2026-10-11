@@ -58,6 +58,12 @@ public class ReqIFConst {
 	public final static String REQ_IF_VERSION = "REQ-IF-VERSION";
 	public final static String COMMENT = "COMMENT";
 	public final static String CREATION_TIME = "CREATION-TIME";
+	public final static String REPOSITORY_ID = "REPOSITORY-ID";
+	public final static String IS_EDITABLE = "IS-EDITABLE";
+	public final static String IS_TABLE_INTERNAL = "IS-TABLE-INTERNAL";
+	public final static String EDITABLE_ATTS = "EDITABLE-ATTS";
+	public final static String THE_ORIGINAL_VALUE = "THE-ORIGINAL-VALUE";
+	public final static String IS_SIMPLIFIED = "IS-SIMPLIFIED";
 	
 	public final static String SPECIFICATION_TYPE = "SPECIFICATION-TYPE";
 	public final static String SPEC_OBJECT_TYPE = "SPEC-OBJECT-TYPE";

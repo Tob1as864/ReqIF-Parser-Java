@@ -17,6 +17,8 @@ public class AttributeDefinition extends Identifiable {
 	private Datatype type;
 	private String defaultValue;
 	private String sourceElementName;
+	private Boolean editable;
+	private AttributeValueXHTML defaultXhtml;
 	
 	
 	
@@ -27,6 +29,28 @@ public class AttributeDefinition extends Identifiable {
 	
 	public String getDefaultValue() {
 		return this.defaultValue;
+	}
+
+	/**
+	 * @return the default of an XHTML attribute as read from the document, or
+	 *         null if there is none or the definition was not read from a
+	 *         document (then {@link #getDefaultValue()} holds the markup)
+	 */
+	public AttributeValueXHTML getDefaultXhtmlValue() {
+		return this.defaultXhtml;
+	}
+
+	/**
+	 * @return IS-EDITABLE: whether values of this attribute may be edited in
+	 *         the receiving tool, or null if the document does not say
+	 */
+	public Boolean getEditable() {
+		return this.editable;
+	}
+
+	public AttributeDefinition setEditable(Boolean editable) {
+		this.editable = editable;
+		return this;
 	}
 
 	/**
@@ -55,6 +79,7 @@ public class AttributeDefinition extends Identifiable {
 		super(attributeDefinition);
 
 		this.sourceElementName = XmlUtils.localName(attributeDefinition);
+		this.editable = XmlUtils.booleanAttribute(attributeDefinition, ReqIFConst.IS_EDITABLE);
 		
 		// Navigate by element (not by fixed child index) so both pretty-printed
 		// and minified ReqIF files are handled.
@@ -73,9 +98,12 @@ public class AttributeDefinition extends Identifiable {
 				this.defaultValue = theValue;
 
 			} else if(XmlUtils.firstChildElementByLocalName(attDefVal, ReqIFConst.THE_VALUE) != null) {
-				// an XHTML default carries its markup in a THE-VALUE element; it is
-				// kept as rendered XHTML, like the value of an XHTML attribute
-				String markup = (String) new AttributeValueXHTML(attDefVal, this).getValue();
+				// an XHTML default carries its markup in a THE-VALUE element. The
+				// parsed value is kept, so it is written back as it was (a p
+				// instead of a div, THE-ORIGINAL-VALUE); getDefaultValue() offers
+				// it as rendered XHTML.
+				this.defaultXhtml = new AttributeValueXHTML(attDefVal, this);
+				String markup = (String) this.defaultXhtml.getValue();
 				this.defaultValue = markup.isEmpty() ? null : markup;
 			}
 		}

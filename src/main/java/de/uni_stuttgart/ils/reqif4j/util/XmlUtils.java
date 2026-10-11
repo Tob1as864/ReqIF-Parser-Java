@@ -166,4 +166,27 @@ public final class XmlUtils {
 		String value = attribute(node, attributeName);
 		return value == null ? "" : value;
 	}
+
+	/**
+	 * @return the xsd:boolean attribute ("true"/"1" is true, "false"/"0"
+	 *         false), or null if the node has no such attribute or its value
+	 *         is not an xsd:boolean - an unknown value must not turn into
+	 *         false and be written back as such
+	 */
+	public static Boolean booleanAttribute(Node node, String attributeName) {
+		String value = attribute(node, attributeName);
+		if (value == null) {
+			return null;
+		}
+		switch (value.trim()) {
+			case "true":
+			case "1":
+				return Boolean.TRUE;
+			case "false":
+			case "0":
+				return Boolean.FALSE;
+			default:
+				return null;
+		}
+	}
 }

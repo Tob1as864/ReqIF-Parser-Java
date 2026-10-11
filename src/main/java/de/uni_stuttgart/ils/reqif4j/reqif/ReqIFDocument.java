@@ -3,6 +3,7 @@ package de.uni_stuttgart.ils.reqif4j.reqif;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
@@ -25,6 +26,7 @@ public class ReqIFDocument {
 	private ReqIFHeader header;
 	private ReqIFCoreContent content;
 	private final java.util.List<org.w3c.dom.Node> toolExtensions = new java.util.ArrayList<>();
+	private String lang;
 
 
 	public String getFilePath() {
@@ -41,6 +43,19 @@ public class ReqIFDocument {
 
 	public ReqIFCoreContent getCoreContent() {
 		return this.content;
+	}
+
+	/**
+	 * @return the document language (xml:lang of REQ-IF), e.g. "de", or null
+	 *         if the document declares none
+	 */
+	public String getLang() {
+		return this.lang;
+	}
+
+	public ReqIFDocument setLang(String lang) {
+		this.lang = lang;
+		return this;
 	}
 
 	/**
@@ -143,10 +158,15 @@ public class ReqIFDocument {
 		}
 		this.content = new ReqIFCoreContent(coreContent, this.typeClassifier);
 
+		Element root = this.reqifDocument.getDocumentElement();
+		if (root.hasAttributeNS(XMLConstants.XML_NS_URI, "lang")) {
+			this.lang = root.getAttributeNS(XMLConstants.XML_NS_URI, "lang");
+		}
+
 		// Tool extensions are kept verbatim; the parser does not interpret them.
-		// Only the TOOL-EXTENSIONS of REQ-IF itself; a vendor extension may well
-		// contain an element of that name, and the schema allows one only.
-		for (Element child : XmlUtils.childElements(this.reqifDocument.getDocumentElement())) {
+		// Only the TOOL-EXTENSIONS of REQ-IF itself count: a vendor extension may
+		// well contain an element of that name, and the schema allows one only.
+		for (Element child : XmlUtils.childElements(root)) {
 			if (ReqIFConst.TOOL_EXTENSIONS.equals(XmlUtils.localName(child))) {
 				this.toolExtensions.add(child);
 			}

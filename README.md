@@ -279,12 +279,17 @@ new ReqIFWriter().write(reqif.getReqIFDocument(), Path.of("out.reqif"));
 String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
 ```
 
-Round-tripping (parse -> write -> parse) preserves the header, all
-datatypes including enumerations, spec types with attribute definitions
-and defaults, spec objects with all attribute value kinds (multiselect
-enumerations and XHTML included), spec relations with their attributes,
-and the specification hierarchy. Attribute values are written in
-document order.
+Round-tripping (parse -> write) is lossless: every element and attribute
+of the ReqIF schema is read into the model and written back, including
+`xml:lang`, the header's `REPOSITORY-ID`, `IS-EDITABLE` of attribute
+definitions and hierarchy nodes, `IS-TABLE-INTERNAL` and `EDITABLE-ATTS`,
+and XHTML values with `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` (e.g. an
+embedded OLE object of which `THE-VALUE` only shows the preview).
+`LosslessRoundTripTest` checks this with a document that uses all of
+them; the comparison ignores only what the schema leaves open (namespace
+prefixes, attribute order, the order of xsd:all children, formatting).
+Attribute values are written in document order. Integer values have no
+size limit (`AttributeValueInteger.getBigInteger()`).
 
 ## Attribute values
 

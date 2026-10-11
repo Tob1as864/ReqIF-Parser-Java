@@ -133,7 +133,9 @@ final class AttributeValueReader {
 				return new AttributeValueEnumeration(defaultValue, attributeDefinition);
 
 			case ReqIFConst.XHTML:
-				return new AttributeValueXHTML(defaultValue, attributeDefinition);
+				return attributeDefinition.getDefaultXhtmlValue() != null
+						? attributeDefinition.getDefaultXhtmlValue()
+						: new AttributeValueXHTML(defaultValue, attributeDefinition);
 
 			case ReqIFConst.DATE:
 				return new AttributeValueDate(defaultValue, attributeDefinition);

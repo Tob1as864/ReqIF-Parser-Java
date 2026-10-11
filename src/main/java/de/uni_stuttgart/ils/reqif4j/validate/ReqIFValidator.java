@@ -277,11 +277,11 @@ public class ReqIFValidator {
 			for (SpecHierarchy hierarchy : specification.getAllSpecHierarchies()) {
 				checkIdentifiable(hierarchy, "SPEC-HIERARCHY", result, identifiers);
 
-				if (hierarchy.getSpecObject() == null) {
-					result.error(hierarchy.getSpecHierarchyID(),
-							"Spec hierarchy references a spec object that does not exist");
+				if (hierarchy.getSpecObjectID() == null) {
+					result.error(hierarchy.getSpecHierarchyID(), "Spec hierarchy has no OBJECT reference");
 
-				} else if (content.getSpecObject(hierarchy.getSpecObjectID()) == null) {
+				} else if (hierarchy.getSpecObject() == null
+						|| content.getSpecObject(hierarchy.getSpecObjectID()) == null) {
 					result.error(hierarchy.getSpecHierarchyID(), "Spec hierarchy references spec object "
 							+ hierarchy.getSpecObjectID() + ", which is not declared in SPEC-OBJECTS");
 				}
