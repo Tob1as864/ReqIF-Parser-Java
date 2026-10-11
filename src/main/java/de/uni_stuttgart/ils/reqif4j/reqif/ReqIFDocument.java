@@ -3,6 +3,7 @@ package de.uni_stuttgart.ils.reqif4j.reqif;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
@@ -25,6 +26,8 @@ public class ReqIFDocument {
 	private ReqIFHeader header;
 	private ReqIFCoreContent content;
 	private final java.util.List<org.w3c.dom.Node> toolExtensions = new java.util.ArrayList<>();
+	private String lang;
+	private String schemaLocation;
 
 
 	public String getFilePath() {
@@ -41,6 +44,42 @@ public class ReqIFDocument {
 
 	public ReqIFCoreContent getCoreContent() {
 		return this.content;
+	}
+
+	/**
+	 * @return the problems found while reading the document - skipped
+	 *         elements, unresolved references, identifiers used twice - in the
+	 *         order they were found; empty for a document that was not read
+	 *         from a file. {@code ReqIFValidator} reports them as warnings.
+	 */
+	public java.util.List<ParseIssue> getParseIssues() {
+		return this.content == null ? java.util.List.of() : this.content.getParseIssues();
+	}
+
+	/**
+	 * @return the document language (xml:lang of REQ-IF), e.g. "de", or null
+	 *         if the document declares none
+	 */
+	public String getLang() {
+		return this.lang;
+	}
+
+	/**
+	 * @return xsi:schemaLocation of REQ-IF: pairs of namespace and schema file
+	 *         that tell a validator where to find the schemas, or null
+	 */
+	public String getSchemaLocation() {
+		return this.schemaLocation;
+	}
+
+	public ReqIFDocument setSchemaLocation(String schemaLocation) {
+		this.schemaLocation = schemaLocation;
+		return this;
+	}
+
+	public ReqIFDocument setLang(String lang) {
+		this.lang = lang;
+		return this;
 	}
 
 	/**
@@ -143,8 +182,22 @@ public class ReqIFDocument {
 		}
 		this.content = new ReqIFCoreContent(coreContent, this.typeClassifier);
 
+		Element root = this.reqifDocument.getDocumentElement();
+		if (root.hasAttributeNS(XMLConstants.XML_NS_URI, "lang")) {
+			this.lang = root.getAttributeNS(XMLConstants.XML_NS_URI, "lang");
+		}
+		if (root.hasAttributeNS(XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI, "schemaLocation")) {
+			this.schemaLocation = root.getAttributeNS(XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI, "schemaLocation");
+		}
+
 		// Tool extensions are kept verbatim; the parser does not interpret them.
-		this.toolExtensions.addAll(XmlUtils.descendantsByLocalName(this.reqifDocument, ReqIFConst.TOOL_EXTENSIONS));
+		// Only the TOOL-EXTENSIONS of REQ-IF itself count: a vendor extension may
+		// well contain an element of that name, and the schema allows one only.
+		for (Element child : XmlUtils.childElements(root)) {
+			if (ReqIFConst.TOOL_EXTENSIONS.equals(XmlUtils.localName(child))) {
+				this.toolExtensions.add(child);
+			}
+		}
 	}
 
 	private static String extractFileName(String path) {

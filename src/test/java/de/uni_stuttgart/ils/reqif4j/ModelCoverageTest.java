@@ -113,4 +113,19 @@ class ModelCoverageTest {
 		assertEquals(new ReqIFWriter().toXml(original.getReqIFDocument()),
 				new ReqIFWriter().toXml(roundTripped.getReqIFDocument()));
 	}
+
+	@Test
+	void onlyTheToolExtensionsOfTheDocumentItselfAreKept(@TempDir Path tempDir) throws Exception {
+
+		// a vendor extension may contain an element named TOOL-EXTENSIONS; it
+		// belongs to the extension, and the schema allows one TOOL-EXTENSIONS only
+		String nested = TestFixtures.REQIF_FIXTURE.replace(
+				"<myTool:settings xmlns:myTool=\"http://example.com/mytool\" view=\"table\"/>",
+				"<myTool:settings xmlns:myTool=\"http://example.com/mytool\"><TOOL-EXTENSIONS/></myTool:settings>");
+		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "nested.reqif", nested).toString());
+
+		assertEquals(1, reqif.getReqIFDocument().getToolExtensions().size());
+		String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+		assertEquals(xml.indexOf("<TOOL-EXTENSIONS>"), xml.lastIndexOf("<TOOL-EXTENSIONS>"), xml);
+	}
 }

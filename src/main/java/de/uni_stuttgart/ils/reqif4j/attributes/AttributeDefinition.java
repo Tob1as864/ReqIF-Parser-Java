@@ -7,29 +7,22 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class AttributeDefinition {
+public class AttributeDefinition extends Identifiable {
 	
 	
-	private String id;
-	private String name;
 	private Datatype type;
 	private String defaultValue;
-	private String alternativeID;
 	private String sourceElementName;
+	private Boolean editable;
+	private AttributeValueXHTML defaultXhtml;
+	private Element unresolvedElement;
 	
 	
 	
-	
-	public String getID() {
-		return this.id;
-	}
-	
-	public String getName() {
-		return this.name;
-	}
 	
 	public Datatype getDataType() {
 		return this.type;
@@ -40,10 +33,26 @@ public class AttributeDefinition {
 	}
 
 	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 * @return the default of an XHTML attribute as read from the document, or
+	 *         null if there is none or the definition was not read from a
+	 *         document (then {@link #getDefaultValue()} holds the markup)
 	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
+	public AttributeValueXHTML getDefaultXhtmlValue() {
+		return this.defaultXhtml;
+	}
+
+	/**
+	 * @return IS-EDITABLE: whether values of this attribute may be edited in
+	 *         the receiving tool, or null if the document does not say
+	 */
+	public Boolean getEditable() {
+		return this.editable;
+	}
+
+	public AttributeDefinition setEditable(Boolean editable) {
+		this.editable = editable;
+		markModified();
+		return this;
 	}
 
 	/**
@@ -51,6 +60,27 @@ public class AttributeDefinition {
 	 *         from, or null when it was not created from a document
 	 */
 	public String getSourceElementName() {
+		return this.sourceElementName;
+	}
+
+	/**
+	 * @return the element this definition was read from if its datatype is not
+	 *         declared - it is then written back as read - otherwise null
+	 */
+	public Element getUnresolvedElement() {
+		return this.type == null ? this.unresolvedElement : null;
+	}
+
+	/**
+	 * @return the element name this definition is written with, e.g.
+	 *         ATTRIBUTE-DEFINITION-STRING; for datatype kinds the parser does
+	 *         not model the name it was read with; null if neither is known
+	 */
+	public String getElementName() {
+		String suffix = ReqIFConst.datatypeSuffix(this.type == null ? null : this.type.getType());
+		if(suffix != null) {
+			return "ATTRIBUTE-DEFINITION-" + suffix;
+		}
 		return this.sourceElementName;
 	}
 	
@@ -62,19 +92,17 @@ public class AttributeDefinition {
 	 * generated instead of parsed.
 	 */
 	public AttributeDefinition(String id, String name, Datatype type, String defaultValue) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.type = type;
 		this.defaultValue = defaultValue;
 	}
 
 	public AttributeDefinition(Node attributeDefinition, Map<String, Datatype> dataTypes) {
-		
-		this.id = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.name = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-		this.alternativeID = XmlUtils.alternativeID(attributeDefinition);
+		super(attributeDefinition);
+
 		this.sourceElementName = XmlUtils.localName(attributeDefinition);
+		this.editable = XmlUtils.booleanAttribute(attributeDefinition, ReqIFConst.IS_EDITABLE);
 		
 		// Navigate by element (not by fixed child index) so both pretty-printed
 		// and minified ReqIF files are handled.
@@ -83,13 +111,28 @@ public class AttributeDefinition {
 		if(typeRef != null) {
 			this.type = dataTypes.get(typeRef.getTextContent().trim());
 		}
+		if(this.type == null && attributeDefinition instanceof Element) {
+			// without its datatype the definition cannot be interpreted; it is
+			// written back as read
+			this.unresolvedElement = (Element) attributeDefinition;
+		}
 
 		Element defVal = XmlUtils.firstChildElementByLocalName(attributeDefinition, ReqIFConst.DEFAULT_VALUE);
 		if(defVal != null) {
 
-			Node attDefVal = XmlUtils.firstChildElement(defVal);
-			if(attDefVal != null && attDefVal.hasAttributes() && attDefVal.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) != null) {
-				this.defaultValue = attDefVal.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
+			Element attDefVal = XmlUtils.firstChildElement(defVal);
+			String theValue = XmlUtils.attribute(attDefVal, ReqIFConst.THE_VALUE);
+			if(theValue != null) {
+				this.defaultValue = theValue;
+
+			} else if(XmlUtils.firstChildElementByLocalName(attDefVal, ReqIFConst.THE_VALUE) != null) {
+				// an XHTML default carries its markup in a THE-VALUE element. The
+				// parsed value is kept, so it is written back as it was (a p
+				// instead of a div, THE-ORIGINAL-VALUE); getDefaultValue() offers
+				// it as rendered XHTML.
+				this.defaultXhtml = new AttributeValueXHTML(attDefVal, this);
+				String markup = (String) this.defaultXhtml.getValue();
+				this.defaultValue = markup.isEmpty() ? null : markup;
 			}
 		}
 	}

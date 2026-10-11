@@ -5,13 +5,18 @@ import java.util.Map;
 import org.w3c.dom.Node;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 
 public class SpecificationType extends SpecType {
 	
 	
 	public SpecificationType(Node specType, Map<String, Datatype> dataTypes) {
-		super(specType, dataTypes);
+		this(specType, dataTypes, ParseIssues.collecting());
+	}
+
+	public SpecificationType(Node specType, Map<String, Datatype> dataTypes, ParseIssues issues) {
+		super(specType, dataTypes, issues);
 
 		this.type = ReqIFConst.SPECIFICATION_TYPE;
 	}

@@ -6,6 +6,7 @@ import java.util.Map;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
@@ -23,12 +24,15 @@ public class DatatypeEnumeration extends Datatype {
 	}
 
 	/**
-	 * @return the LONG-NAME of the enum value with the given id, or null if
-	 *         unknown
+	 * @return the LONG-NAME of the enum value with the given id, "" if the
+	 *         value has no LONG-NAME, or null if the id is unknown
 	 */
 	public String getEnumValueName(String id) {
 		DatatypeEnumerationValue value = this.enumValues.get(id);
-		return value == null ? null : value.getName();
+		if (value == null) {
+			return null;
+		}
+		return value.getName() == null ? "" : value.getName();
 	}
 
 	/**
@@ -64,28 +68,23 @@ public class DatatypeEnumeration extends Datatype {
 	}
 
 	public DatatypeEnumeration(String id, String name, Node enumeration) {
+		this(id, name, enumeration, ParseIssues.collecting());
+	}
+
+	/**
+	 * @param issues receives enum values that cannot be read (no IDENTIFIER)
+	 *               or are declared twice
+	 */
+	public DatatypeEnumeration(String id, String name, Node enumeration, ParseIssues issues) {
 		super(id, name, ReqIFConst.ENUMERATION);
 
 		// Iterate ENUM-VALUE elements independent of whitespace text nodes,
 		// namespace prefixes and optional attributes.
 		for (Element enumValue : XmlUtils.descendantsByLocalName(enumeration, ReqIFConst.ENUM_VALUE)) {
 
-			String identifier = XmlUtils.attribute(enumValue, ReqIFConst.IDENTIFIER);
-			if (identifier == null) {
-				continue;
-			}
-			String longName = XmlUtils.attribute(enumValue, ReqIFConst.LONG_NAME);
-
-			Element embeddedValue = XmlUtils.firstDescendantByLocalName(enumValue, ReqIFConst.EMBEDDED_VALUE);
-			String key = embeddedValue == null ? "" : orEmpty(XmlUtils.attribute(embeddedValue, ReqIFConst.KEY));
-			String otherContent = embeddedValue == null ? "" : orEmpty(XmlUtils.attribute(embeddedValue, ReqIFConst.OTHER_CONTENT));
-
-			enumValues.put(identifier, new DatatypeEnumerationValue(identifier, orEmpty(longName), key, otherContent));
+			DatatypeEnumerationValue value = issues.readOrSkip("enum value", () -> new DatatypeEnumerationValue(enumValue));
+			issues.put(enumValues, value, "Enum value");
 		}
-	}
-
-	private static String orEmpty(String value) {
-		return value == null ? "" : value;
 	}
 
 }

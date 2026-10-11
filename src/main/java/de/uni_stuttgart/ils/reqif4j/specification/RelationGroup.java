@@ -7,6 +7,7 @@ import java.util.List;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
@@ -18,31 +19,13 @@ import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
  * between a source and a target specification, for example a traceability view
  * between a system and a software specification.
  */
-public class RelationGroup {
+public class RelationGroup extends Identifiable {
 
-	private String id;
-	private String name;
-	private String alternativeID;
 	private String relationGroupTypeRef;
 	private String sourceSpecificationRef;
 	private String targetSpecificationRef;
 	private final List<String> specRelationRefs = new ArrayList<String>();
 
-
-	public String getID() {
-		return this.id;
-	}
-
-	public String getName() {
-		return this.name;
-	}
-
-	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
-	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
-	}
 
 	/**
 	 * @return the IDENTIFIER of the RELATION-GROUP-TYPE, or null
@@ -72,6 +55,40 @@ public class RelationGroup {
 		return Collections.unmodifiableList(this.specRelationRefs);
 	}
 
+	public RelationGroup setSourceSpecificationRef(String sourceSpecificationRef) {
+		this.sourceSpecificationRef = sourceSpecificationRef;
+		markModified();
+		return this;
+	}
+
+	public RelationGroup setTargetSpecificationRef(String targetSpecificationRef) {
+		this.targetSpecificationRef = targetSpecificationRef;
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Adds a relation to the group, unless it already belongs to it.
+	 */
+	public RelationGroup addSpecRelationRef(String specRelationID) {
+		if (!this.specRelationRefs.contains(specRelationID)) {
+			this.specRelationRefs.add(specRelationID);
+			markModified();
+		}
+		return this;
+	}
+
+	/**
+	 * @return whether the relation belonged to the group
+	 */
+	public boolean removeSpecRelationRef(String specRelationID) {
+		boolean removed = this.specRelationRefs.remove(specRelationID);
+		if (removed) {
+			markModified();
+		}
+		return removed;
+	}
+
 
 
 
@@ -81,9 +98,8 @@ public class RelationGroup {
 	 */
 	public RelationGroup(String id, String name, String relationGroupTypeRef,
 			String sourceSpecificationRef, String targetSpecificationRef, List<String> specRelationRefs) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.relationGroupTypeRef = relationGroupTypeRef;
 		this.sourceSpecificationRef = sourceSpecificationRef;
 		this.targetSpecificationRef = targetSpecificationRef;
@@ -93,10 +109,8 @@ public class RelationGroup {
 	}
 
 	public RelationGroup(Node relationGroup) {
+		super(relationGroup);
 
-		this.id = XmlUtils.attribute(relationGroup, ReqIFConst.IDENTIFIER);
-		this.name = XmlUtils.attribute(relationGroup, ReqIFConst.LONG_NAME);
-		this.alternativeID = XmlUtils.alternativeID(relationGroup);
 
 		this.relationGroupTypeRef = refIn(relationGroup, ReqIFConst.TYPE, ReqIFConst.RELATION_GROUP_TYPE_REF);
 		this.sourceSpecificationRef = refIn(relationGroup, ReqIFConst.SOURCE_SPECIFICATION, ReqIFConst.SPECIFICATION_REF);

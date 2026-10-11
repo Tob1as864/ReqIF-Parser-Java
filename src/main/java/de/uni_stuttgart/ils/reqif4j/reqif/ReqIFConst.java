@@ -4,12 +4,15 @@ public class ReqIFConst {
 	
 	public final static String IDENTIFIER = "IDENTIFIER";
 	public final static String LONG_NAME = "LONG-NAME";
+	public final static String DESC = "DESC";
+	public final static String LAST_CHANGE = "LAST-CHANGE";
 	public final static String THE_VALUE = "THE-VALUE";
 	public final static String KEY = "KEY";
 	public final static String OTHER_CONTENT = "OTHER-CONTENT";
 	public final static String MIN = "MIN";
 	public final static String MAX = "MAX";
 	public final static String MAX_LENGTH = "MAX-LENGTH";
+	public final static String ACCURACY = "ACCURACY";
 	
 	public final static String _TEXT = "#text";
 	public final static String ENUM_VALUE = "ENUM-VALUE";
@@ -27,6 +30,9 @@ public class ReqIFConst {
 	public final static String SPEC_ATTRIBUTES = "SPEC-ATTRIBUTES";
 	public final static String ALTERNATIVE_ID = "ALTERNATIVE-ID";
 	public final static String TOOL_EXTENSIONS = "TOOL-EXTENSIONS";
+	public final static String REQ_IF_TOOL_EXTENSION = "REQ-IF-TOOL-EXTENSION";
+
+
 	public final static String SPEC_RELATION_GROUPS = "SPEC-RELATION-GROUPS";
 	public final static String RELATION_GROUP = "RELATION-GROUP";
 	public final static String RELATION_GROUP_TYPE = "RELATION-GROUP-TYPE";
@@ -55,6 +61,12 @@ public class ReqIFConst {
 	public final static String REQ_IF_VERSION = "REQ-IF-VERSION";
 	public final static String COMMENT = "COMMENT";
 	public final static String CREATION_TIME = "CREATION-TIME";
+	public final static String REPOSITORY_ID = "REPOSITORY-ID";
+	public final static String IS_EDITABLE = "IS-EDITABLE";
+	public final static String IS_TABLE_INTERNAL = "IS-TABLE-INTERNAL";
+	public final static String EDITABLE_ATTS = "EDITABLE-ATTS";
+	public final static String THE_ORIGINAL_VALUE = "THE-ORIGINAL-VALUE";
+	public final static String IS_SIMPLIFIED = "IS-SIMPLIFIED";
 	
 	public final static String SPECIFICATION_TYPE = "SPECIFICATION-TYPE";
 	public final static String SPEC_OBJECT_TYPE = "SPEC-OBJECT-TYPE";
@@ -83,4 +95,33 @@ public class ReqIFConst {
 	
 	public final static String EOR = "EOR";
 	public final static String EOD = "EOD";
-}
+
+	/**
+	 * @return the kind an element name ends with, e.g. STRING for
+	 *         ATTRIBUTE-VALUE-STRING or REAL for ATTRIBUTE-DEFINITION-REAL
+	 */
+	public static String kindOf(String elementName) {
+		return elementName == null ? null : elementName.substring(elementName.lastIndexOf('-') + 1);
+	}
+
+	/**
+	 * @return the suffix of the element names belonging to a datatype
+	 *         category, e.g. "REAL" for DOUBLE as in DATATYPE-DEFINITION-REAL,
+	 *         or null for a category the parser does not model
+	 */
+	public static String datatypeSuffix(String datatypeCategory) {
+		if (datatypeCategory == null) {
+			return null;
+		}
+		switch (datatypeCategory) {
+			case DOUBLE:
+			case REAL:		return REAL;
+			case BOOLEAN:
+			case INTEGER:
+			case STRING:
+			case DATE:
+			case XHTML:
+			case ENUMERATION:	return datatypeCategory;
+			default:		return null;
+		}
+	}}

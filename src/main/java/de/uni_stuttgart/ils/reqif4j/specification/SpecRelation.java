@@ -3,6 +3,7 @@ package de.uni_stuttgart.ils.reqif4j.specification;
 import java.util.Collection;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import org.w3c.dom.Element;
@@ -40,6 +41,16 @@ public class SpecRelation extends SpecObject {
     }
 
     public SpecRelation(Node specRelation, SpecType specType) {
+        this(specRelation, specType, ParseIssues.collecting());
+    }
+
+    /**
+     * @param specType the resolved relation type; if null, the relation is
+     *                 kept with its unresolved type reference, but its values
+     *                 cannot be interpreted and are reported and skipped
+     * @param issues   receives the problems found
+     */
+    public SpecRelation(Node specRelation, SpecType specType, ParseIssues issues) {
         super(specRelation);
         this.specType = specType;
 
@@ -58,9 +69,16 @@ public class SpecRelation extends SpecObject {
         // relationTypeRef, not in the inherited type field.
         this.type = ReqIFConst.UNDEFINED;
 
-        if (specType != null) {
-            readAttributeValues(specRelation, specType);
-        }
+        readAttributeValues(specRelation, specType, issues);
+    }
+
+    /**
+     * @return the IDENTIFIER of the relation type - also if the reference
+     *         could not be resolved - or null if it has none
+     */
+    @Override
+    public String getSpecTypeID() {
+        return this.specType != null ? this.specType.getID() : this.relationTypeRef;
     }
 
     public String getSourceObjID() {
@@ -69,6 +87,24 @@ public class SpecRelation extends SpecObject {
 
     public String getTargetObjID() {
         return this.targetObjID;
+    }
+
+    /**
+     * Points the relation at another source object.
+     */
+    public SpecRelation setSourceObjID(String sourceObjID) {
+        this.sourceObjID = sourceObjID;
+        markModified();
+        return this;
+    }
+
+    /**
+     * Points the relation at another target object.
+     */
+    public SpecRelation setTargetObjID(String targetObjID) {
+        this.targetObjID = targetObjID;
+        markModified();
+        return this;
     }
 
     /**
@@ -85,6 +121,11 @@ public class SpecRelation extends SpecObject {
      */
     public String getRelationTypeName() {
         return this.specType == null ? null : this.specType.getName();
+    }
+
+    // A relation has no content category, whatever its values.
+    @Override
+    protected void valuesChanged() {
     }
 
     // A relation is none of the content categories.

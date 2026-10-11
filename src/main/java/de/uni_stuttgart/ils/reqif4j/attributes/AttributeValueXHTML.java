@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElement;
@@ -59,6 +61,8 @@ public class AttributeValueXHTML extends AttributeValue {
 	private static final String VARIABLE_NAME_MISSING = "VARIABLE_NAME_MISSING";
 
 	XHTMLElementDiv divValue;
+	private XHTMLElementDiv originalValue;
+	private Boolean simplified;
 
 	@Override
 	public Object getValue() {
@@ -68,14 +72,46 @@ public class AttributeValueXHTML extends AttributeValue {
 		return divValue.toString();
 	}
 
+	/**
+	 * @param xhtmlContent the ATTRIBUTE-VALUE-XHTML element; for compatibility a
+	 *                     node that merely contains the XHTML div is accepted too
+	 */
 	public AttributeValueXHTML(Node xhtmlContent, AttributeDefinition type) {
 		super(type);
 
-		// The div may carry a namespace prefix (xhtml:div, reqif-xhtml:div, ...),
-		// so it has to be located by local name.
-		Node div = XmlUtils.firstDescendantByLocalName(xhtmlContent, XHTML.DIV);
-		this.divValue = div == null ? null : new XHTMLElementDiv(div);
+		Element theValue = XmlUtils.firstChildElementByLocalName(xhtmlContent, ReqIFConst.THE_VALUE);
+		Node content;
+		if(theValue != null) {
+			// THE-VALUE holds a div or, as the schema allows, a single p
+			content = XmlUtils.firstChildElement(theValue);
+			Element original = XmlUtils.firstChildElement(
+					XmlUtils.firstChildElementByLocalName(xhtmlContent, ReqIFConst.THE_ORIGINAL_VALUE));
+			this.originalValue = original == null ? null : new XHTMLElementDiv(original);
+			this.simplified = XmlUtils.booleanAttribute(xhtmlContent, ReqIFConst.IS_SIMPLIFIED);
+		} else {
+			// The div may carry a namespace prefix (xhtml:div, reqif-xhtml:div, ...),
+			// so it has to be located by local name.
+			content = XmlUtils.firstDescendantByLocalName(xhtmlContent, XHTML.DIV);
+		}
+		this.divValue = content == null ? null : new XHTMLElementDiv(content);
 		this.value = deconstructXHTML(this.divValue);
+	}
+
+	/**
+	 * @return THE-ORIGINAL-VALUE: the complete content when THE-VALUE holds a
+	 *         simplified version of it, e.g. an embedded OLE object of which
+	 *         THE-VALUE only shows the preview image; null if there is none
+	 */
+	public XHTMLElementDiv getOriginalValue() {
+		return this.originalValue;
+	}
+
+	/**
+	 * @return IS-SIMPLIFIED: whether THE-VALUE is a simplified version of
+	 *         THE-ORIGINAL-VALUE, or null if the document does not say
+	 */
+	public Boolean getSimplified() {
+		return this.simplified;
 	}
 
 	/**
@@ -92,8 +128,42 @@ public class AttributeValueXHTML extends AttributeValue {
 		this.value = deconstructXHTML(this.divValue);
 	}
 
+	/**
+	 * Creates an XHTML value whose THE-VALUE is a simplified version of the
+	 * complete content, e.g. the preview image of an embedded OLE object.
+	 *
+	 * @param value         the simplified markup
+	 * @param originalValue the complete markup (THE-ORIGINAL-VALUE)
+	 * @throws IllegalArgumentException if the markup is not well-formed
+	 */
+	public AttributeValueXHTML(String value, String originalValue, AttributeDefinition type) {
+		this(value, type);
+
+		if(value == null || value.isBlank() || originalValue == null || originalValue.isBlank()) {
+			throw new IllegalArgumentException("A simplified XHTML value of attribute "
+					+ (type == null ? null : type.getID()) + " needs both the value and the original value");
+		}
+		this.originalValue = new XHTMLElementDiv(XhtmlParser.parseDiv(originalValue));
+		this.simplified = Boolean.TRUE;
+	}
+
 	public XHTMLElementDiv getDivValue() {
 		return this.divValue;
+	}
+
+	/**
+	 * @return the block elements of THE-VALUE (paragraphs, tables, lists ...),
+	 *         empty if the value has no content
+	 */
+	public List<XHTMLNode> getBlocks() {
+		return this.divValue == null ? Collections.<XHTMLNode>emptyList() : blocksOf(this.divValue);
+	}
+
+	/**
+	 * THE-VALUE holds a div or, as the schema allows, a single p.
+	 */
+	private static List<XHTMLNode> blocksOf(XHTMLElementDiv value) {
+		return XHTML.P.equals(value.getTagName()) ? List.of(value) : childrenOf(value);
 	}
 
 	/**
@@ -121,7 +191,8 @@ public class AttributeValueXHTML extends AttributeValue {
 			return xhtmlElementList;
 		}
 
-		for(XHTMLNode child: childrenOf(div)) {
+		List<XHTMLNode> blocks = blocksOf(div);
+		for(XHTMLNode child: blocks) {
 			String elementType = elementToken(child.getTagName());
 			if(elementType != null) {
 				xhtmlElementList.add(elementType, deconstructElement(elementType, child));

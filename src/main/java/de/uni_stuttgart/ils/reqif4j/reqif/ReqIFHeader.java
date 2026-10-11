@@ -16,6 +16,7 @@ public class ReqIFHeader {
 	private String comment = "";
 	private String creationDate = "";
 	private String creationTime = "";
+	private String repositoryID;
 	
 	
 	
@@ -64,6 +65,19 @@ public class ReqIFHeader {
 	public String getCreationTime() {
 		return this.creationTime;
 	}
+
+	/**
+	 * @return the optional REPOSITORY-ID, the repository the document was
+	 *         exported from, or null if the document declares none
+	 */
+	public String getRepositoryID() {
+		return this.repositoryID;
+	}
+
+	public ReqIFHeader setRepositoryID(String repositoryID) {
+		this.repositoryID = repositoryID;
+		return this;
+	}
 	
 	
 	
@@ -92,6 +106,7 @@ public class ReqIFHeader {
 			this.creationTime = creationTime;
 			this.creationDate = creationDateOf(creationTime);
 		}
+		this.repositoryID = textOf(theHeader, ReqIFConst.REPOSITORY_ID);
 		String title = textOf(theHeader, ReqIFConst.TITLE);
 		if(title != null) {
 			// The title is returned as written in the document; stripping a

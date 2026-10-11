@@ -82,6 +82,8 @@ class RobustnessTest {
 
 		assertEquals(0, so1.getAttribute("Priority"),
 				"a missing THE-VALUE on an integer attribute must parse as 0, not crash");
+		assertTrue(reqif.getReqIFDocument().getParseIssues().get(0).getMessage().contains("has no THE-VALUE"),
+				"but it is reported");
 	}
 
 	@Test

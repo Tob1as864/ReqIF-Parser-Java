@@ -16,9 +16,9 @@ import de.uni_stuttgart.ils.reqif4j.build.ReqIFBuilder;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
 import de.uni_stuttgart.ils.reqif4j.specification.RelationGroup;
+import de.uni_stuttgart.ils.reqif4j.specification.SpecHierarchy;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
 import de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator;
-import de.uni_stuttgart.ils.reqif4j.validate.ValidationIssue;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationResult;
 
 /**
@@ -62,7 +62,20 @@ class ReqIFValidatorTest {
 
 		ValidationResult result = validate(reqif.getReqIFDocument());
 
-		assertTrue(result.isValid(), "the fixture must validate cleanly, got:\n" + result);
+		// The main fixture deliberately carries a date-only DATE value, which the
+		// reader accepts leniently but the schema does not (xsd:dateTime needs a
+		// time). That must be the only finding.
+		assertEquals(1, result.getIssues().size(), result.toString());
+		assertTrue(hasError(result, "'2026-01-01' is not an xsd:dateTime"), result.toString());
+	}
+
+	@Test
+	void schemaValidFixtureIsValid(@TempDir Path tempDir) throws Exception {
+		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "valid.reqif", TestFixtures.SCHEMA_VALID_REQIF).toString());
+
+		ValidationResult result = validate(reqif.getReqIFDocument());
+
+		assertTrue(result.getIssues().isEmpty(), "the fixture must validate cleanly, got:\n" + result);
 	}
 
 	@Test
@@ -73,19 +86,21 @@ class ReqIFValidatorTest {
 	@Test
 	void missingSpecObjectOfARelationIsReported() {
 		ReqIFDocument document = validBuilder().build();
-		// remove the relation target after building
-		document.getCoreContent().getSpecObjects().remove("so-2");
+		// point the relation at an object that does not exist
+		document.getCoreContent().getSpecRelation("sr-1").setTargetObjID("so-gone");
 
 		ValidationResult result = validate(document);
 
 		assertFalse(result.isValid());
-		assertTrue(hasError(result, "Relation target so-2 is not a known spec object"), result.toString());
+		assertTrue(hasError(result, "Relation target so-gone is not a known spec object"), result.toString());
 	}
 
 	@Test
 	void unknownSpecHierarchyTargetIsReported() {
 		ReqIFDocument document = validBuilder().build();
-		document.getCoreContent().getSpecObjects().remove("so-1");
+		// a node that shows an object the content does not have
+		SpecObject elsewhere = new SpecObject("so-gone", document.getCoreContent().getSpecType("st-req"), List.of());
+		document.getCoreContent().getSpecification("spec-1").addChild(new SpecHierarchy("sh-gone", 1, 2, elsewhere, null));
 
 		ValidationResult result = validate(document);
 
@@ -123,13 +138,29 @@ class ReqIFValidatorTest {
 	@Test
 	void identifierUsedTwiceAcrossCategoriesIsReported() {
 		ReqIFDocument document = validBuilder().build();
-		// reuse the datatype id for a relation group
-		document.getCoreContent().addRelationGroup(
-				new RelationGroup("dt-string", "Clash", "st-rel", "spec-1", "spec-1", List.of()));
+		// reuse the datatype id for a hierarchy node; a document read from a
+		// file may have that
+		SpecObject so1 = document.getCoreContent().getSpecObject("so-1");
+		document.getCoreContent().getSpecification("spec-1").addChild(new SpecHierarchy("dt-string", 1, 2, so1, null));
 
 		ValidationResult result = validate(document);
 
 		assertTrue(hasError(result, "Identifier is used twice"), result.toString());
+	}
+
+	@Test
+	void editableAttributesMustBeDeclared() throws Exception {
+		// as read from a file; the model refuses such a list
+		String xml = new de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter().toXml(validBuilder().build()).replace(
+				"<OBJECT><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF>",
+				"<EDITABLE-ATTS><ATTRIBUTE-DEFINITION-STRING-REF>ad-ghost</ATTRIBUTE-DEFINITION-STRING-REF></EDITABLE-ATTS>"
+						+ "<OBJECT><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF>");
+		ReqIFDocument document = new ReqIFDocument(new java.io.ByteArrayInputStream(
+				xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)), "ghost.reqif");
+
+		ValidationResult result = validate(document);
+
+		assertTrue(hasError(result, "EDITABLE-ATTS references attribute definition ad-ghost"), result.toString());
 	}
 
 	@Test
@@ -146,27 +177,28 @@ class ReqIFValidatorTest {
 	}
 
 	@Test
-	void missingHeaderIsOnlyAWarning() {
+	void missingHeaderIsAnError() {
 		ReqIFDocument document = new ReqIFDocument(null,
 				validBuilder().build().getCoreContent());
 
 		ValidationResult result = validate(document);
 
-		assertTrue(result.isValid(), "a missing header must not make the document invalid");
+		// the schema requires THE-HEADER, and the writer cannot invent its IDENTIFIER
+		assertFalse(result.isValid());
 		assertEquals(1, result.getIssues().size());
-		assertEquals(ValidationIssue.Severity.WARNING, result.getIssues().get(0).getSeverity());
+		assertEquals("Document has no THE-HEADER", result.getIssues().get(0).getMessage());
 	}
 
 	@Test
 	void throwIfInvalidReportsEveryError() {
 		ReqIFDocument document = validBuilder().build();
-		document.getCoreContent().getSpecObjects().remove("so-2");
+		document.getCoreContent().getSpecRelation("sr-1").setTargetObjID("so-gone");
 
 		IllegalStateException failure = assertThrows(IllegalStateException.class,
 				() -> validate(document).throwIfInvalid());
 
 		assertTrue(failure.getMessage().contains("ReqIF document is invalid"));
-		assertTrue(failure.getMessage().contains("so-2"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("so-gone"), failure.getMessage());
 	}
 
 	@Test

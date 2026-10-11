@@ -45,7 +45,7 @@ public class LongNameTypeClassifier implements TypeClassifier {
 		for (AttributeValue attributeValue : specObject.getAttributes().values()) {
 
 			if (isBoolean(attributeValue)
-					&& attributeValue.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
+					&& lowerCaseName(attributeValue).contains(ReqIFConst.REQ.toLowerCase())) {
 				return Boolean.TRUE.equals(attributeValue.getValue());
 			}
 		}
@@ -61,8 +61,8 @@ public class LongNameTypeClassifier implements TypeClassifier {
 		for (AttributeValue attributeValue : specObject.getAttributes().values()) {
 
 			if (isBoolean(attributeValue)
-					&& attributeValue.getName().toLowerCase().contains(ReqIFConst.SUB.toLowerCase())
-					&& attributeValue.getName().toLowerCase().contains(ReqIFConst.REQ.toLowerCase())) {
+					&& lowerCaseName(attributeValue).contains(ReqIFConst.SUB.toLowerCase())
+					&& lowerCaseName(attributeValue).contains(ReqIFConst.REQ.toLowerCase())) {
 				return Boolean.TRUE.equals(attributeValue.getValue());
 			}
 		}
@@ -73,5 +73,12 @@ public class LongNameTypeClassifier implements TypeClassifier {
 		return attributeValue.getAttributeDefinitionType() != null
 				&& attributeValue.getAttributeDefinitionType().getDataType() != null
 				&& ReqIFConst.BOOLEAN.equals(attributeValue.getAttributeDefinitionType().getDataType().getType());
+	}
+
+	/**
+	 * LONG-NAME is optional in ReqIF, so an attribute may have no name.
+	 */
+	private static String lowerCaseName(AttributeValue attributeValue) {
+		return attributeValue.getName() == null ? "" : attributeValue.getName().toLowerCase();
 	}
 }

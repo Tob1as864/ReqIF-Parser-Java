@@ -4,10 +4,14 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.validation.SchemaFactory;
+
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
 
 /**
  * Factories for XML components with the same hardening applied everywhere.
@@ -26,6 +30,22 @@ public final class SecureXml {
 	 *         not resolve external entities
 	 */
 	public static DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
+		synchronized (SecureXml.class) {
+			if (factory == null) {
+				factory = newDocumentBuilderFactory();
+			}
+			// a factory is not required to be thread-safe
+			return factory.newDocumentBuilder();
+		}
+	}
+
+	/**
+	 * Looking up and configuring a factory costs more than parsing a small
+	 * XHTML value, so one is kept; the builders it creates are not shared.
+	 */
+	private static DocumentBuilderFactory factory;
+
+	private static DocumentBuilderFactory newDocumentBuilderFactory() throws ParserConfigurationException {
 
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setNamespaceAware(true);
@@ -41,8 +61,32 @@ public final class SecureXml {
 		} catch (IllegalArgumentException ignored) {
 			// parser implementation does not support these attributes
 		}
+		return factory;
+	}
 
-		return factory.newDocumentBuilder();
+	/**
+	 * @return a namespace-aware SAX reader with the same hardening as
+	 *         {@link #newDocumentBuilder()}. Unlike a DOM it keeps line numbers,
+	 *         which makes schema violations of a file traceable.
+	 */
+	public static XMLReader newXMLReader() throws ParserConfigurationException, SAXException {
+
+		SAXParserFactory factory = SAXParserFactory.newInstance();
+		factory.setNamespaceAware(true);
+		factory.setXIncludeAware(false);
+
+		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+
+		XMLReader reader = factory.newSAXParser().getXMLReader();
+		try {
+			reader.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+			reader.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+		} catch (SAXException ignored) {
+			// parser implementation does not support these properties
+		}
+		return reader;
 	}
 
 	/**

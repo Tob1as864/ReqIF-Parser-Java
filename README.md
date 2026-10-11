@@ -279,17 +279,150 @@ new ReqIFWriter().write(reqif.getReqIFDocument(), Path.of("out.reqif"));
 String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
 ```
 
-Round-tripping (parse -> write -> parse) preserves the header, all
-datatypes including enumerations, spec types with attribute definitions
-and defaults, spec objects with all attribute value kinds (multiselect
-enumerations and XHTML included), spec relations with their attributes,
-and the specification hierarchy. Attribute values are written sorted by
-definition id so the output is reproducible.
+Round-tripping (parse -> write) is lossless: every element and attribute
+of the ReqIF schema is read into the model and written back, including
+`xml:lang`, the header's `REPOSITORY-ID`, `IS-EDITABLE` of attribute
+definitions and hierarchy nodes, `IS-TABLE-INTERNAL` and `EDITABLE-ATTS`,
+and XHTML values with `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` (e.g. an
+embedded OLE object of which `THE-VALUE` only shows the preview).
+`LosslessRoundTripTest` checks this with a document that uses all of
+them; the comparison ignores only what the schema leaves open (namespace
+prefixes, attribute order, the order of xsd:all children, formatting).
+Typed values are written in canonical notation, so the lexical form of
+a value may change while its meaning does not: `1` becomes `true` for a
+boolean, `1e3` becomes `1000.0` for a real, `+5` becomes `5`.
+Attribute values are written in document order. Integer values have no
+size limit (`AttributeValueInteger.getBigInteger()`).
+
+## Attribute values
+
+An element's values are available in two views:
+
+```java
+SpecObject specObject = reqif.getReqIFCoreContent().getSpecObject("so-1");
+
+// what the element itself carries - this is what is written back -
+// keyed by attribute definition IDENTIFIER, in document order
+Map<String, AttributeValue> own = specObject.getValues();
+AttributeValue text = specObject.getValue("ad-text");
+
+// effective values by LONG-NAME, including the defaults of attribute
+// definitions the element has no value for (read-only)
+Object priority = specObject.getAttribute("Priority");
+
+// changing values, by attribute definition IDENTIFIER; the value class
+// follows the datatype, unknown definitions and enum values are refused
+specObject.set("ad-prio", 7)
+          .setXhtml("ad-text", "<p>The system shall boot.</p>")
+          .setEnum("ad-status", "ev-draft", "ev-approved");
+specObject.removeValue("ad-text");   // the default applies again
+```
+
+Defaults are never turned into values: an attribute the document leaves
+unset stays unset when the document is written, and the default keeps
+applying through its attribute definition. Prefer `getValues()` when
+names may repeat - LONG-NAMEs need not be unique within a spec type.
+
+## Identity and metadata of elements
+
+Every identifiable element - datatypes, enum values, spec types, attribute
+definitions, spec objects, spec relations, specifications, spec hierarchy
+nodes and relation groups - extends `Identifiable` and exposes the
+properties the ReqIF schema defines for it:
+
+```java
+SpecObject specObject = reqif.getReqIFCoreContent().getSpecObject("so-1");
+
+specObject.getID();             // IDENTIFIER
+specObject.getName();           // LONG-NAME, null if the document declares none
+specObject.getDesc();           // DESC
+specObject.getLastChange();     // LAST-CHANGE, as written (xsd:dateTime)
+specObject.getAlternativeID();  // ALTERNATIVE-ID
+
+specObject.setDesc("reviewed").setLastChange("2026-10-11T12:00:00Z");
+```
+
+They are written back unchanged; properties a document does not declare
+stay absent instead of being written empty.
+
+Elements created from plain values, and elements changed through the API
+(values, properties, structure), are *modified* (`isModified()`): the
+writer gives them the time of writing as `LAST-CHANGE`, so a tool that
+imports the document sees what changed, and once the output succeeded
+takes that time into the model - writing again reports no new change.
+`setLastChange(...)` after the last change keeps the given value;
+`ReqIFCoreContent.clearModified()` keeps every element's `LAST-CHANGE`.
+`buildDocument` and the validator leave the model alone. `ALTERNATIVE-ID` is written
+in the nested form the schema prescribes
+(`<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>`);
+the flat form older versions of this library wrote is still read.
+
+## Schema-valid output
+
+The writer emits every value the official ReqIF schema requires, also when
+the model does not carry it - typically for a document built with
+`ReqIFBuilder`. The model itself is not changed:
+
+| missing in the model | written as |
+|---|---|
+| `LAST-CHANGE` of a modified element | the time of writing |
+| `LAST-CHANGE` of an element | the header's `CREATION-TIME`, or the time of writing |
+| header `CREATION-TIME` | the time of writing |
+| header `REQ-IF-TOOL-ID`, `SOURCE-TOOL-ID` | `reqif4j` |
+| header `REQ-IF-VERSION` | `1.0` (the only value the schema allows) |
+| header `TITLE` | empty |
+| `ACCURACY` / `MIN` / `MAX` of a REAL datatype | 15 / full double range |
+
+`MULTI-VALUED` and `OTHER-CONTENT` are always written, also when `false`
+or empty, and infinite REAL values use the xsd notation `INF` / `-INF`.
+The time of writing comes from a `java.time.Clock`; pass a fixed one for
+reproducible output:
+
+```java
+new ReqIFWriter().setClock(Clock.fixed(Instant.parse("2026-10-11T12:00:00Z"), ZoneOffset.UTC))
+        .write(document, Path.of("out.reqif"));
+```
+
+What no default can fix - a missing header, missing or invalid
+identifiers, malformed dates - is reported by `ReqIFValidator` (see
+below). A document the validator accepts without errors is written
+schema-valid, with one exception: which XHTML elements a value may use
+(ReqIF allows a subset, e.g. no `font` or `img`) is only checked by
+`validateAgainstSchema`, against the official schema.
 
 Indenting is **off by default**: the XML indenter inserts whitespace into
 mixed content, which would change XHTML attribute values. Enable it with
 `new ReqIFWriter().setIndent(true)` only when readable output matters more
 than exact XHTML content.
+
+## Changing documents
+
+The content is changed through its methods, which keep the references
+between elements consistent; the maps its getters return are read-only.
+
+```java
+ReqIFCoreContent content = reqif.getReqIFCoreContent();
+
+// hierarchy: insert, move (to any specification or node) and remove nodes
+content.addSpecHierarchy("spec-1", 0, new SpecHierarchy("sh-new", 0, 0, specObject, null));
+content.moveSpecHierarchy("sh-new", "sh-1", 2);   // below sh-1, third child
+content.removeSpecHierarchy("sh-new");            // with everything below it
+
+// elements: identifiers must be unused anywhere in the document
+content.addSpecObject(new SpecObject("so-3", content.getSpecType("st-req"), List.of()));
+content.removeSpecObject("so-1");     // its nodes' children move up, its relations go
+content.removeSpecRelation("sr-1");   // also from its relation groups
+content.removeSpecification("spec-2"); // with the relation groups between it and others
+content.removeSpecType("st-old");     // refused while an element has this type
+content.removeDatatype("dt-old");     // refused while an attribute uses it
+
+// relations and relation groups
+content.getSpecRelation("sr-2").setSourceObjID("so-3").setTargetObjID("so-2");
+content.getRelationGroup("rg-1").addSpecRelationRef("sr-2");
+```
+
+Levels and section numbers of hierarchy nodes follow every change; a node
+is in one place only (`getParent()`) and never below itself.
 
 ## Creating documents from scratch
 
@@ -328,25 +461,62 @@ ReqIFDocument document = ReqIFBuilder.create()
 new ReqIFWriter().write(document, Path.of("out.reqif"));
 ```
 
+Everything the parser reads can be built as well:
+
+```java
+builder
+        .relationGroupType("st-group", "Trace", t -> {})
+        .specObjectType("st-req", "Requirement Type", t -> t
+                .xhtmlAttribute("ad-text", "ReqIF.Text", "dt-xhtml")
+                .editable("ad-text", true))                         // IS-EDITABLE
+        .specObject("so-ole", "st-req", o -> o                      // IS-SIMPLIFIED
+                .setXhtml("ad-text", "<p>preview</p>", "<p>complete content</p>"))
+        .specification("spec-1", "System", "st-spec", s -> s
+                .child("sh-1", "so-1", h -> h.tableInternal(false).editable(true)
+                        .editableAttributes("ad-text")))            // EDITABLE-ATTS
+        .relationGroup("rg-1", "System to software", "st-group", "spec-1", "spec-2", "sr-1")
+        .with("so-1", e -> e.setDesc("Boot").setAlternativeID("REQ-1"))   // any element
+        .lang("de")                                                 // xml:lang
+        .toolExtension("<tool:settings xmlns:tool=\"urn:example\"/>");
+```
+
+Tool extensions must be elements of a namespace of their own, as the
+schema requires. The builder's elements count as unchanged: they get the
+header's `CREATION-TIME` as `LAST-CHANGE` unless one is set with `with`.
+
 XHTML values may be passed with or without a surrounding `div`; the
 markup is parsed, so the node tree and the token list work on generated
 values too. The content category of generated spec objects is derived by
 the same `TypeClassifier` used when reading (`typeClassifier(...)` to
 override).
 
-## Writing .reqifz archives
+## Reading and writing .reqifz archives
 
-Images travel with the document, stored under the path the XHTML
+A .reqifz archive holds one or more ReqIF documents plus the files they
+reference - images, embedded OLE objects, PDFs or anything else. Reading
+it keeps every entry: the documents in `getReqIFDocuments()`, all other
+files in `getAttachmentFiles()` (pictures additionally in
+`getPictureFiles()`). The archive is extracted into a temporary
+directory that `close()` deletes again, so use try-with-resources and
+read the files before closing. Archives can also be read from a stream:
+
+```java
+try (ReqIFz reqifz = new ReqIFz(uploadStream, "upload.reqifz")) {
+    File ole = reqifz.getAttachmentFiles().get("files/diagram.ole");
+}
+```
+
+Attachments travel with the document, stored under the path the XHTML
 `object` elements reference:
 
 ```java
-Map<String, byte[]> pictures = Map.of("files/diagram.png", pngBytes);
-new ReqIFzWriter().write(document, "spec.reqif", pictures, Path.of("spec.reqifz"));
+Map<String, byte[]> attachments = Map.of("files/diagram.png", pngBytes);
+new ReqIFzWriter().write(document, "spec.reqif", attachments, Path.of("spec.reqifz"));
 ```
 
 An archive that was read can be re-packed - the documents are serialized
-from the model (so modifications are included) while the images are
-copied from the extracted files, without consuming the one-shot streams:
+from the model (so modifications are included) while every attachment is
+copied unchanged from the extracted files:
 
 ```java
 try (ReqIFz source = new ReqIFz("in.reqifz")) {
@@ -357,10 +527,20 @@ try (ReqIFz source = new ReqIFz("in.reqifz")) {
 # Validation
 
 `ReqIFValidator` checks a document before it is written: identifiers
-present and globally unique, resolvable datatype and spec type
-references, attribute values matching their spec type, enum value
-references, relation endpoints, spec hierarchy targets and relation
+present, valid `xsd:ID`s and globally unique, resolvable datatype and
+spec type references, attribute values matching their spec type, enum
+value references, relation endpoints, spec hierarchy targets and relation
 group references.
+
+Values the schema constrains are errors when they do not fit:
+`LAST-CHANGE`, `CREATION-TIME` and DATE values must be `xsd:dateTime`
+(a date alone is not enough), enum `KEY`s integers, `REQ-IF-VERSION`
+`1.0`, and default values - written as they are - must already be in
+schema notation (`true`/`false`, `1.5`, `INF`). Values outside the
+limits of their datatype (`MAX-LENGTH`, `MIN`/`MAX`) are warnings: the
+schema cannot express those limits, but importing tools may reject them.
+Text with characters XML cannot hold (control characters) is an error,
+as are relation groups without type, source or target specification.
 
 ```java
 new ReqIFValidator().validate(document).throwIfInvalid();
@@ -369,16 +549,123 @@ new ReqIFWriter().write(document, Path.of("out.reqif"));
 
 This is a model-level check. The OMG ReqIF XSD is **not bundled** with
 this library for licensing reasons; if you have it, run a full XML
-Schema validation on top:
+Schema validation on top - either of the XML the writer produces for a
+document, or of a file on disk (findings then carry line numbers):
 
 ```java
 ValidationResult schemaIssues =
-        new ReqIFValidator().validateAgainstSchema(document, Path.of("reqif.xsd"));
+        new ReqIFValidator().validateAgainstSchema(document, Path.of("schema/reqif.xsd"));
+ValidationResult fileIssues =
+        new ReqIFValidator().validateAgainstSchema(Path.of("in.reqif"), Path.of("schema/reqif.xsd"));
 ```
 
-Not covered yet: identifiers duplicated within one category (the parser
-keys its maps by identifier, so a duplicate has already replaced its
-predecessor by the time the model exists).
+`reqif.xsd` imports further schemas by http URL: `xml.xsd`,
+[`driver.xsd`](http://www.omg.org/spec/ReqIF/20110402/driver.xsd) and the
+XHTML modules it references (`xhtml-*-1.xsd`). Validation never goes
+online; these imports are looked up by file name in the directory of
+`reqif.xsd`, so download them into the same folder. A missing import is
+reported by name together with its original URL.
+
+The test suite validates against the official schema. It downloads the
+schema files on first use into `target/reqif-schema` (or the directory
+in the `REQIF_SCHEMA_DIR` environment variable); without network access
+these tests are skipped locally and fail on CI.
+
+Relations may connect spec objects, and relation groups specifications,
+of another document of the same .reqifz archive (the schema types these
+references `GLOBAL-REF`). Validate the documents of an archive together
+to resolve them across documents:
+
+```java
+try (ReqIFz archive = new ReqIFz("export.reqifz")) {
+    new ReqIFValidator().validate(archive).throwIfInvalid();
+}
+```
+
+Identifiers duplicated within one category cannot be seen in the model
+(maps are keyed by identifier, so the later element has replaced the
+earlier); the parser reports them while reading, see below.
+
+## Conventions of the ReqIF Implementation Guide
+
+`ImplementationGuideCheck` checks what tools exchanging ReqIF rely on
+beyond the schema, following the *ReqIF Implementation Guide* of the
+ReqIF Implementor Forum:
+
+- the standard attributes have the datatype tools expect: dates
+  (`ReqIF.ForeignCreatedOn`, `ReqIF.ForeignModifiedOn`) are DATE,
+  `ReqIF.ForeignDeleted` is BOOLEAN, `ReqIF.Text` is XHTML, names and
+  descriptions are STRING or XHTML;
+- embedded objects state their MIME type and reference a file of the
+  archive by a relative path; an object that is not a PNG image, such as
+  an OLE object, contains a PNG image as preview;
+- a simplified XHTML value (`IS-SIMPLIFIED`) carries
+  `THE-ORIGINAL-VALUE`, and the other way round;
+- for an archive, every file an object references is in it.
+
+```java
+ValidationResult conventions = new ImplementationGuideCheck().check(document);
+ValidationResult archiveConventions = new ImplementationGuideCheck().check(reqifz);
+```
+
+Findings are warnings - the document is valid ReqIF, but importing tools
+may show it differently than intended - except for files missing from an
+archive, which are errors.
+
+# Tested against real exports
+
+`CorpusTest` reads exports of IBM DOORS, Siemens Polarion, ReqIF Studio,
+Enterprise Architect, Capella and StrictDoc as well as the reference files
+of the ReqIF Implementor Forum (`src/test/resources/corpus`, with their
+origin and license). Each document is written back as read - or differs
+for a stated reason, such as a document in the namespace of a ReqIF draft
+- and written the same way a second time; the validator raises no error
+for a schema-valid file, and a document it finds no error in is written
+schema-valid. Archives are re-packed with all their entries.
+
+# Large documents
+
+Reading, changing and writing take time in proportion to the size of a
+document. The 19 MB reference file of the ReqIF Implementor Forum with
+10,000 objects is read in about half a second and written in less;
+the model needs about 100 MB of heap for it (roughly 10 KB per object).
+`LargeDocumentTest` builds, writes, reads and changes 20,000 objects to
+keep it that way.
+
+# Reading imperfect documents
+
+Real exports are not always schema-valid. A document with broken parts is
+still read: what cannot be used is skipped, everything else is kept, and
+each problem is recorded instead of stopping the reading with an
+exception:
+
+```java
+ReqIF reqif = new ReqIF("export.reqif");
+for (ParseIssue issue : reqif.getReqIFDocument().getParseIssues()) {
+    System.out.println(issue);   // e.g. "[so-1] Value references attribute definition ad-x, ..."
+}
+```
+
+- elements without `IDENTIFIER` are skipped;
+- an unresolvable type reference keeps the element and its reference (it
+  is written back); its values cannot be interpreted and are kept as
+  `UninterpretedAttributeValue`s - the XML element as read, written back
+  unchanged - as are values of unknown attribute definitions and values
+  whose kind does not match their definition (Polarion, for example,
+  writes `ReqIF.Text` values as `ATTRIBUTE-VALUE-STRING`);
+- an attribute definition whose datatype is missing is kept as read, too;
+- values that do not fit their datatype (`THE-VALUE="abc"` for an integer)
+  are kept as written and written back unchanged;
+- identifiers used twice within one kind are reported, the later element
+  wins.
+
+`ReqIFValidator.validate` reports these issues as warnings - they say
+what happened while reading - next to its own findings, which report as
+errors what is still wrong with the model (an unresolved reference, a
+value that does not fit its datatype) until it is fixed. The model
+classes' constructors that take no `ParseIssues` read just as tolerantly
+and discard the issues; only an element without IDENTIFIER makes them
+throw a `ReqIFParseException`.
 
 # Unmodelled ReqIF kinds
 

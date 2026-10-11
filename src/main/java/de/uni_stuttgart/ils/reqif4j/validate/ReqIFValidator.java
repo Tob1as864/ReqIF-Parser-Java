@@ -1,29 +1,46 @@
 package de.uni_stuttgart.ils.reqif4j.validate;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Source;
 import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.sax.SAXSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 
 import org.xml.sax.ErrorHandler;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
+import de.uni_stuttgart.ils.reqif4j.attributes.UninterpretedAttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeDouble;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumeration;
+import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumerationValue;
+import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeInteger;
+import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeString;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssue;
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFHeader;
 import de.uni_stuttgart.ils.reqif4j.specification.RelationGroup;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecHierarchy;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
@@ -31,6 +48,8 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecRelation;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
+import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
+import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
 
 /**
@@ -42,15 +61,26 @@ import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
  * new ReqIFWriter().write(document, Path.of("out.reqif"));
  * </pre>
  *
- * Validated are: identifiers present and globally unique, resolvable datatype
- * and spec type references, attribute values matching their spec type, enum
- * value references, relation endpoints, spec hierarchy targets and relation
- * group references.
+ * Validated are: identifiers present, valid xsd:IDs and globally unique,
+ * resolvable datatype and spec type references, attribute values matching
+ * their spec type, enum value references, relation endpoints, spec hierarchy
+ * targets and relation group references. Values the schema constrains
+ * lexically - LAST-CHANGE, CREATION-TIME and DATE values (xsd:dateTime),
+ * enum KEYs (xsd:integer), REQ-IF-VERSION (fixed to 1.0) - are errors when
+ * they do not fit; values outside the limits of their datatype (MAX-LENGTH,
+ * MIN/MAX) are warnings, because the schema cannot express those limits.
+ *
+ * Required values the writer fills in when the model lacks them (see
+ * {@link ReqIFWriter#buildDocument(ReqIFDocument)}) are not reported. A
+ * document without errors is written schema-valid, except for the XHTML
+ * content model: which XHTML elements a value may use is only checked by
+ * {@link #validateAgainstSchema(ReqIFDocument, Path)}.
  *
  * This is a model-level check, not a schema check. The OMG ReqIF XSD is not
  * bundled with this library; if you have it, pass it to
- * {@link #validateAgainstSchema(ReqIFDocument, Path)} for a full XML Schema
- * validation on top.
+ * {@link #validateAgainstSchema(ReqIFDocument, Path)} (or, for a file on disk,
+ * {@link #validateAgainstSchema(Path, Path)}) for a full XML Schema validation
+ * on top.
  */
 public class ReqIFValidator {
 
@@ -59,6 +89,51 @@ public class ReqIFValidator {
 	 *         {@link ValidationResult#throwIfInvalid()}
 	 */
 	public ValidationResult validate(ReqIFDocument document) {
+		return validate(document, Set.of(), Set.of());
+	}
+
+	/**
+	 * Validates the documents of a .reqifz archive together. Relations may
+	 * connect spec objects, and relation groups specifications, of another
+	 * document of the archive (the schema types these references GLOBAL-REF),
+	 * so they are resolved across all documents; everything else within each
+	 * document. Each message names the document it is about.
+	 */
+	public ValidationResult validate(Map<String, ReqIFDocument> documents) {
+
+		Set<String> specObjects = new HashSet<String>();
+		Set<String> specifications = new HashSet<String>();
+		for (ReqIFDocument document : documents.values()) {
+			if (document != null && document.getCoreContent() != null) {
+				specObjects.addAll(document.getCoreContent().getSpecObjects().keySet());
+				specifications.addAll(document.getCoreContent().getSpecifications().keySet());
+			}
+		}
+		ValidationResult result = new ValidationResult();
+		for (Map.Entry<String, ReqIFDocument> document : documents.entrySet()) {
+			for (ValidationIssue issue : validate(document.getValue(), specObjects, specifications).getIssues()) {
+				result.add(issue.getSeverity(), issue.getElementID(), document.getKey() + ": " + issue.getMessage());
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Validates the documents of an archive together, see
+	 * {@link #validate(Map)}.
+	 */
+	public ValidationResult validate(de.uni_stuttgart.ils.reqif4j.reqif.ReqIFz archive) {
+		return validate(archive.getReqIFDocuments());
+	}
+
+	/**
+	 * @param globalSpecObjects     spec objects of other documents a relation
+	 *                              may reference
+	 * @param globalSpecifications  specifications of other documents a
+	 *                              relation group may reference
+	 */
+	private ValidationResult validate(ReqIFDocument document, Set<String> globalSpecObjects,
+			Set<String> globalSpecifications) {
 
 		ValidationResult result = new ValidationResult();
 
@@ -66,10 +141,20 @@ public class ReqIFValidator {
 			result.error(null, "Document is null");
 			return result;
 		}
+		// What the parser had to skip or could not resolve. Warnings: they tell
+		// what happened to the file, while what is still wrong with the model -
+		// an unresolved reference, a value that does not fit - is reported as
+		// an error by the checks below, and stops being reported once fixed.
+		for (ParseIssue issue : document.getParseIssues()) {
+			result.warning(issue.getElementID(), "While reading: " + issue.getMessage());
+		}
+
+		Map<String, String> identifiers = new HashMap<String, String>();
 		if (document.getHeader() == null) {
-			result.warning(null, "Document has no THE-HEADER");
-		} else if (isBlank(document.getHeader().getID())) {
-			result.error(null, "REQ-IF-HEADER has no IDENTIFIER");
+			// the schema requires THE-HEADER, and the writer cannot invent its IDENTIFIER
+			result.error(null, "Document has no THE-HEADER");
+		} else {
+			checkHeader(document.getHeader(), result, identifiers);
 		}
 
 		ReqIFCoreContent content = document.getCoreContent();
@@ -78,32 +163,91 @@ public class ReqIFValidator {
 			return result;
 		}
 
-		Map<String, String> identifiers = new HashMap<String, String>();
 		checkDatatypes(content, result, identifiers);
 		checkSpecTypes(content, result, identifiers);
 		checkSpecObjects(content, result, identifiers);
-		checkSpecRelations(content, result, identifiers);
+		checkSpecRelations(content, result, identifiers, globalSpecObjects);
 		checkSpecifications(content, result, identifiers);
-		checkRelationGroups(content, result, identifiers);
+		checkRelationGroups(content, result, identifiers, globalSpecifications);
 
 		return result;
 	}
 
 
+	/**
+	 * Empty header fields are fine, the writer fills them in; present ones must
+	 * match the schema.
+	 */
+	private void checkHeader(ReqIFHeader header, ValidationResult result, Map<String, String> identifiers) {
+
+		if (isBlank(header.getID())) {
+			result.error(null, "REQ-IF-HEADER has no IDENTIFIER");
+		} else {
+			checkIdentifier(header.getID(), "REQ-IF-HEADER", result, identifiers);
+		}
+		checkText(header.getID(), "TITLE", header.getTitle(), result);
+		checkText(header.getID(), "COMMENT", header.getComment(), result);
+		checkText(header.getID(), "REQ-IF-TOOL-ID", header.getToolID(), result);
+		checkText(header.getID(), "SOURCE-TOOL-ID", header.getSourceToolID(), result);
+		if (!isBlank(header.getCreationTime()) && !XsdTypes.isDateTime(header.getCreationTime())) {
+			result.error(header.getID(), "CREATION-TIME '" + header.getCreationTime() + "' is not an xsd:dateTime");
+		}
+		if (!isBlank(header.getReqIFVersion()) && !ReqIFWriter.REQIF_VERSION.equals(header.getReqIFVersion())) {
+			result.error(header.getID(), "REQ-IF-VERSION is '" + header.getReqIFVersion()
+					+ "', but the schema only allows " + ReqIFWriter.REQIF_VERSION);
+		}
+	}
+
 	private void checkDatatypes(ReqIFCoreContent content, ValidationResult result, Map<String, String> identifiers) {
 
 		for (Datatype datatype : content.getDatatypes().values()) {
-			checkIdentifier(datatype.getID(), "DATATYPE-DEFINITION", result, identifiers);
+			checkIdentifiable(datatype, "DATATYPE-DEFINITION", result, identifiers);
+
+			if (datatype instanceof DatatypeInteger) {
+				DatatypeInteger integer = (DatatypeInteger) datatype;
+				checkBounds(datatype, integer.getMin() <= integer.getMax(), integer.getMin(), integer.getMax(), result);
+
+			} else if (datatype instanceof DatatypeDouble) {
+				DatatypeDouble real = (DatatypeDouble) datatype;
+				checkBounds(datatype, real.getMin() <= real.getMax(), real.getMin(), real.getMax(), result);
+
+			} else if (datatype instanceof DatatypeEnumeration) {
+				for (DatatypeEnumerationValue value : ((DatatypeEnumeration) datatype).getEnumValues().values()) {
+					checkIdentifiable(value, "ENUM-VALUE", result, identifiers);
+					checkText(value.getID(), "OTHER-CONTENT of enum value", value.getOtherContent(), result);
+					if (isBlank(value.getKey())) {
+						result.error(value.getID(), "Enum value '" + value.getName() + "' has no KEY");
+					} else if (!XsdTypes.isInteger(value.getKey())) {
+						result.error(value.getID(), "KEY '" + value.getKey() + "' of enum value '" + value.getName()
+								+ "' is not an integer");
+					}
+				}
+			}
+		}
+	}
+
+	private void checkBounds(Datatype datatype, boolean ordered, Object min, Object max, ValidationResult result) {
+		if (!ordered) {
+			result.warning(datatype.getID(), "Datatype '" + datatype.getName() + "' has MIN " + min
+					+ " greater than MAX " + max + "; no value can satisfy it");
 		}
 	}
 
 	private void checkSpecTypes(ReqIFCoreContent content, ValidationResult result, Map<String, String> identifiers) {
 
 		for (SpecType specType : content.getSpecTypes().values()) {
-			checkIdentifier(specType.getID(), "SPEC-TYPE", result, identifiers);
+			checkIdentifiable(specType, "SPEC-TYPE", result, identifiers);
 
 			for (AttributeDefinition definition : specType.getAttributeDefinitions().values()) {
-				checkIdentifier(definition.getID(), "ATTRIBUTE-DEFINITION", result, identifiers);
+				checkIdentifiable(definition, "ATTRIBUTE-DEFINITION", result, identifiers);
+				// written verbatim, so it must already be in schema notation; an XHTML
+				// default read from a document is well-formed by construction
+				boolean xhtmlDefault = definition.getDefaultXhtmlValue() != null && definition.getDataType() != null
+						&& ReqIFConst.XHTML.equals(definition.getDataType().getType());
+				if (definition.getDefaultValue() != null && !(definition instanceof AttributeDefinitionEnumeration)
+						&& !xhtmlDefault) {
+					checkScalar(definition.getID(), "Default value", definition, definition.getDefaultValue(), result);
+				}
 
 				Datatype datatype = definition.getDataType();
 				if (datatype == null) {
@@ -153,30 +297,32 @@ public class ReqIFValidator {
 	private void checkSpecObjects(ReqIFCoreContent content, ValidationResult result, Map<String, String> identifiers) {
 
 		for (SpecObject specObject : content.getSpecObjects().values()) {
-			checkIdentifier(specObject.getID(), "SPEC-OBJECT", result, identifiers);
+			checkIdentifiable(specObject, "SPEC-OBJECT", result, identifiers);
 			checkSpecTypeRef(content, specObject.getID(), specObject.getSpecTypeID(), "SPEC-OBJECT", result);
 			checkAttributeValues(specObject.getID(), specObject.getSpecTypeID(), content,
-					specObject.getAttributes(), result);
+					specObject.getValues(), result);
 		}
 	}
 
 	private void checkSpecRelations(ReqIFCoreContent content, ValidationResult result,
-			Map<String, String> identifiers) {
+			Map<String, String> identifiers, Set<String> globalSpecObjects) {
 
 		for (SpecRelation relation : content.getSpecRelation().values()) {
-			checkIdentifier(relation.getID(), "SPEC-RELATION", result, identifiers);
+			checkIdentifiable(relation, "SPEC-RELATION", result, identifiers);
 			checkSpecTypeRef(content, relation.getID(), relation.getRelationTypeRef(), "SPEC-RELATION", result);
 
-			if (content.getSpecObject(relation.getSourceObjID()) == null) {
+			if (content.getSpecObject(relation.getSourceObjID()) == null
+					&& !globalSpecObjects.contains(relation.getSourceObjID())) {
 				result.error(relation.getID(), "Relation source " + relation.getSourceObjID()
 						+ " is not a known spec object");
 			}
-			if (content.getSpecObject(relation.getTargetObjID()) == null) {
+			if (content.getSpecObject(relation.getTargetObjID()) == null
+					&& !globalSpecObjects.contains(relation.getTargetObjID())) {
 				result.error(relation.getID(), "Relation target " + relation.getTargetObjID()
 						+ " is not a known spec object");
 			}
 			checkAttributeValues(relation.getID(), relation.getRelationTypeRef(), content,
-					relation.getAttributes(), result);
+					relation.getValues(), result);
 		}
 	}
 
@@ -184,39 +330,72 @@ public class ReqIFValidator {
 			Map<String, String> identifiers) {
 
 		for (Specification specification : content.getSpecifications().values()) {
-			checkIdentifier(specification.getID(), "SPECIFICATION", result, identifiers);
+			checkIdentifiable(specification, "SPECIFICATION", result, identifiers);
 			checkSpecTypeRef(content, specification.getID(), specification.getSpecTypeID(), "SPECIFICATION", result);
 			checkAttributeValues(specification.getID(), specification.getSpecTypeID(), content,
-					specification.getAttributes(), result);
+					specification.getValues(), result);
 
 			for (SpecHierarchy hierarchy : specification.getAllSpecHierarchies()) {
-				checkIdentifier(hierarchy.getSpecHierarchyID(), "SPEC-HIERARCHY", result, identifiers);
+				checkIdentifiable(hierarchy, "SPEC-HIERARCHY", result, identifiers);
 
-				if (hierarchy.getSpecObject() == null) {
-					result.error(hierarchy.getSpecHierarchyID(),
-							"Spec hierarchy references a spec object that does not exist");
+				if (hierarchy.getSpecObjectID() == null) {
+					result.error(hierarchy.getSpecHierarchyID(), "Spec hierarchy has no OBJECT reference");
 
-				} else if (content.getSpecObject(hierarchy.getSpecObjectID()) == null) {
+				} else if (hierarchy.getSpecObject() == null
+						|| content.getSpecObject(hierarchy.getSpecObjectID()) == null) {
 					result.error(hierarchy.getSpecHierarchyID(), "Spec hierarchy references spec object "
 							+ hierarchy.getSpecObjectID() + ", which is not declared in SPEC-OBJECTS");
 				}
+				checkEditableAttributes(content, hierarchy, result);
 			}
 		}
 	}
 
+	/**
+	 * EDITABLE-ATTS names attributes of the node's object. (The writer derives
+	 * each reference element from the definition, so its kind need not be
+	 * checked.)
+	 */
+	private static void checkEditableAttributes(ReqIFCoreContent content, SpecHierarchy hierarchy,
+			ValidationResult result) {
+
+		SpecType objectType = hierarchy.getSpecObject() == null ? null : hierarchy.getSpecObject().getResolvedSpecType();
+		for (Map.Entry<String, String> ref : hierarchy.getEditableAttributeRefs()) {
+			String id = ref.getKey();
+			AttributeDefinition definition = objectType == null ? null : objectType.getAttributeDefinition(id);
+			if (definition == null && !declaresAttributeDefinition(content, id)) {
+				result.error(hierarchy.getID(), "EDITABLE-ATTS references attribute definition " + id
+						+ ", which no spec type declares");
+			} else if (definition == null && objectType != null) {
+				result.error(hierarchy.getID(), "EDITABLE-ATTS references attribute definition " + id
+						+ ", which is not an attribute of spec type " + objectType.getID() + " of the node's object");
+			}
+		}
+	}
+
+	private static boolean declaresAttributeDefinition(ReqIFCoreContent content, String attributeDefinitionID) {
+		for (SpecType specType : content.getSpecTypes().values()) {
+			if (specType.getAttributeDefinition(attributeDefinitionID) != null) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private void checkRelationGroups(ReqIFCoreContent content, ValidationResult result,
-			Map<String, String> identifiers) {
+			Map<String, String> identifiers, Set<String> globalSpecifications) {
 
 		for (RelationGroup group : content.getRelationGroups().values()) {
-			checkIdentifier(group.getID(), "RELATION-GROUP", result, identifiers);
+			checkIdentifiable(group, "RELATION-GROUP", result, identifiers);
 
-			if (group.getRelationGroupTypeRef() != null
-					&& content.getSpecType(group.getRelationGroupTypeRef()) == null) {
+			if (isBlank(group.getRelationGroupTypeRef())) {
+				result.error(group.getID(), "Relation group has no type reference");
+			} else if (content.getSpecType(group.getRelationGroupTypeRef()) == null) {
 				result.error(group.getID(), "Relation group references type " + group.getRelationGroupTypeRef()
 						+ ", which is not declared in SPEC-TYPES");
 			}
-			checkSpecificationRef(content, group, group.getSourceSpecificationRef(), "source", result);
-			checkSpecificationRef(content, group, group.getTargetSpecificationRef(), "target", result);
+			checkSpecificationRef(content, group, group.getSourceSpecificationRef(), "source", result, globalSpecifications);
+			checkSpecificationRef(content, group, group.getTargetSpecificationRef(), "target", result, globalSpecifications);
 
 			for (String relationRef : group.getSpecRelationRefs()) {
 				if (content.getSpecRelation(relationRef) == null) {
@@ -228,9 +407,11 @@ public class ReqIFValidator {
 	}
 
 	private void checkSpecificationRef(ReqIFCoreContent content, RelationGroup group, String specificationRef,
-			String role, ValidationResult result) {
+			String role, ValidationResult result, Set<String> globalSpecifications) {
 
-		if (specificationRef != null && content.getSpecification(specificationRef) == null) {
+		if (isBlank(specificationRef)) {
+			result.error(group.getID(), "Relation group has no " + role + " specification");
+		} else if (content.getSpecification(specificationRef) == null && !globalSpecifications.contains(specificationRef)) {
 			result.error(group.getID(), "Relation group " + role + " specification " + specificationRef
 					+ " is not declared in SPECIFICATIONS");
 		}
@@ -248,6 +429,7 @@ public class ReqIFValidator {
 			return;
 		}
 
+		// the explicit values, the ones that are written, in document order
 		for (AttributeValue attributeValue : attributeValues.values()) {
 			AttributeDefinition definition = attributeValue.getAttributeDefinitionType();
 
@@ -256,8 +438,22 @@ public class ReqIFValidator {
 				continue;
 			}
 			if (specType.getAttributeDefinition(definition.getID()) == null) {
-				result.error(ownerID, "Attribute value '" + attributeValue.getName() + "' uses definition "
+				// a value of an undeclared definition knows only its IDENTIFIER
+				String label = attributeValue.getName() != null ? "Attribute value '" + attributeValue.getName() + "'"
+						: "A value";
+				result.error(ownerID, label + " uses definition "
 						+ definition.getID() + ", which does not belong to spec type " + specTypeID);
+			}
+			if (attributeValue instanceof UninterpretedAttributeValue) {
+				checkUninterpreted(ownerID, (UninterpretedAttributeValue) attributeValue, definition, specType, result);
+				continue;
+			}
+			if (attributeValue.getValue() != null && !(attributeValue instanceof AttributeValueEnumeration)
+					&& !(attributeValue instanceof AttributeValueXHTML)) {
+				Object value = attributeValue.getValue();
+				// typed values are written in xsd notation, so check that form
+				String text = value instanceof Double ? XsdTypes.formatDouble((Double) value) : String.valueOf(value);
+				checkScalar(ownerID, "Attribute '" + attributeValue.getName() + "'", definition, text, result);
 			}
 			if (attributeValue instanceof AttributeValueEnumeration) {
 				AttributeValueEnumeration enumValue = (AttributeValueEnumeration) attributeValue;
@@ -270,6 +466,39 @@ public class ReqIFValidator {
 							+ enumValue.getValueRefs().size() + " values");
 				}
 			}
+		}
+	}
+
+	/**
+	 * A value kept as read is written back unchanged: its THE-VALUE must fit
+	 * the kind of its own element, and a kind that does not match its
+	 * definition is worth a warning, as importing tools may reject it.
+	 */
+	private static void checkUninterpreted(String ownerID, UninterpretedAttributeValue value,
+			AttributeDefinition definition, SpecType specType, ValidationResult result) {
+
+		String elementName = value.getSourceElementName();
+		String kind = ReqIFConst.kindOf(elementName);
+		String theValue = de.uni_stuttgart.ils.reqif4j.util.XmlUtils.attribute(value.getElement(), ReqIFConst.THE_VALUE);
+		boolean simpleKind = List.of(ReqIFConst.BOOLEAN, ReqIFConst.INTEGER, ReqIFConst.REAL, ReqIFConst.DATE,
+				ReqIFConst.STRING).contains(kind);
+		if (simpleKind && theValue == null) {
+			// written as read, so the required attribute stays missing
+			result.error(ownerID, elementName + " for " + definition.getID() + " has no THE-VALUE");
+		} else if (simpleKind && !(ReqIFConst.BOOLEAN.equals(kind) && XsdTypes.isBoolean(theValue)
+				|| ReqIFConst.INTEGER.equals(kind) && XsdTypes.isInteger(theValue)
+				|| ReqIFConst.REAL.equals(kind) && XsdTypes.isDouble(theValue)
+				|| ReqIFConst.DATE.equals(kind) && XsdTypes.isDateTime(theValue)
+				|| ReqIFConst.STRING.equals(kind) && XsdTypes.isXmlText(theValue))) {
+			result.error(ownerID, elementName + " for " + definition.getID() + ": '" + theValue
+					+ "' is not valid for its kind");
+		}
+		AttributeDefinition declared = specType.getAttributeDefinition(definition.getID());
+		String declaredKind = declared == null || declared.getDataType() == null ? null
+				: ReqIFConst.datatypeSuffix(declared.getDataType().getType());
+		if (declaredKind != null && !declaredKind.equals(kind)) {
+			result.warning(ownerID, elementName + " for attribute '" + declared.getName() + "' (" + declared.getID()
+					+ "), which is an " + declared.getElementName() + "; it is written as read");
 		}
 	}
 
@@ -286,7 +515,115 @@ public class ReqIFValidator {
 	}
 
 	/**
-	 * ReqIF identifiers must be present and unique across the whole document.
+	 * A value must be lexically valid for its datatype (an error: the written
+	 * file would violate the schema) and should respect the datatype's limits
+	 * (a warning: the schema cannot express them, but importing tools may
+	 * reject the value).
+	 *
+	 * @param text the value as written, e.g. "42" or "2026-07-23T10:00:00Z"
+	 */
+	private void checkScalar(String ownerID, String what, AttributeDefinition definition, String text,
+			ValidationResult result) {
+
+		Datatype datatype = definition.getDataType();
+		if (datatype == null) {
+			return;
+		}
+		String category = datatype.getType();
+		if (!XsdTypes.isXmlText(text)) {
+			result.error(ownerID, what + " contains characters XML does not allow (control characters)");
+			return;
+		}
+
+		if (ReqIFConst.ENUMERATION.equals(category)) {
+			// only reachable for a default of a definition that is not an
+			// AttributeDefinitionEnumeration; enum values are references
+			result.error(ownerID, what + " of an enumeration must be given as enum value references "
+					+ "(an enumeration attribute definition), not as text");
+
+		} else if (ReqIFConst.XHTML.equals(category)) {
+			try {
+				XhtmlParser.parseDiv(text);
+			} catch (IllegalArgumentException e) {
+				result.error(ownerID, what + " is not well-formed XHTML");
+			}
+
+		} else if (ReqIFConst.DATE.equals(category)) {
+			if (!XsdTypes.isDateTime(text)) {
+				result.error(ownerID, what + ": '" + text + "' is not an xsd:dateTime");
+			}
+
+		} else if (ReqIFConst.BOOLEAN.equals(category)) {
+			if (!XsdTypes.isBoolean(text)) {
+				result.error(ownerID, what + ": '" + text + "' is not an xsd:boolean (true, false, 1 or 0)");
+			}
+
+		} else if (datatype instanceof DatatypeString) {
+			// xsd counts characters, not UTF-16 units
+			int length = text.codePointCount(0, text.length());
+			int maxLength = ((DatatypeString) datatype).getMaxLength();
+			if (length > maxLength) {
+				result.warning(ownerID, what + " is " + length + " characters long, but datatype '"
+						+ datatype.getName() + "' allows " + maxLength);
+			}
+
+		} else if (datatype instanceof DatatypeInteger) {
+			DatatypeInteger integer = (DatatypeInteger) datatype;
+			if (!XsdTypes.isInteger(text)) {
+				result.error(ownerID, what + ": '" + text + "' is not an integer");
+			} else if (outside(new BigInteger(text.trim()), integer.getMin(), integer.getMax())) {
+				result.warning(ownerID, what + " " + text.trim() + " is outside the range " + integer.getMin()
+						+ ".." + integer.getMax() + " of datatype '" + datatype.getName() + "'");
+			}
+
+		} else if (datatype instanceof DatatypeDouble) {
+			DatatypeDouble real = (DatatypeDouble) datatype;
+			if (!XsdTypes.isDouble(text)) {
+				result.error(ownerID, what + ": '" + text + "' is not an xsd:double");
+				return;
+			}
+			double value = XsdTypes.parseDouble(text);
+			if (value < real.getMin() || value > real.getMax()) {
+				result.warning(ownerID, what + " " + text.trim() + " is outside the range " + real.getMin()
+						+ ".." + real.getMax() + " of datatype '" + datatype.getName() + "'");
+			}
+		}
+	}
+
+	/**
+	 * Text with characters XML does not allow cannot be written at all.
+	 */
+	private void checkText(String ownerID, String what, String text, ValidationResult result) {
+		if (!XsdTypes.isXmlText(text)) {
+			result.error(ownerID, what + " contains characters XML does not allow (control characters)");
+		}
+	}
+
+	private static boolean outside(BigInteger value, long min, long max) {
+		return value.compareTo(BigInteger.valueOf(min)) < 0 || value.compareTo(BigInteger.valueOf(max)) > 0;
+	}
+
+	/**
+	 * Checks the identifier and, if present, the LAST-CHANGE of an element. A
+	 * missing LAST-CHANGE is fine: the writer fills it in.
+	 */
+	private void checkIdentifiable(Identifiable identifiable, String kind, ValidationResult result,
+			Map<String, String> identifiers) {
+
+		checkIdentifier(identifiable.getID(), kind, result, identifiers);
+		checkText(identifiable.getID(), "LONG-NAME of " + kind, identifiable.getName(), result);
+		checkText(identifiable.getID(), "DESC of " + kind, identifiable.getDesc(), result);
+
+		String lastChange = identifiable.getLastChange();
+		if (!isBlank(lastChange) && !XsdTypes.isDateTime(lastChange)) {
+			result.error(identifiable.getID(), "LAST-CHANGE '" + lastChange + "' of " + kind
+					+ " is not an xsd:dateTime");
+		}
+	}
+
+	/**
+	 * ReqIF identifiers must be present, valid xsd:IDs and unique across the
+	 * whole document.
 	 *
 	 * Note that identifiers duplicated <em>within</em> one category cannot be
 	 * detected here: the parser keys its maps by identifier, so a duplicate has
@@ -298,6 +635,10 @@ public class ReqIFValidator {
 			result.error(null, kind + " has no IDENTIFIER");
 			return;
 		}
+		if (!XsdTypes.isNCName(id)) {
+			// e.g. starts with a digit or contains a blank or colon
+			result.error(id, "Identifier '" + id + "' of " + kind + " is not a valid xsd:ID");
+		}
 		String previousKind = identifiers.put(id, kind);
 		if (previousKind != null) {
 			result.error(id, "Identifier is used twice: as " + previousKind + " and as " + kind);
@@ -306,48 +647,163 @@ public class ReqIFValidator {
 
 
 	/**
-	 * Validates the written XML against an XML Schema. The OMG ReqIF XSD is not
-	 * bundled with this library for licensing reasons; download it from the OMG
-	 * and pass its path here.
+	 * Validates the XML the writer produces for this document against an XML
+	 * Schema. The OMG ReqIF XSD is not bundled with this library for licensing
+	 * reasons; download it from the OMG and pass its path here.
+	 *
+	 * What is checked is the output, not the model: required values the writer
+	 * fills in (LAST-CHANGE, header fields, see
+	 * {@link ReqIFWriter#buildDocument(ReqIFDocument)}) are not reported as
+	 * missing.
+	 *
+	 * The official {@code reqif.xsd} imports {@code xml.xsd}, {@code driver.xsd}
+	 * and the XHTML modules ({@code xhtml-*-1.xsd}) by http URL. Validation never
+	 * goes online: these imports are looked up by file name in the directory of
+	 * {@code schema}, so place them next to it.
 	 *
 	 * @param schema path to reqif.xsd
 	 * @return the schema violations, empty if the document is schema-valid
 	 */
 	public ValidationResult validateAgainstSchema(ReqIFDocument document, Path schema) throws IOException {
 
+		return validate(new DOMSource(new ReqIFWriter().buildDocument(document)), schema);
+	}
+
+	/**
+	 * Validates a ReqIF file as it is on disk, e.g. a file received from another
+	 * tool or one written by {@link ReqIFWriter}. Unlike
+	 * {@link #validateAgainstSchema(ReqIFDocument, Path)} the findings carry the
+	 * line numbers of the file.
+	 *
+	 * @param reqifFile the .reqif file to check
+	 * @param schema    path to reqif.xsd, with its imports next to it
+	 * @return the schema violations, empty if the file is schema-valid
+	 */
+	public ValidationResult validateAgainstSchema(Path reqifFile, Path schema) throws IOException {
+
+		try {
+			InputSource input = new InputSource(reqifFile.toUri().toString());
+			return validate(new SAXSource(SecureXml.newXMLReader(), input), schema);
+		} catch (ParserConfigurationException | SAXException e) {
+			throw new IOException("Failed to create an XML reader", e);
+		}
+	}
+
+	private ValidationResult validate(Source source, Path schema) throws IOException {
+
 		ValidationResult result = new ValidationResult();
+		Path schemaFile = schema.toAbsolutePath();
+		LocalSchemaResolver resolver = new LocalSchemaResolver(schemaFile.getParent());
+
+		// Problems while loading the schema itself - an unreadable import is only a
+		// warning to the parser - would make every finding below meaningless.
+		ValidationResult schemaProblems = new ValidationResult();
+		IssueCollector schemaCollector = new IssueCollector(schemaProblems);
+		Schema xsd = null;
 		try {
 			SchemaFactory factory = SecureXml.newSchemaFactory(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-			Schema xsd = factory.newSchema(schema.toFile());
-
-			Validator validator = xsd.newValidator();
-			validator.setErrorHandler(new ErrorHandler() {
-
-				@Override
-				public void warning(SAXParseException exception) {
-					result.warning(null, message(exception));
-				}
-
-				@Override
-				public void error(SAXParseException exception) {
-					result.error(null, message(exception));
-				}
-
-				@Override
-				public void fatalError(SAXParseException exception) {
-					result.error(null, message(exception));
-				}
-
-				private String message(SAXParseException exception) {
-					return "line " + exception.getLineNumber() + ": " + exception.getMessage();
-				}
-			});
-			validator.validate(new DOMSource(new ReqIFWriter().buildDocument(document)));
-
+			factory.setResourceResolver(resolver);
+			factory.setErrorHandler(schemaCollector);
+			xsd = factory.newSchema(schemaFile.toFile());
 		} catch (SAXException e) {
-			result.error(null, "Schema validation failed: " + e.getMessage());
+			schemaCollector.reportUnlessReported(e);
+		}
+		if (xsd == null || !schemaProblems.getIssues().isEmpty() || !resolver.getMissing().isEmpty()) {
+			StringBuilder message = new StringBuilder("Schema could not be loaded: ").append(schemaFile);
+			for (ValidationIssue problem : schemaProblems.getIssues()) {
+				message.append("\n  ").append(problem.getMessage());
+			}
+			appendMissingImports(message, resolver, schemaFile);
+			result.error(null, message.toString());
+			return result;
+		}
+
+		IssueCollector collector = new IssueCollector(result);
+		try {
+			Validator validator = xsd.newValidator();
+			validator.setErrorHandler(collector);
+			validator.validate(source);
+		} catch (SAXException e) {
+			// normally reported through the error handler already; anything else
+			// stopped the validation and must not be lost
+			collector.reportUnlessReported(e);
 		}
 		return result;
+	}
+
+	private static void appendMissingImports(StringBuilder message, LocalSchemaResolver resolver, Path schemaFile) {
+
+		if (resolver.getMissing().isEmpty()) {
+			return;
+		}
+		message.append("\nThe schema imports files that are not available locally. Download them and place them next to ")
+				.append(schemaFile.getFileName()).append(" in ").append(schemaFile.getParent()).append(':');
+		for (Map.Entry<String, String> missing : resolver.getMissing().entrySet()) {
+			message.append("\n  ").append(missing.getValue()).append(" (").append(missing.getKey()).append(')');
+		}
+	}
+
+	/**
+	 * Records parser findings as issues. Warnings stay warnings; errors and
+	 * fatal errors are errors.
+	 *
+	 * After a fatal error the parser throws a new exception for the same
+	 * problem; that one must not be reported again. Errors and warnings are
+	 * never merged: findings on a DOM source carry no position, so equal
+	 * messages may well be different problems.
+	 */
+	private static final class IssueCollector implements ErrorHandler {
+
+		private final ValidationResult result;
+		private final Set<String> fatalErrors = new HashSet<String>();
+
+		IssueCollector(ValidationResult result) {
+			this.result = result;
+		}
+
+		@Override
+		public void warning(SAXParseException exception) {
+			this.result.warning(null, message(exception));
+		}
+
+		@Override
+		public void error(SAXParseException exception) {
+			this.result.error(null, message(exception));
+		}
+
+		@Override
+		public void fatalError(SAXParseException exception) {
+			this.fatalErrors.add(fingerprint(exception));
+			this.result.error(null, message(exception));
+		}
+
+		/**
+		 * For an exception that ended parsing: reports it unless it repeats a
+		 * fatal error the handler has seen already.
+		 */
+		void reportUnlessReported(SAXException exception) {
+			if (!this.fatalErrors.contains(fingerprint(exception))) {
+				this.result.error(null, exception instanceof SAXParseException
+						? message((SAXParseException) exception)
+						: exception.getMessage());
+			}
+		}
+
+		private static String fingerprint(SAXException exception) {
+			if (exception instanceof SAXParseException) {
+				SAXParseException parseException = (SAXParseException) exception;
+				return parseException.getSystemId() + ':' + parseException.getLineNumber() + ':'
+						+ parseException.getColumnNumber() + ':' + parseException.getMessage();
+			}
+			return String.valueOf(exception.getMessage());
+		}
+
+		private static String message(SAXParseException exception) {
+			// a DOM source has no line numbers
+			return exception.getLineNumber() < 0
+					? exception.getMessage()
+					: "line " + exception.getLineNumber() + ": " + exception.getMessage();
+		}
 	}
 
 	private static boolean isBlank(String value) {

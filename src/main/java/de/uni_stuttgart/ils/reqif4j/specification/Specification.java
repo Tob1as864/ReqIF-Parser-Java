@@ -1,118 +1,184 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueBoolean;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueDate;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueDouble;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueInteger;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueString;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
+import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class Specification {
+public class Specification extends SpecElementWithAttributes implements HierarchyParent {
 	
 	
-	private String id;
-	private String name;
-	private String alternativeID;
 	private SpecType type;
-	private int numberOfSpecObjects;
-	private int sectionCounter = 0;
-	private Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
-	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
-	private List<SpecHierarchy> allSpecHierarchies = new ArrayList<SpecHierarchy>();
+	private String specTypeRef;
+	private final HierarchyChildren children = new HierarchyChildren(this);
 	
 	
 	
 	
-	public String getID() {
-		return this.id;
-	}
-
-	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
-	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
-	}
 	
 	/**
 	 * @return the value of an attribute named "Description", or null if the
 	 *         specification has no such attribute
 	 */
 	public String getDescription() {
-		AttributeValue description = this.attributeValues.get("Description");
+		AttributeValue description = getAttributes().get("Description");
 		return description == null ? null : (String) description.getValue();
 	}
 	
-	public String getName() {
-		return this.name;
-	}
 	
 	public String getSpecType() {
-		return this.type.getType();
+		return this.type == null ? null : this.type.getType();
 	}
 	
 	public String getSpecTypeName() {
-		return this.type.getName();
+		return this.type == null ? null : this.type.getName();
 	}
 
 	/**
-	 * @return the IDENTIFIER of the specification type, or null if the
-	 *         reference could not be resolved
+	 * @return the IDENTIFIER of the specification type - also if the
+	 *         reference could not be resolved - or null if it has none
 	 */
 	public String getSpecTypeID() {
-		return this.type == null ? null : this.type.getID();
+		return this.type != null ? this.type.getID() : this.specTypeRef;
 	}
 	
-	public Map<String, AttributeValue> getAttributes() {
-		return this.attributeValues;
-	}
 	
-	public Object getAttribute(String attributeName) {
-		AttributeValue attributeValue = this.attributeValues.get(attributeName);
-		return attributeValue == null ? null : attributeValue.getValue();
-	}
-	
+	/**
+	 * @return the number of hierarchy nodes, at all levels
+	 */
 	public int getNumberOfSpecObjects() {
-		return this.numberOfSpecObjects;
+		return this.children.descendants().size();
 	}
-	
+
+	/**
+	 * @return the number of top-level hierarchy nodes (sections)
+	 */
 	public int getNumberOfSections() {
-		return this.sectionCounter;
+		return this.children.size();
 	}
 
+	/**
+	 * @return the top-level hierarchy nodes in document order (a copy)
+	 */
+	@Override
 	public List<SpecHierarchy> getChildren() {
-
-        return new ArrayList<SpecHierarchy>(this.children.values());
+		return this.children.list();
 	}
 	
 	public List<SpecObject> getLvlOneSpecHierarchies() {
 		
 		List<SpecObject> children = new ArrayList<SpecObject>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
+		for(SpecHierarchy specHierarchy: this.children.list()) {
 			children.add(specHierarchy.getSpecObject());
 		}
 		
 		return children;
 	}
-	
+
+	/**
+	 * @return all hierarchy nodes, depth-first in document order (read-only)
+	 */
 	public List<SpecHierarchy> getAllSpecHierarchies() {
-		return this.allSpecHierarchies;
+		return this.children.descendants();
+	}
+
+	/**
+	 * @return the hierarchy node with this IDENTIFIER at any level, or null
+	 */
+	public SpecHierarchy getSpecHierarchy(String specHierarchyID) {
+		return specHierarchyID == null ? null : this.children.descendant(specHierarchyID);
+	}
+
+	/**
+	 * Appends a top-level hierarchy node.
+	 *
+	 * @throws IllegalArgumentException see {@link #addChild(int, SpecHierarchy)}
+	 */
+	public Specification addChild(SpecHierarchy child) {
+		return addChild(this.children.size(), child);
+	}
+
+	/**
+	 * Inserts a top-level hierarchy node at a position, 0 for first; the
+	 * sections of the following nodes shift.
+	 *
+	 * @throws IllegalArgumentException if the node is already placed somewhere
+	 *         (move it with {@link de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent#moveSpecHierarchy}),
+	 *         a node with the same IDENTIFIER is already at the top level, or
+	 *         the position is out of range
+	 */
+	@Override
+	public Specification addChild(int index, SpecHierarchy child) {
+		this.children.add(index, child);
+		if(index == this.children.size() - 1) {
+			// appended: nothing else moves
+			child.place(1, index + 1);
+		} else {
+			renumber(index);
+		}
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Removes a top-level hierarchy node, with everything below it.
+	 *
+	 * @return the removed node, or null if there is no such node
+	 */
+	@Override
+	public SpecHierarchy removeChild(String specHierarchyID) {
+		int position = this.children.indexOf(specHierarchyID);
+		SpecHierarchy removed = this.children.remove(specHierarchyID);
+		if(removed != null) {
+			// the sections before it stay as they are
+			renumber(position);
+			markModified();
+		}
+		return removed;
+	}
+
+	@Override
+	public int getChildCount() {
+		return this.children.size();
+	}
+
+	@Override
+	public SpecHierarchy getChild(String specHierarchyID) {
+		return this.children.get(specHierarchyID);
+	}
+
+	@Override
+	public Specification setChildren(List<SpecHierarchy> children) {
+		this.children.replace(children);
+		renumber(0);
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Top-level nodes are the sections, numbered from 1.
+	 *
+	 * @param from the first position whose section may have changed
+	 */
+	private void renumber(int from) {
+		int index = 0;
+		for(SpecHierarchy child: this.children.values()) {
+			if(index >= from) {
+				child.place(1, index + 1);
+			}
+			index++;
+		}
+	}
+
+	HierarchyChildren hierarchyChildren() {
+		return this.children;
 	}
 	
 	
@@ -124,191 +190,52 @@ public class Specification {
 	 */
 	public Specification(String id, String name, SpecType specType,
 			java.util.Collection<AttributeValue> attributeValues, List<SpecHierarchy> children) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.type = specType;
 
+		AttributeValues values = resetValues(specType);
 		if(attributeValues != null) {
 			for(AttributeValue attributeValue: attributeValues) {
-				this.attributeValues.put(attributeValue.getName(), attributeValue);
+				values.put(attributeValue);
 			}
 		}
 
 		if(children != null) {
-			for(SpecHierarchy child: children) {
-				this.children.put(child.getSpecHierarchyID(), child);
-				this.sectionCounter++;
-			}
+			this.children.putAll(children);
 		}
-
-		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
-			allChildren.add(specHierarchy);
-			allChildren.addAll(specHierarchy.getAllChildren());
-		}
-		this.allSpecHierarchies.addAll(allChildren);
-		this.numberOfSpecObjects = allChildren.size();
 	}
 
 	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects) {
+		this(specification, specType, specObjects, ParseIssues.collecting());
+	}
+
+	/**
+	 * @param specType the resolved specification type; if null, the
+	 *                 specification is kept with its unresolved type reference,
+	 *                 but its values cannot be interpreted and are reported and
+	 *                 skipped
+	 * @param issues   receives the problems found
+	 */
+	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects, ParseIssues issues) {
+		super(specification);
 		
-		this.id = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.name = specification.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-		this.alternativeID = XmlUtils.alternativeID(specification);
 		this.type = specType;
-		
-		Element valuesElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.VALUES);
-		if(valuesElement != null) {
+		this.specTypeRef = typeRef(specification, ReqIFConst.SPEC_TYPE_REF);
 
-			for(Element attribute: XmlUtils.childElements(valuesElement)) {
+		readValues(specification, specType, this.specTypeRef, issues);
 
-				String attValNodeName = XmlUtils.localName(attribute);
-				{
-
-					String attributeDefinitionRef = XmlUtils.firstChildElement(
-							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
-					String attributeDefinitionName = specType.getAttributeDefinitions().get(attributeDefinitionRef).getName();
-					String attributeValue;
-					AttributeDefinition attributeDefinition = specType.getAttributeDefinition(attributeDefinitionRef);
-					
-					switch(attValNodeName.substring(attValNodeName.lastIndexOf("-")+1)) {
-					
-						case ReqIFConst.BOOLEAN:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueBoolean(attributeValue, attributeDefinition));
-														break;
-							
-						case ReqIFConst.INTEGER:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueInteger(attributeValue, attributeDefinition));
-														break;
-							
-						case ReqIFConst.STRING:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueString(attributeValue, attributeDefinition));
-														break;
-							
-						case ReqIFConst.ENUMERATION:	// Multiselect: read ALL ENUM-VALUE-REF children, not just the first
-														List<String> enumRefs = new ArrayList<String>();
-														List<String> enumNames = new ArrayList<String>();
-														for(Element ref : XmlUtils.descendantsByLocalName(attribute, ReqIFConst.ENUM_VALUE_REF)) {
-															String refID = ref.getTextContent().trim();
-															enumRefs.add(refID);
-															enumNames.add(specType.getEnumValueName(refID));
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueEnumeration(enumNames, enumRefs, attributeDefinition));
-														break;
-							
-						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinitionName, new AttributeValueXHTML(attribute, attributeDefinition));
-														break;
-
-						// DATE and REAL values were formerly ignored on specifications
-						case ReqIFConst.DATE:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueDate(attributeValue, attributeDefinition));
-														break;
-
-						case ReqIFConst.REAL:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
-														break;
-
-						// Values of datatype kinds the parser does not model are
-						// kept generically instead of being dropped.
-						default:						if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName,
-																new AttributeValue(attributeValue, attributeDefinition)
-																		.setSourceElementName(XmlUtils.localName(attribute)));
-														break;
-					}
-				}
-			}
-		}
-		
-		if(this.attributeValues.size() < specType.getAttributeDefinitions().size()) {
-			
-			for(AttributeDefinition attributeDefinition: specType.getAttributeDefinitions().values()) {
-				
-				if(!this.attributeValues.containsKey(attributeDefinition.getName())) {
-
-					if(attributeDefinition.getDataType() == null) {
-						throw new ExceptionSpecObject("Attribute definition not existing in ReqIF parser\n", attributeDefinition);
-					}
-
-					switch(attributeDefinition.getDataType().getType()) {
-					
-						case ReqIFConst.BOOLEAN:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueBoolean(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-						
-						case ReqIFConst.INTEGER:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueInteger(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-						
-						case ReqIFConst.STRING:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueString(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-						
-						case ReqIFConst.ENUMERATION:	if(attributeDefinition instanceof AttributeDefinitionEnumeration) {
-															AttributeDefinitionEnumeration enumDefinition = (AttributeDefinitionEnumeration) attributeDefinition;
-															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(enumDefinition.getDefaultValues(), enumDefinition.getDefaultValueRefs(), attributeDefinition));
-														}else{
-															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(attributeDefinition.getDefaultValue(), attributeDefinition));
-														}
-														break;
-
-						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueXHTML(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-
-						case ReqIFConst.DATE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDate(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-
-						case ReqIFConst.DOUBLE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDouble(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-
-						default:						break;
-					}
-				}
-			}
-		}
-		
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
-		if(childrenElement != null) {
-
-			for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
-
-				String specHierarchyID = XmlUtils.attribute(specHierarchy, ReqIFConst.IDENTIFIER);
-
-				this.children.put(specHierarchyID, new SpecHierarchy(1, ++this.sectionCounter, specHierarchy, specObjects));
+		int sectionCounter = 0;
+		for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
+			int section = sectionCounter + 1;
+			SpecHierarchy child = issues.readOrSkip("spec hierarchy",
+					() -> new SpecHierarchy(1, section, specHierarchy, specObjects, issues));
+			if(child != null) {
+				sectionCounter = section;
 			}
+			this.children.put(child, issues);
 		}
-		
-		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
-			allChildren.add(specHierarchy);
-			for(SpecHierarchy child: specHierarchy.getAllChildren()) {
-				allChildren.add(child);
-			}
-		}
-		this.allSpecHierarchies.addAll(allChildren);
-		this.numberOfSpecObjects = allChildren.size();
 	}
 
 }

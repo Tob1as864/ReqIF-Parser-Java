@@ -6,10 +6,12 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
@@ -20,17 +22,21 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NamedNodeMap;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
+import de.uni_stuttgart.ils.reqif4j.attributes.UninterpretedAttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeDouble;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumeration;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumerationValue;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeInteger;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeString;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
@@ -43,6 +49,8 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
 import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
+import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 
 /**
  * Serializes a parsed {@link ReqIFDocument} back to ReqIF XML.
@@ -63,11 +71,24 @@ import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
 public class ReqIFWriter {
 
 	public static final String REQIF_NAMESPACE = "http://www.omg.org/spec/ReqIF/20110401/reqif.xsd";
+	/** what all ReqIF namespaces, also those of drafts, begin with */
+	private static final String REQIF_NAMESPACE_PREFIX = "http://www.omg.org/spec/ReqIF/";
 	public static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
+	/** REQ-IF-TOOL-ID and SOURCE-TOOL-ID written when the header has none. */
+	public static final String DEFAULT_TOOL_ID = "reqif4j";
+	/** The only REQ-IF-VERSION the schema allows. */
+	public static final String REQIF_VERSION = "1.0";
+
 	private static final String XHTML_PREFIX = "xhtml";
+	/** user data keys of the output DOM holding the LAST-CHANGE defaults */
+	private static final String DEFAULT_LAST_CHANGE = "reqif4j.defaultLastChange";
+	private static final String NOW = "reqif4j.now";
+	/** the modified elements, which take the time of writing as LAST-CHANGE */
+	private static final String STAMPED = "reqif4j.stamped";
 
 	private boolean indent = false;
+	private Clock clock = Clock.systemUTC();
 
 	/**
 	 * Enables pretty-printing.
@@ -79,6 +100,17 @@ public class ReqIFWriter {
 	 */
 	public ReqIFWriter setIndent(boolean indent) {
 		this.indent = indent;
+		return this;
+	}
+
+
+	/**
+	 * Sets the clock that supplies the timestamp for required dates the model
+	 * does not carry; see {@link #buildDocument(ReqIFDocument)}. Mainly useful
+	 * to make generated output reproducible.
+	 */
+	public ReqIFWriter setClock(Clock clock) {
+		this.clock = clock == null ? Clock.systemUTC() : clock;
 		return this;
 	}
 
@@ -96,20 +128,55 @@ public class ReqIFWriter {
 	 * Writes the document to the given stream. The stream is not closed.
 	 */
 	public void write(ReqIFDocument document, OutputStream out) throws IOException {
+		serialize(document, out).apply();
+	}
+
+	/**
+	 * Writes the document without yet taking the new LAST-CHANGE of modified
+	 * elements into the model, for writers that store the output further and
+	 * apply the stamps only once that succeeded.
+	 */
+	Stamps serialize(ReqIFDocument document, OutputStream out) throws IOException {
+		Stamps stamps = new Stamps();
 		try {
-			transformer().transform(new DOMSource(buildDocument(document)), new StreamResult(out));
+			transformer().transform(new DOMSource(build(document, stamps)), new StreamResult(out));
 		} catch (TransformerException e) {
 			throw new IOException("Failed to write ReqIF document", e);
+		}
+		return stamps;
+	}
+
+	/**
+	 * The modified elements of a written document and the LAST-CHANGE they
+	 * were written with.
+	 */
+	static final class Stamps {
+
+		private final List<Identifiable> elements = new ArrayList<Identifiable>();
+		private String lastChange;
+
+		/**
+		 * Takes the written LAST-CHANGE into the model; the elements are no
+		 * longer modified.
+		 */
+		void apply() {
+			for (Identifiable element : this.elements) {
+				element.setLastChange(this.lastChange);
+			}
 		}
 	}
 
 	/**
-	 * @return the document serialized as an XML string
+	 * @return the document serialized as an XML string; like the other
+	 *         output methods, this takes the LAST-CHANGE of modified elements
+	 *         into the model, see {@link #buildDocument(ReqIFDocument)}
 	 */
 	public String toXml(ReqIFDocument document) {
 		try {
 			StringWriter writer = new StringWriter();
-			transformer().transform(new DOMSource(buildDocument(document)), new StreamResult(writer));
+			Stamps stamps = new Stamps();
+			transformer().transform(new DOMSource(build(document, stamps)), new StreamResult(writer));
+			stamps.apply();
 			return writer.toString();
 		} catch (TransformerException e) {
 			throw new ReqIFWriteException("Failed to serialize ReqIF document", e);
@@ -119,20 +186,64 @@ public class ReqIFWriter {
 
 	/**
 	 * Builds the output DOM from the object model.
+	 *
+	 * The schema requires some values a model may lack, typically one that was
+	 * generated rather than parsed. They are filled in on output only; this
+	 * method does not change the model:
+	 *
+	 * <ul>
+	 * <li>LAST-CHANGE of an element: the time of writing if the element was
+	 * {@link Identifiable#isModified() modified}; otherwise, if it has none,
+	 * the header's CREATION-TIME, or the time of writing if the header has
+	 * none either;</li>
+	 * <li>header CREATION-TIME: the time of writing;</li>
+	 * <li>header REQ-IF-TOOL-ID and SOURCE-TOOL-ID: {@value #DEFAULT_TOOL_ID};
+	 * REQ-IF-VERSION: {@value #REQIF_VERSION}; TITLE: empty.</li>
+	 * </ul>
+	 *
+	 * Not filled in, because no default would be meaningful: a missing header
+	 * and missing identifiers. {@link de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator}
+	 * reports both.
+	 *
+	 * The output methods ({@link #write(ReqIFDocument, OutputStream)},
+	 * {@link #toXml(ReqIFDocument)}, ...) in addition give modified elements
+	 * the LAST-CHANGE they were written with once the output succeeded; they
+	 * are then no longer modified, so writing again does not report a new
+	 * change.
 	 */
 	public Document buildDocument(ReqIFDocument document) {
+		return build(document, new Stamps());
+	}
+
+	private Document build(ReqIFDocument document, Stamps stamps) {
 
 		if (document == null) {
 			throw new ReqIFWriteException("Cannot write a null ReqIF document");
 		}
 
 		Document xml = newDocument();
+		// one timestamp for the whole document, so all defaults agree
+		String now = this.clock.instant().truncatedTo(ChronoUnit.SECONDS).toString();
+		String creationTime = document.getHeader() == null ? "" : document.getHeader().getCreationTime();
+		xml.setUserData(DEFAULT_LAST_CHANGE, isBlank(creationTime) ? now : creationTime, null);
+		xml.setUserData(NOW, now, null);
+		stamps.lastChange = now;
+		xml.setUserData(STAMPED, stamps.elements, null);
+
 		Element root = xml.createElementNS(REQIF_NAMESPACE, "REQ-IF");
 		root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:" + XHTML_PREFIX, XHTML_NAMESPACE);
+		if (document.getLang() != null) {
+			root.setAttributeNS(XMLConstants.XML_NS_URI, "xml:lang", document.getLang());
+		}
+		if (document.getSchemaLocation() != null) {
+			root.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:xsi", XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI);
+			root.setAttributeNS(XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI, "xsi:schemaLocation",
+					schemaLocation(document.getSchemaLocation()));
+		}
 		xml.appendChild(root);
 
 		if (document.getHeader() != null) {
-			root.appendChild(header(xml, document.getHeader()));
+			root.appendChild(header(xml, document.getHeader(), now));
 		}
 		root.appendChild(coreContent(xml, document.getCoreContent()));
 
@@ -141,11 +252,19 @@ public class ReqIFWriter {
 			root.appendChild(xml.importNode(extension, true));
 		}
 
+		// only needed while building; not part of the returned document
+		xml.setUserData(DEFAULT_LAST_CHANGE, null, null);
+		xml.setUserData(NOW, null, null);
+		xml.setUserData(STAMPED, null, null);
 		return xml;
 	}
 
 
-	private Element header(Document xml, ReqIFHeader header) {
+	/**
+	 * REQ-IF-HEADER is an xsd:sequence; only COMMENT and REPOSITORY-ID are
+	 * optional, the other elements get a default if the header lacks them.
+	 */
+	private Element header(Document xml, ReqIFHeader header, String now) {
 
 		Element theHeader = element(xml, ReqIFConst.THE_HEADER);
 		Element reqifHeader = element(xml, ReqIFConst.REQ_IF_HEADER);
@@ -153,11 +272,12 @@ public class ReqIFWriter {
 		theHeader.appendChild(reqifHeader);
 
 		appendTextIfPresent(xml, reqifHeader, ReqIFConst.COMMENT, header.getComment());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.CREATION_TIME, header.getCreationTime());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.REQ_IF_TOOL_ID, header.getToolID());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.REQ_IF_VERSION, header.getReqIFVersion());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.SOURCE_TOOL_ID, header.getSourceToolID());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.TITLE, header.getTitle());
+		appendText(xml, reqifHeader, ReqIFConst.CREATION_TIME, orDefault(header.getCreationTime(), now));
+		appendTextIfPresent(xml, reqifHeader, ReqIFConst.REPOSITORY_ID, header.getRepositoryID());
+		appendText(xml, reqifHeader, ReqIFConst.REQ_IF_TOOL_ID, orDefault(header.getToolID(), DEFAULT_TOOL_ID));
+		appendText(xml, reqifHeader, ReqIFConst.REQ_IF_VERSION, orDefault(header.getReqIFVersion(), REQIF_VERSION));
+		appendText(xml, reqifHeader, ReqIFConst.SOURCE_TOOL_ID, orDefault(header.getSourceToolID(), DEFAULT_TOOL_ID));
+		appendText(xml, reqifHeader, ReqIFConst.TITLE, nullToEmpty(header.getTitle()));
 
 		return theHeader;
 	}
@@ -202,6 +322,13 @@ public class ReqIFWriter {
 		}
 		reqifContent.appendChild(specRelations);
 
+		Element specifications = element(xml, ReqIFConst.SPECIFICATIONS);
+		for (Specification specification : content.getSpecifications().values()) {
+			specifications.appendChild(specification(xml, specification));
+		}
+		reqifContent.appendChild(specifications);
+
+		// REQ-IF-CONTENT is an xsd:sequence: the relation groups come last
 		if (!content.getRelationGroups().isEmpty()) {
 			Element relationGroups = element(xml, ReqIFConst.SPEC_RELATION_GROUPS);
 			for (RelationGroup relationGroup : content.getRelationGroups().values()) {
@@ -209,12 +336,6 @@ public class ReqIFWriter {
 			}
 			reqifContent.appendChild(relationGroups);
 		}
-
-		Element specifications = element(xml, ReqIFConst.SPECIFICATIONS);
-		for (Specification specification : content.getSpecifications().values()) {
-			specifications.appendChild(specification(xml, specification));
-		}
-		reqifContent.appendChild(specifications);
 
 		return coreContent;
 	}
@@ -233,14 +354,18 @@ public class ReqIFWriter {
 		}
 
 		Element definition = element(xml, elementName);
-		definition.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(datatype.getID()));
-		definition.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(datatype.getName()));
-		appendAlternativeID(xml, definition, datatype.getAlternativeID());
+		identifiable(xml, definition, datatype);
 
 		if (datatype instanceof DatatypeInteger) {
 			DatatypeInteger integer = (DatatypeInteger) datatype;
 			definition.setAttribute(ReqIFConst.MIN, Long.toString(integer.getMin()));
 			definition.setAttribute(ReqIFConst.MAX, Long.toString(integer.getMax()));
+
+		} else if (datatype instanceof DatatypeDouble) {
+			DatatypeDouble real = (DatatypeDouble) datatype;
+			definition.setAttribute(ReqIFConst.ACCURACY, Integer.toString(real.getAccuracy()));
+			definition.setAttribute(ReqIFConst.MIN, XsdTypes.formatDouble(real.getMin()));
+			definition.setAttribute(ReqIFConst.MAX, XsdTypes.formatDouble(real.getMax()));
 
 		} else if (datatype instanceof DatatypeString) {
 			definition.setAttribute(ReqIFConst.MAX_LENGTH,
@@ -260,14 +385,12 @@ public class ReqIFWriter {
 	private Element enumValue(Document xml, DatatypeEnumerationValue value) {
 
 		Element enumValue = element(xml, ReqIFConst.ENUM_VALUE);
-		enumValue.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(value.getID()));
-		enumValue.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(value.getName()));
+		identifiable(xml, enumValue, value);
 
 		Element embedded = element(xml, ReqIFConst.EMBEDDED_VALUE);
+		// both attributes are required, OTHER-CONTENT even when empty
 		embedded.setAttribute(ReqIFConst.KEY, nullToEmpty(value.getKey()));
-		if (value.getOtherContent() != null && !value.getOtherContent().isEmpty()) {
-			embedded.setAttribute(ReqIFConst.OTHER_CONTENT, value.getOtherContent());
-		}
+		embedded.setAttribute(ReqIFConst.OTHER_CONTENT, nullToEmpty(value.getOtherContent()));
 
 		Element properties = element(xml, ReqIFConst.PROPERTIES);
 		properties.appendChild(embedded);
@@ -291,9 +414,7 @@ public class ReqIFWriter {
 		}
 
 		Element type = element(xml, elementName);
-		type.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specType.getID()));
-		type.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(specType.getName()));
-		appendAlternativeID(xml, type, specType.getAlternativeID());
+		identifiable(xml, type, specType);
 
 		Element specAttributes = element(xml, ReqIFConst.SPEC_ATTRIBUTES);
 		for (AttributeDefinition definition : specType.getAttributeDefinitions().values()) {
@@ -310,26 +431,41 @@ public class ReqIFWriter {
 	private Element attributeDefinition(Document xml, AttributeDefinition definition) {
 
 		Datatype datatype = definition.getDataType();
-		if (datatype == null) {
-			return null;
+		if (datatype == null && definition.getUnresolvedElement() != null) {
+			// as read, with the properties the model may have changed
+			Element copy = asReqIF(xml, definition.getUnresolvedElement());
+			for (String name : List.of(ReqIFConst.LONG_NAME, ReqIFConst.DESC, ReqIFConst.IS_EDITABLE)) {
+				copy.removeAttribute(name);
+			}
+			Element alternativeID = XmlUtils.firstChildElementByLocalName(copy, ReqIFConst.ALTERNATIVE_ID);
+			if (alternativeID != null) {
+				copy.removeChild(alternativeID);
+			}
+			Node first = copy.getFirstChild();
+			identifiable(xml, copy, definition);
+			Element written = XmlUtils.firstChildElementByLocalName(copy, ReqIFConst.ALTERNATIVE_ID);
+			if (written != null && first != null) {
+				// the schema wants it first
+				copy.insertBefore(written, first);
+			}
+			setAttributeIfPresent(copy, ReqIFConst.IS_EDITABLE, toString(definition.getEditable()));
+			return copy;
 		}
-		String elementName = ReqIFElements.attributeDefinition(datatype.getType());
-		if (elementName == null) {
-			// datatype kinds the parser does not model: keep the original name
-			elementName = definition.getSourceElementName();
-		}
-		if (elementName == null) {
+		// datatype kinds the parser does not model keep their original name
+		String elementName = definition.getElementName();
+		if (datatype == null || elementName == null) {
 			return null;
 		}
 
 		Element attributeDefinition = element(xml, elementName);
-		attributeDefinition.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(definition.getID()));
-		attributeDefinition.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(definition.getName()));
-		appendAlternativeID(xml, attributeDefinition, definition.getAlternativeID());
+		identifiable(xml, attributeDefinition, definition);
+		setAttributeIfPresent(attributeDefinition, ReqIFConst.IS_EDITABLE, toString(definition.getEditable()));
 
-		if (definition instanceof AttributeDefinitionEnumeration
-				&& ((AttributeDefinitionEnumeration) definition).isMultiValued()) {
-			attributeDefinition.setAttribute(ReqIFConst.MULTI_VALUED, "true");
+		// required on every enumeration attribute definition, "false" included
+		if (ReqIFConst.ENUMERATION.equals(datatype.getType())) {
+			boolean multiValued = definition instanceof AttributeDefinitionEnumeration
+					&& ((AttributeDefinitionEnumeration) definition).isMultiValued();
+			attributeDefinition.setAttribute(ReqIFConst.MULTI_VALUED, Boolean.toString(multiValued));
 		}
 
 		Element type = element(xml, ReqIFConst.TYPE);
@@ -362,8 +498,23 @@ public class ReqIFWriter {
 			return defaultValue;
 		}
 
-		if (definition.getDefaultValue() == null) {
+		// an enumeration default is a list of enum value references, which only
+		// an enumeration definition carries; text would be schema-invalid
+		if (definition.getDefaultValue() == null || ReqIFConst.ENUMERATION.equals(datatype.getType())) {
 			return null;
+		}
+		if (ReqIFConst.XHTML.equals(datatype.getType())) {
+			// an XHTML value carries its content in a THE-VALUE element, not in
+			// an attribute
+			AttributeValueXHTML parsed = definition.getDefaultXhtmlValue();
+			Element value = xhtmlValue(xml, definition,
+					parsed != null ? parsed : new AttributeValueXHTML(definition.getDefaultValue(), definition));
+			if (value == null) {
+				return null;
+			}
+			Element defaultValue = element(xml, ReqIFConst.DEFAULT_VALUE);
+			defaultValue.appendChild(value);
+			return defaultValue;
 		}
 		String elementName = ReqIFElements.attributeValue(datatype.getType());
 		if (elementName == null) {
@@ -383,9 +534,8 @@ public class ReqIFWriter {
 	private Element specObject(Document xml, SpecObject specObject) {
 
 		Element element = element(xml, ReqIFConst.SPEC_OBJECT);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specObject.getID()));
-		appendAlternativeID(xml, element, specObject.getAlternativeID());
-		element.appendChild(values(xml, specObject.getAttributes()));
+		identifiable(xml, element, specObject);
+		element.appendChild(values(xml, specObject.getValues()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_OBJECT_TYPE, specObject.getSpecTypeID()));
 		return element;
 	}
@@ -393,9 +543,8 @@ public class ReqIFWriter {
 	private Element specRelation(Document xml, SpecRelation specRelation) {
 
 		Element element = element(xml, ReqIFConst.SPEC_RELATION);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specRelation.getID()));
-		appendAlternativeID(xml, element, specRelation.getAlternativeID());
-		element.appendChild(values(xml, specRelation.getAttributes()));
+		identifiable(xml, element, specRelation);
+		element.appendChild(values(xml, specRelation.getValues()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_RELATION_TYPE, specRelation.getRelationTypeRef()));
 		element.appendChild(objectRef(xml, ReqIFConst.SOURCE, specRelation.getSourceObjID()));
 		element.appendChild(objectRef(xml, ReqIFConst.TARGET, specRelation.getTargetObjID()));
@@ -405,10 +554,8 @@ public class ReqIFWriter {
 	private Element specification(Document xml, Specification specification) {
 
 		Element element = element(xml, ReqIFConst.SPECIFICATION);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specification.getID()));
-		element.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(specification.getName()));
-		appendAlternativeID(xml, element, specification.getAlternativeID());
-		element.appendChild(values(xml, specification.getAttributes()));
+		identifiable(xml, element, specification);
+		element.appendChild(values(xml, specification.getValues()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPECIFICATION_TYPE, specification.getSpecTypeID()));
 
 		List<SpecHierarchy> children = specification.getChildren();
@@ -430,10 +577,27 @@ public class ReqIFWriter {
 	private Element specHierarchy(Document xml, SpecHierarchy hierarchy) {
 
 		Element element = element(xml, ReqIFConst.SPEC_HIERARCHY);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(hierarchy.getSpecHierarchyID()));
-		appendAlternativeID(xml, element, hierarchy.getAlternativeID());
+		identifiable(xml, element, hierarchy);
 
-		if (hierarchy.getSpecObject() != null) {
+		setAttributeIfPresent(element, ReqIFConst.IS_TABLE_INTERNAL, toString(hierarchy.getTableInternal()));
+		setAttributeIfPresent(element, ReqIFConst.IS_EDITABLE, toString(hierarchy.getEditable()));
+		if (!hierarchy.getEditableAttributeRefs().isEmpty()) {
+			Element editableAtts = element(xml, ReqIFConst.EDITABLE_ATTS);
+			SpecType objectType = hierarchy.getSpecObject() == null ? null
+					: hierarchy.getSpecObject().getResolvedSpecType();
+			for (java.util.Map.Entry<String, String> ref : hierarchy.getEditableAttributeRefs()) {
+				// the reference must name the kind the definition is written as
+				AttributeDefinition definition = objectType == null ? null
+						: objectType.getAttributeDefinition(ref.getKey());
+				Element refElement = element(xml, definition != null && definition.getElementName() != null
+						? definition.getElementName() + "-REF" : ref.getValue());
+				refElement.setTextContent(ref.getKey());
+				editableAtts.appendChild(refElement);
+			}
+			element.appendChild(editableAtts);
+		}
+		// written also when unresolved, so the reference is not lost
+		if (hierarchy.getSpecObjectID() != null) {
 			element.appendChild(objectRef(xml, ReqIFConst.OBJECT, hierarchy.getSpecObjectID()));
 		}
 		List<SpecHierarchy> nested = hierarchy.getChildren();
@@ -448,14 +612,9 @@ public class ReqIFWriter {
 
 		Element values = element(xml, ReqIFConst.VALUES);
 
-		List<AttributeValue> sorted = new ArrayList<AttributeValue>(attributeValues.values());
-		// deterministic output regardless of the map implementation
-		sorted.sort(Comparator.comparing(value -> {
-			AttributeDefinition definition = value.getAttributeDefinitionType();
-			return definition == null || definition.getID() == null ? "" : definition.getID();
-		}));
-
-		for (AttributeValue attributeValue : sorted) {
+		// only the element's own values, in document order; defaults stay with
+		// their attribute definitions
+		for (AttributeValue attributeValue : attributeValues.values()) {
 			Element written = attributeValue(xml, attributeValue);
 			if (written != null) {
 				values.appendChild(written);
@@ -466,8 +625,12 @@ public class ReqIFWriter {
 
 	private Element attributeValue(Document xml, AttributeValue attributeValue) {
 
+		if (attributeValue instanceof UninterpretedAttributeValue) {
+			return asReqIF(xml, ((UninterpretedAttributeValue) attributeValue).getElement());
+		}
 		AttributeDefinition definition = attributeValue.getAttributeDefinitionType();
-		if (definition == null || definition.getDataType() == null) {
+		// a definition that cannot be written cannot be referenced either
+		if (definition == null || definition.getDataType() == null || definition.getElementName() == null) {
 			return null;
 		}
 		String datatypeCategory = definition.getDataType().getType();
@@ -476,11 +639,10 @@ public class ReqIFWriter {
 			if (!(attributeValue instanceof AttributeValueEnumeration)) {
 				return null;
 			}
-			List<String> refs = ((AttributeValueEnumeration) attributeValue).getValueRefs();
-			if (refs.isEmpty()) {
-				return null;
-			}
-			return enumerationValue(xml, definition, refs);
+			// an empty selection is a value too ("nothing selected"); left out, the
+			// definition's default would apply when the document is read again
+			return enumerationValue(xml, definition,
+					((AttributeValueEnumeration) attributeValue).getValueRefs());
 		}
 
 		if (ReqIFConst.XHTML.equals(datatypeCategory)) {
@@ -501,7 +663,8 @@ public class ReqIFWriter {
 		}
 
 		Element element = element(xml, elementName);
-		element.setAttribute(ReqIFConst.THE_VALUE, String.valueOf(value));
+		element.setAttribute(ReqIFConst.THE_VALUE,
+				value instanceof Double ? XsdTypes.formatDouble((Double) value) : String.valueOf(value));
 		element.appendChild(definitionRef(xml, definition));
 		return element;
 	}
@@ -523,15 +686,29 @@ public class ReqIFWriter {
 
 	private Element xhtmlValue(Document xml, AttributeDefinition definition, AttributeValue attributeValue) {
 
+		// THE-VALUE must hold an XHTML div or p; an attribute without content
+		// is left out instead of being written as an invalid empty value
+		Node content = xhtmlContent(xml, attributeValue);
+		if (content == null) {
+			return null;
+		}
+
 		Element element = element(xml, ReqIFElements.attributeValue(ReqIFConst.XHTML));
 		element.appendChild(definitionRef(xml, definition));
 
 		Element theValue = element(xml, ReqIFConst.THE_VALUE);
-		Node content = xhtmlContent(xml, attributeValue);
-		if (content != null) {
-			theValue.appendChild(content);
-		}
+		theValue.appendChild(content);
 		element.appendChild(theValue);
+
+		if (attributeValue instanceof AttributeValueXHTML) {
+			AttributeValueXHTML xhtml = (AttributeValueXHTML) attributeValue;
+			setAttributeIfPresent(element, ReqIFConst.IS_SIMPLIFIED, toString(xhtml.getSimplified()));
+			if (xhtml.getOriginalValue() != null && xhtml.getOriginalValue().getNode() != null) {
+				Element original = element(xml, ReqIFConst.THE_ORIGINAL_VALUE);
+				original.appendChild(xml.importNode(xhtml.getOriginalValue().getNode(), true));
+				element.appendChild(original);
+			}
+		}
 		return element;
 	}
 
@@ -555,14 +732,70 @@ public class ReqIFWriter {
 		return xml.importNode(XhtmlParser.parseDiv(value.toString()), true);
 	}
 
+	/**
+	 * @return the schema location with the namespace of a ReqIF draft
+	 *         replaced by the one written; each even token is a namespace,
+	 *         each odd one the schema file for it
+	 */
+	private static String schemaLocation(String schemaLocation) {
+		String[] tokens = schemaLocation.trim().split("\\s+");
+		for (int i = 0; i < tokens.length; i += 2) {
+			if (tokens[i].startsWith(REQIF_NAMESPACE_PREFIX)) {
+				tokens[i] = REQIF_NAMESPACE;
+			}
+		}
+		return String.join(" ", tokens);
+	}
+
+	/**
+	 * @return whether the element is a ReqIF one: in a ReqIF namespace, or -
+	 *         in a document without namespace - named like one (ReqIF element
+	 *         names are upper case, XHTML ones lower case)
+	 */
+	private static boolean isReqIFElement(Node node) {
+		String namespace = node.getNamespaceURI();
+		if (namespace == null || namespace.isEmpty()) {
+			return XmlUtils.localName(node).matches("[A-Z][A-Z0-9-]*");
+		}
+		return namespace.startsWith(REQIF_NAMESPACE_PREFIX);
+	}
+
+	/**
+	 * Copies an element read from a document. Its ReqIF elements are put into
+	 * the namespace written - the source may use a prefix or an earlier ReqIF
+	 * namespace - everything else, such as XHTML, stays as it is.
+	 */
+	private static Element asReqIF(Document xml, Element source) {
+		Element copy = (Element) xml.importNode(source, true);
+		return (Element) toReqIFNamespace(xml, copy);
+	}
+
+	private static Node toReqIFNamespace(Document xml, Node node) {
+		Node result = node;
+		if (node.getNodeType() == Node.ELEMENT_NODE && isReqIFElement(node)) {
+			result = xml.renameNode(node, REQIF_NAMESPACE, XmlUtils.localName(node));
+		}
+		if (result.getNodeType() == Node.ELEMENT_NODE) {
+			// declarations of a ReqIF namespace would contradict the renamed elements
+			NamedNodeMap attributes = result.getAttributes();
+			for (int i = attributes.getLength() - 1; i >= 0; i--) {
+				Node attribute = attributes.item(i);
+				if (XMLConstants.XMLNS_ATTRIBUTE_NS_URI.equals(attribute.getNamespaceURI())
+						&& attribute.getNodeValue().startsWith(REQIF_NAMESPACE_PREFIX)) {
+					((Element) result).removeAttributeNode((org.w3c.dom.Attr) attribute);
+				}
+			}
+		}
+		for (Node child = result.getFirstChild(); child != null; child = child.getNextSibling()) {
+			child = toReqIFNamespace(xml, child);
+		}
+		return result;
+	}
+
 	private Element definitionRef(Document xml, AttributeDefinition definition) {
 
 		Element definitionElement = element(xml, ReqIFConst.DEFINITION);
-		String refName = ReqIFElements.attributeDefinitionRef(definition.getDataType().getType());
-		if (refName == null && definition.getSourceElementName() != null) {
-			refName = definition.getSourceElementName() + "-REF";
-		}
-		Element ref = element(xml, refName);
+		Element ref = element(xml, definition.getElementName() + "-REF");
 		ref.setTextContent(nullToEmpty(definition.getID()));
 		definitionElement.appendChild(ref);
 		return definitionElement;
@@ -589,9 +822,7 @@ public class ReqIFWriter {
 	private Element relationGroup(Document xml, RelationGroup relationGroup) {
 
 		Element element = element(xml, ReqIFConst.RELATION_GROUP);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(relationGroup.getID()));
-		element.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(relationGroup.getName()));
-		appendAlternativeID(xml, element, relationGroup.getAlternativeID());
+		identifiable(xml, element, relationGroup);
 
 		element.appendChild(wrappedRef(xml, ReqIFConst.TYPE, ReqIFConst.RELATION_GROUP_TYPE_REF,
 				relationGroup.getRelationGroupTypeRef()));
@@ -622,16 +853,46 @@ public class ReqIFWriter {
 	}
 
 	/**
-	 * ALTERNATIVE-ID is the first child of an identifiable element.
+	 * Writes IDENTIFIER, LONG-NAME, DESC, LAST-CHANGE and ALTERNATIVE-ID. Optional
+	 * properties the element does not have are left out rather than written
+	 * empty, so a document round-trips unchanged; the required LAST-CHANGE gets
+	 * the document's default.
+	 *
+	 * The ALTERNATIVE-ID is wrapped twice, as the schema prescribes:
+	 * {@code <ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>}.
+	 * It must be the first child, so call this right after creating the element.
 	 */
-	private void appendAlternativeID(Document xml, Element parent, String alternativeID) {
+	private void identifiable(Document xml, Element element, Identifiable identifiable) {
 
-		if (alternativeID == null || alternativeID.isEmpty()) {
-			return;
+		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(identifiable.getID()));
+		setAttributeIfPresent(element, ReqIFConst.LONG_NAME, identifiable.getName());
+		setAttributeIfPresent(element, ReqIFConst.DESC, identifiable.getDesc());
+		// required by the schema; a modified element changed now, see
+		// buildDocument for the default of one that never had a value
+		if (identifiable.isModified()) {
+			@SuppressWarnings("unchecked")
+			List<Identifiable> stamped = (List<Identifiable>) xml.getUserData(STAMPED);
+			stamped.add(identifiable);
 		}
-		Element element = element(xml, ReqIFConst.ALTERNATIVE_ID);
-		element.setAttribute(ReqIFConst.IDENTIFIER, alternativeID);
-		parent.appendChild(element);
+		String lastChange = identifiable.isModified() ? (String) xml.getUserData(NOW)
+				: isBlank(identifiable.getLastChange()) ? (String) xml.getUserData(DEFAULT_LAST_CHANGE)
+				: identifiable.getLastChange();
+		element.setAttribute(ReqIFConst.LAST_CHANGE, lastChange);
+
+		String alternativeID = identifiable.getAlternativeID();
+		if (alternativeID != null && !alternativeID.isEmpty()) {
+			Element wrapper = element(xml, ReqIFConst.ALTERNATIVE_ID);
+			Element alternative = element(xml, ReqIFConst.ALTERNATIVE_ID);
+			alternative.setAttribute(ReqIFConst.IDENTIFIER, alternativeID);
+			wrapper.appendChild(alternative);
+			element.appendChild(wrapper);
+		}
+	}
+
+	private static void setAttributeIfPresent(Element element, String name, String value) {
+		if (value != null) {
+			element.setAttribute(name, value);
+		}
 	}
 
 	private Element element(Document xml, String name) {
@@ -643,6 +904,11 @@ public class ReqIFWriter {
 		if (text == null || text.isEmpty()) {
 			return;
 		}
+		appendText(xml, parent, name, text);
+	}
+
+	private void appendText(Document xml, Element parent, String name, String text) {
+
 		Element element = element(xml, name);
 		element.setTextContent(text);
 		parent.appendChild(element);
@@ -650,6 +916,18 @@ public class ReqIFWriter {
 
 	private static String nullToEmpty(String value) {
 		return value == null ? "" : value;
+	}
+
+	private static String toString(Boolean value) {
+		return value == null ? null : value.toString();
+	}
+
+	private static String orDefault(String value, String fallback) {
+		return isBlank(value) ? fallback : value;
+	}
+
+	private static boolean isBlank(String value) {
+		return value == null || value.isBlank();
 	}
 
 	private Document newDocument() {
