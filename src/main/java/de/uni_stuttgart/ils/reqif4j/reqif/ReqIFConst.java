@@ -4,6 +4,8 @@ public class ReqIFConst {
 	
 	public final static String IDENTIFIER = "IDENTIFIER";
 	public final static String LONG_NAME = "LONG-NAME";
+	public final static String DESC = "DESC";
+	public final static String LAST_CHANGE = "LAST-CHANGE";
 	public final static String THE_VALUE = "THE-VALUE";
 	public final static String KEY = "KEY";
 	public final static String OTHER_CONTENT = "OTHER-CONTENT";

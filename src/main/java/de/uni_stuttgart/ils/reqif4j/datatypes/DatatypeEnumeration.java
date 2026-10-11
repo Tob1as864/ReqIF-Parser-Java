@@ -23,12 +23,15 @@ public class DatatypeEnumeration extends Datatype {
 	}
 
 	/**
-	 * @return the LONG-NAME of the enum value with the given id, or null if
-	 *         unknown
+	 * @return the LONG-NAME of the enum value with the given id, "" if the
+	 *         value has no LONG-NAME, or null if the id is unknown
 	 */
 	public String getEnumValueName(String id) {
 		DatatypeEnumerationValue value = this.enumValues.get(id);
-		return value == null ? null : value.getName();
+		if (value == null) {
+			return null;
+		}
+		return value.getName() == null ? "" : value.getName();
 	}
 
 	/**
@@ -70,22 +73,12 @@ public class DatatypeEnumeration extends Datatype {
 		// namespace prefixes and optional attributes.
 		for (Element enumValue : XmlUtils.descendantsByLocalName(enumeration, ReqIFConst.ENUM_VALUE)) {
 
-			String identifier = XmlUtils.attribute(enumValue, ReqIFConst.IDENTIFIER);
-			if (identifier == null) {
+			if (XmlUtils.attribute(enumValue, ReqIFConst.IDENTIFIER) == null) {
 				continue;
 			}
-			String longName = XmlUtils.attribute(enumValue, ReqIFConst.LONG_NAME);
-
-			Element embeddedValue = XmlUtils.firstDescendantByLocalName(enumValue, ReqIFConst.EMBEDDED_VALUE);
-			String key = embeddedValue == null ? "" : orEmpty(XmlUtils.attribute(embeddedValue, ReqIFConst.KEY));
-			String otherContent = embeddedValue == null ? "" : orEmpty(XmlUtils.attribute(embeddedValue, ReqIFConst.OTHER_CONTENT));
-
-			enumValues.put(identifier, new DatatypeEnumerationValue(identifier, orEmpty(longName), key, otherContent));
+			DatatypeEnumerationValue value = new DatatypeEnumerationValue(enumValue);
+			enumValues.put(value.getID(), value);
 		}
-	}
-
-	private static String orEmpty(String value) {
-		return value == null ? "" : value;
 	}
 
 }

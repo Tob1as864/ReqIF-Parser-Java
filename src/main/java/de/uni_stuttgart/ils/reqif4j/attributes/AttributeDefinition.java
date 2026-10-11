@@ -7,29 +7,19 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class AttributeDefinition {
+public class AttributeDefinition extends Identifiable {
 	
 	
-	private String id;
-	private String name;
 	private Datatype type;
 	private String defaultValue;
-	private String alternativeID;
 	private String sourceElementName;
 	
 	
 	
-	
-	public String getID() {
-		return this.id;
-	}
-	
-	public String getName() {
-		return this.name;
-	}
 	
 	public Datatype getDataType() {
 		return this.type;
@@ -37,13 +27,6 @@ public class AttributeDefinition {
 	
 	public String getDefaultValue() {
 		return this.defaultValue;
-	}
-
-	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
-	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
 	}
 
 	/**
@@ -62,18 +45,15 @@ public class AttributeDefinition {
 	 * generated instead of parsed.
 	 */
 	public AttributeDefinition(String id, String name, Datatype type, String defaultValue) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.type = type;
 		this.defaultValue = defaultValue;
 	}
 
 	public AttributeDefinition(Node attributeDefinition, Map<String, Datatype> dataTypes) {
-		
-		this.id = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.name = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-		this.alternativeID = XmlUtils.alternativeID(attributeDefinition);
+		super(attributeDefinition);
+
 		this.sourceElementName = XmlUtils.localName(attributeDefinition);
 		
 		// Navigate by element (not by fixed child index) so both pretty-printed

@@ -286,6 +286,38 @@ enumerations and XHTML included), spec relations with their attributes,
 and the specification hierarchy. Attribute values are written sorted by
 definition id so the output is reproducible.
 
+## Identity and metadata of elements
+
+Every identifiable element - datatypes, enum values, spec types, attribute
+definitions, spec objects, spec relations, specifications, spec hierarchy
+nodes and relation groups - extends `Identifiable` and exposes the
+properties the ReqIF schema defines for it:
+
+```java
+SpecObject specObject = reqif.getReqIFCoreContent().getSpecObject("so-1");
+
+specObject.getID();             // IDENTIFIER
+specObject.getName();           // LONG-NAME, null if the document declares none
+specObject.getDesc();           // DESC
+specObject.getLastChange();     // LAST-CHANGE, as written (xsd:dateTime)
+specObject.getAlternativeID();  // ALTERNATIVE-ID
+
+specObject.setDesc("reviewed").setLastChange("2026-10-11T12:00:00Z");
+```
+
+They are written back unchanged; properties a document does not declare
+stay absent instead of being written empty. `ALTERNATIVE-ID` is written
+in the nested form the schema prescribes
+(`<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>`);
+the flat form older versions of this library wrote is still read.
+
+A schema-valid document stays schema-valid after a round trip, as long as
+it uses only what the writer already covers. Not yet covered: elements
+without `LAST-CHANGE` (e.g. generated with `ReqIFBuilder`) get none, and
+`MULTI-VALUED="false"`, an empty `OTHER-CONTENT` and the `ACCURACY`/`MIN`/`MAX`
+of REAL datatypes are not written although the schema requires them - see
+`IST-SOLL-ANALYSE.md`.
+
 Indenting is **off by default**: the XML indenter inserts whitespace into
 mixed content, which would change XHTML attribute values. Enable it with
 `new ReqIFWriter().setIndent(true)` only when readable output matters more

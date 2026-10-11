@@ -8,27 +8,15 @@ import java.util.Map;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueBoolean;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueDate;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueDouble;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueInteger;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueString;
-import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class Specification {
+public class Specification extends Identifiable {
 	
 	
-	private String id;
-	private String name;
-	private String alternativeID;
 	private SpecType type;
 	private int numberOfSpecObjects;
 	private int sectionCounter = 0;
@@ -39,16 +27,6 @@ public class Specification {
 	
 	
 	
-	public String getID() {
-		return this.id;
-	}
-
-	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
-	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
-	}
 	
 	/**
 	 * @return the value of an attribute named "Description", or null if the
@@ -59,9 +37,6 @@ public class Specification {
 		return description == null ? null : (String) description.getValue();
 	}
 	
-	public String getName() {
-		return this.name;
-	}
 	
 	public String getSpecType() {
 		return this.type.getType();
@@ -124,14 +99,13 @@ public class Specification {
 	 */
 	public Specification(String id, String name, SpecType specType,
 			java.util.Collection<AttributeValue> attributeValues, List<SpecHierarchy> children) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.type = specType;
 
 		if(attributeValues != null) {
 			for(AttributeValue attributeValue: attributeValues) {
-				this.attributeValues.put(attributeValue.getName(), attributeValue);
+				this.attributeValues.put(AttributeValueReader.key(attributeValue.getAttributeDefinitionType()), attributeValue);
 			}
 		}
 
@@ -152,143 +126,12 @@ public class Specification {
 	}
 
 	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects) {
+		super(specification);
 		
-		this.id = specification.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.name = specification.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-		this.alternativeID = XmlUtils.alternativeID(specification);
 		this.type = specType;
-		
-		Element valuesElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.VALUES);
-		if(valuesElement != null) {
 
-			for(Element attribute: XmlUtils.childElements(valuesElement)) {
+		AttributeValueReader.read(specification, specType, this.attributeValues);
 
-				String attValNodeName = XmlUtils.localName(attribute);
-				{
-
-					String attributeDefinitionRef = XmlUtils.firstChildElement(
-							XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION)).getTextContent().trim();
-					String attributeDefinitionName = specType.getAttributeDefinitions().get(attributeDefinitionRef).getName();
-					String attributeValue;
-					AttributeDefinition attributeDefinition = specType.getAttributeDefinition(attributeDefinitionRef);
-					
-					switch(attValNodeName.substring(attValNodeName.lastIndexOf("-")+1)) {
-					
-						case ReqIFConst.BOOLEAN:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueBoolean(attributeValue, attributeDefinition));
-														break;
-							
-						case ReqIFConst.INTEGER:		if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueInteger(attributeValue, attributeDefinition));
-														break;
-							
-						case ReqIFConst.STRING:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueString(attributeValue, attributeDefinition));
-														break;
-							
-						case ReqIFConst.ENUMERATION:	// Multiselect: read ALL ENUM-VALUE-REF children, not just the first
-														List<String> enumRefs = new ArrayList<String>();
-														List<String> enumNames = new ArrayList<String>();
-														for(Element ref : XmlUtils.descendantsByLocalName(attribute, ReqIFConst.ENUM_VALUE_REF)) {
-															String refID = ref.getTextContent().trim();
-															enumRefs.add(refID);
-															enumNames.add(specType.getEnumValueName(refID));
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueEnumeration(enumNames, enumRefs, attributeDefinition));
-														break;
-							
-						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinitionName, new AttributeValueXHTML(attribute, attributeDefinition));
-														break;
-
-						// DATE and REAL values were formerly ignored on specifications
-						case ReqIFConst.DATE:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueDate(attributeValue, attributeDefinition));
-														break;
-
-						case ReqIFConst.REAL:			if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName, new AttributeValueDouble(attributeValue, attributeDefinition));
-														break;
-
-						// Values of datatype kinds the parser does not model are
-						// kept generically instead of being dropped.
-						default:						if(attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE) !=null) {
-															attributeValue = attribute.getAttributes().getNamedItem(ReqIFConst.THE_VALUE).getTextContent();
-														}else{
-															attributeValue = "";
-														}
-														this.attributeValues.put(attributeDefinitionName,
-																new AttributeValue(attributeValue, attributeDefinition)
-																		.setSourceElementName(XmlUtils.localName(attribute)));
-														break;
-					}
-				}
-			}
-		}
-		
-		if(this.attributeValues.size() < specType.getAttributeDefinitions().size()) {
-			
-			for(AttributeDefinition attributeDefinition: specType.getAttributeDefinitions().values()) {
-				
-				if(!this.attributeValues.containsKey(attributeDefinition.getName())) {
-
-					if(attributeDefinition.getDataType() == null) {
-						throw new ExceptionSpecObject("Attribute definition not existing in ReqIF parser\n", attributeDefinition);
-					}
-
-					switch(attributeDefinition.getDataType().getType()) {
-					
-						case ReqIFConst.BOOLEAN:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueBoolean(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-						
-						case ReqIFConst.INTEGER:		this.attributeValues.put(attributeDefinition.getName(), new AttributeValueInteger(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-						
-						case ReqIFConst.STRING:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueString(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-						
-						case ReqIFConst.ENUMERATION:	if(attributeDefinition instanceof AttributeDefinitionEnumeration) {
-															AttributeDefinitionEnumeration enumDefinition = (AttributeDefinitionEnumeration) attributeDefinition;
-															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(enumDefinition.getDefaultValues(), enumDefinition.getDefaultValueRefs(), attributeDefinition));
-														}else{
-															this.attributeValues.put(attributeDefinition.getName(), new AttributeValueEnumeration(attributeDefinition.getDefaultValue(), attributeDefinition));
-														}
-														break;
-
-						case ReqIFConst.XHTML:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueXHTML(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-
-						case ReqIFConst.DATE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDate(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-
-						case ReqIFConst.DOUBLE:			this.attributeValues.put(attributeDefinition.getName(), new AttributeValueDouble(attributeDefinition.getDefaultValue(), attributeDefinition));
-														break;
-
-						default:						break;
-					}
-				}
-			}
-		}
-		
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
 		if(childrenElement != null) {
 

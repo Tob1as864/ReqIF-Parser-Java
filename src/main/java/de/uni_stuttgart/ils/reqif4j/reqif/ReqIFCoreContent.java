@@ -149,9 +149,9 @@ public class ReqIFCoreContent {
                 String dataTypeNodeName = XmlUtils.localName(dataType);
                 {
 
-                    String dataTypeID = dataType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-                    String dataTypeName = dataType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-                    String dataTypeAlternativeID = XmlUtils.alternativeID(dataType);
+                    String dataTypeID = XmlUtils.attribute(dataType, ReqIFConst.IDENTIFIER);
+                    // LONG-NAME is optional in ReqIF
+                    String dataTypeName = XmlUtils.attribute(dataType, ReqIFConst.LONG_NAME);
 
                     switch (dataTypeNodeName.substring(dataTypeNodeName.lastIndexOf("-") + 1)) {
 
@@ -195,9 +195,8 @@ public class ReqIFCoreContent {
                             this.dataTypes.put(dataTypeID, new Datatype(dataTypeID, dataTypeName, ReqIFConst.UNDEFINED, dataTypeNodeName));
                             break;
                     }
-                    if (this.dataTypes.get(dataTypeID) != null) {
-                        this.dataTypes.get(dataTypeID).setAlternativeID(dataTypeAlternativeID);
-                    }
+                    // DESC, LAST-CHANGE and ALTERNATIVE-ID
+                    this.dataTypes.get(dataTypeID).readIdentifiable(dataType);
                 }
             }
         }
@@ -211,7 +210,7 @@ public class ReqIFCoreContent {
                 String specTypeNodeName = XmlUtils.localName(specType);
                 {
 
-                    String specTypeID = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+                    String specTypeID = XmlUtils.attribute(specType, ReqIFConst.IDENTIFIER);
 
                     switch (specTypeNodeName) {
 

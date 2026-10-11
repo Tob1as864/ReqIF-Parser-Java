@@ -7,6 +7,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
+
 /**
  * Helper methods for namespace- and whitespace-independent DOM navigation.
  *
@@ -125,13 +127,23 @@ public final class XmlUtils {
 	/**
 	 * Reads the optional ALTERNATIVE-ID of an identifiable element.
 	 *
-	 * @return the IDENTIFIER of the ALTERNATIVE-ID child, or null if the element
+	 * The schema wraps the alternative id twice:
+	 * {@code <ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>}.
+	 * The flat form {@code <ALTERNATIVE-ID IDENTIFIER="..."/>} is not
+	 * schema-valid but is accepted as well, because earlier versions of this
+	 * library wrote it.
+	 *
+	 * @return the IDENTIFIER of the alternative id, or null if the element
 	 *         declares none
 	 */
 	public static String alternativeID(Node identifiable) {
 
-		Element alternativeID = firstChildElementByLocalName(identifiable, "ALTERNATIVE-ID");
-		return alternativeID == null ? null : attribute(alternativeID, "IDENTIFIER");
+		Element wrapper = firstChildElementByLocalName(identifiable, ReqIFConst.ALTERNATIVE_ID);
+		if (wrapper == null) {
+			return null;
+		}
+		Element nested = firstChildElementByLocalName(wrapper, ReqIFConst.ALTERNATIVE_ID);
+		return attribute(nested != null ? nested : wrapper, ReqIFConst.IDENTIFIER);
 	}
 
 	/**
@@ -144,5 +156,14 @@ public final class XmlUtils {
 		}
 		Node attribute = node.getAttributes().getNamedItem(attributeName);
 		return attribute == null ? null : attribute.getTextContent();
+	}
+
+	/**
+	 * @return the text content of the named attribute, or "" if the node has
+	 *         no such attribute.
+	 */
+	public static String attributeOrEmpty(Node node, String attributeName) {
+		String value = attribute(node, attributeName);
+		return value == null ? "" : value;
 	}
 }

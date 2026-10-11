@@ -9,33 +9,20 @@ import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumeration;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class SpecType {
+public class SpecType extends Identifiable {
 	
 	
 	private Map<String, AttributeDefinition> attributeDefinitions = new LinkedHashMap<String, AttributeDefinition>();
-	private String id;
-	protected String name;
 	protected String type;
-	protected String alternativeID;
 	protected String sourceElementName;
 	
 	
 	
 	
-	public String getID() {
-		return this.id;
-	}
-
-	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
-	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
-	}
-
 	/**
 	 * @return the SPEC-TYPE element name this type was read from, or null when
 	 *         it was not created from a document. Needed to write back spec type
@@ -44,10 +31,6 @@ public class SpecType {
 	 */
 	public String getSourceElementName() {
 		return this.sourceElementName;
-	}
-	
-	public String getName() {
-		return this.name;
 	}
 	
 	public String getType() {
@@ -126,9 +109,8 @@ public class SpecType {
 	 * @param kind SPEC-OBJECT-TYPE, SPECIFICATION-TYPE or SPEC-RELATION-TYPE
 	 */
 	public SpecType(String id, String name, String kind) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.type = kind;
 	}
 
@@ -142,10 +124,8 @@ public class SpecType {
 	}
 
 	public SpecType(Node specType, Map<String, Datatype> dataTypes) {
-		
-		this.id = specType.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.name = specType.getAttributes().getNamedItem(ReqIFConst.LONG_NAME).getTextContent();
-		this.alternativeID = XmlUtils.alternativeID(specType);
+		super(specType);
+
 		this.sourceElementName = XmlUtils.localName(specType);
 		this.type = ReqIFConst.UNDEFINED;
 
@@ -158,7 +138,7 @@ public class SpecType {
 				String attDefNodeName = XmlUtils.localName(attributeDefinition);
 				{
 					
-					String attDefID = attributeDefinition.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
+					String attDefID = XmlUtils.attribute(attributeDefinition, ReqIFConst.IDENTIFIER);
 					
 					switch(attDefNodeName.substring(attDefNodeName.lastIndexOf("-")+1)) {
 					

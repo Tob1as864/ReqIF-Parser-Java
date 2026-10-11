@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,6 +15,7 @@ import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
 import de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationIssue;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationResult;
+import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
 
 /**
  * Validation against the official OMG ReqIF schema, whose imports (xml.xsd,
@@ -51,21 +51,17 @@ class SchemaConformanceTest {
 	}
 
 	@Test
-	void parsedDocumentIsValidatedWithoutGoingOnline(@TempDir Path tempDir) throws Exception {
+	void roundTripOfASchemaValidDocumentStaysSchemaValid(@TempDir Path tempDir) throws Exception {
 
-		// The writer does not produce schema-valid output yet (LAST-CHANGE is not
-		// written); what matters here is that the schema with its http imports
-		// loads at all, which it did not before.
-		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "doc.reqif", TestFixtures.SCHEMA_VALID_REQIF).toString());
+		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "in.reqif", TestFixtures.SCHEMA_VALID_REQIF).toString());
 
-		ValidationResult result = new ReqIFValidator()
-				.validateAgainstSchema(reqif.getReqIFDocument(), OfficialReqIFSchema.reqifXsd());
+		// the XML the writer produces for the model ...
+		OfficialReqIFSchema.assertSchemaValid(reqif.getReqIFDocument());
 
-		List<String> loadFailures = result.getIssues().stream()
-				.map(ValidationIssue::getMessage)
-				.filter(message -> message.startsWith("Schema could not be loaded"))
-				.collect(Collectors.toList());
-		assertTrue(loadFailures.isEmpty(), loadFailures.toString());
+		// ... and the file written to disk
+		Path written = tempDir.resolve("out.reqif");
+		new ReqIFWriter().write(reqif.getReqIFDocument(), written);
+		OfficialReqIFSchema.assertSchemaValid(written);
 	}
 
 	@Test

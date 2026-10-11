@@ -2,6 +2,32 @@
 
 Stand: 2026-10-11 · Basis: Branch `claude/dreamy-goldberg-muhi8j` (= `master` @ `972ae90`, Version `1.1.2-SNAPSHOT`)
 
+## 0. Umsetzungsstand
+
+| Phase | Stand | Ergebnis |
+|---|---|---|
+| **1.1** Schemaprüfung | ✅ erledigt | `validateAgainstSchema` löst die http-Importe des offiziellen XSD lokal auf und geht nie online. Fehlende Importe werden mit Namen und URL gemeldet. Neue Variante für Dateien auf der Platte mit Zeilennummern. Die Tests laden das Schema einmalig herunter (in der CI gecacht) und prüfen gegen das echte OMG-XSD (`OfficialReqIFSchema.assertSchemaValid`). |
+| **1.2** `Identifiable` | ✅ erledigt | Gemeinsame Basisklasse für alle 9 Elementarten. `LAST-CHANGE`, `DESC`, `LONG-NAME` (auch an Spec-Objekten, Relationen und Hierarchieknoten) und `ALTERNATIVE-ID` werden gelesen und geschrieben. Fehlender `LONG-NAME` führt nicht mehr zur NPE, fehlender `IDENTIFIER` zu einer klaren `ReqIFParseException`. Das Lesen der Attributwerte liegt jetzt in einer Klasse (`AttributeValueReader`). |
+
+Beim Umsetzen von Phase 1 fielen vier weitere Writer-Fehler auf. Sie wurden behoben, weil sie einen
+schemagültigen Round-Trip verhinderten:
+
+- **`ALTERNATIVE-ID` hatte die falsche Form.** Das Schema verschachtelt das Element
+  (`<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER=".."/></ALTERNATIVE-ID>`). reqif4j las und schrieb die flache
+  Form, las also die Alternative-IDs echter Dateien nicht und schrieb ungültiges XML. Jetzt wird die
+  verschachtelte Form geschrieben, gelesen werden beide.
+- **`SPEC-RELATION-GROUPS` stand vor `SPECIFICATIONS`.** `REQ-IF-CONTENT` ist eine `xsd:sequence`.
+  Jede Datei mit Relationsgruppen war deshalb ungültig.
+- **Leeres `<THE-VALUE/>` für XHTML-Attribute ohne Inhalt.** Das ist ungültig, solche Werte werden jetzt ausgelassen.
+- **Werte unbenannter Attributdefinitionen überschrieben sich.** Ohne `LONG-NAME` dient jetzt die ID als
+  Schlüssel. Die eigentliche Umstellung auf IDs bleibt Arbeitspaket 3.1.
+
+Eine API-Änderung: `getName()` liefert für Elemente ohne `LONG-NAME` jetzt `null` (vorher Absturz,
+bei Enum-Werten `""`). `DatatypeEnumeration.getEnumValueName()` liefert weiterhin `""`.
+
+Offen für Phase 2: ein Default für `LAST-CHANGE` bei erzeugten Elementen (2.1), die übrigen
+Pflichtattribute (2.2) und deren Prüfung im Modellvalidator (2.3).
+
 ## 1. Zusammenfassung
 
 **Zielbild:** Jede gültige ReqIF-1.2-Datei (`.reqif`/`.reqifz`) wird verlustfrei eingelesen, lässt
@@ -70,10 +96,10 @@ Legende: ✅ unterstützt · ⚠️ teilweise · ❌ fehlt · — nicht anwendba
 | Header: `REPOSITORY-ID` | ❌ | ❌ | ❌ |
 | `TOOL-EXTENSIONS` | ✅ (roh) | ✅ (roh) | ❌ |
 | Identifiable: `IDENTIFIER` | ✅ | ✅ | ✅ |
-| Identifiable: `LAST-CHANGE` (**Pflicht**) | ❌ | ❌ | ❌ |
-| Identifiable: `DESC` | ❌ | ❌ | ❌ |
-| Identifiable: `LONG-NAME` | ⚠️ nur Datentypen, Spec-Typen, Attributdefinitionen, Spezifikationen, Relationsgruppen. Bei Fehlen: Absturz | ⚠️ ebenso | ⚠️ |
-| `ALTERNATIVE-ID` | ✅ | ✅ | ❌ |
+| Identifiable: `LAST-CHANGE` (**Pflicht**) | ✅ *(1.2)* | ⚠️ nur wenn vorhanden, kein Default *(2.1)* | ⚠️ nur per Setter |
+| Identifiable: `DESC` | ✅ *(1.2)* | ✅ *(1.2)* | ⚠️ nur per Setter |
+| Identifiable: `LONG-NAME` | ✅ alle Elemente, optional *(1.2)* | ✅ *(1.2)* | ⚠️ nicht für Spec-Objekte |
+| `ALTERNATIVE-ID` | ✅ verschachtelte und flache Form *(1.2)* | ✅ verschachtelt *(1.2)* | ⚠️ nur per Setter |
 | `DATATYPE-DEFINITION-BOOLEAN` / `-DATE` / `-XHTML` | ✅ | ✅ | ✅ |
 | `DATATYPE-DEFINITION-STRING` `MAX-LENGTH` | ✅ | ✅ | ✅ |
 | `DATATYPE-DEFINITION-INTEGER` `MIN`/`MAX` | ✅ (long) | ✅ | ✅ |

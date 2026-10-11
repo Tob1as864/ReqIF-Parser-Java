@@ -12,16 +12,15 @@ import org.w3c.dom.NodeList;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTMLElementList;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLNode;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElementDiv;
 
-public class SpecHierarchy {
+public class SpecHierarchy extends Identifiable {
 	
 	
-	private String specHierarchyID;
-	private String alternativeID;
 	private int hierarchyLvl;
 	private int section;
 	private SpecObject specObject;
@@ -30,15 +29,11 @@ public class SpecHierarchy {
 	
 	
 	
-	public String getSpecHierarchyID() {
-		return this.specHierarchyID;
-	}
-
 	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
+	 * @return the IDENTIFIER of this hierarchy node, same as {@link #getID()}
 	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
+	public String getSpecHierarchyID() {
+		return getID();
 	}
 	
 	public String getSpecObjectID(){
@@ -167,8 +162,8 @@ public class SpecHierarchy {
 	 */
 	public SpecHierarchy(String specHierarchyID, int hierarchyLvl, int section, SpecObject specObject,
 			List<SpecHierarchy> children) {
+		super(specHierarchyID, null);
 
-		this.specHierarchyID = specHierarchyID;
 		this.hierarchyLvl = hierarchyLvl;
 		this.section = section;
 		this.specObject = specObject;
@@ -181,11 +176,10 @@ public class SpecHierarchy {
 	}
 
 	public SpecHierarchy(int hierarchyLvl, int section, Node specHierarchy, Map<String, SpecObject> specObjects) {
+		super(specHierarchy);
 		
 		this.hierarchyLvl = hierarchyLvl;
 		this.section = section;
-		this.specHierarchyID = specHierarchy.getAttributes().getNamedItem(ReqIFConst.IDENTIFIER).getTextContent();
-		this.alternativeID = XmlUtils.alternativeID(specHierarchy);
 		
 		Element object = XmlUtils.firstChildElementByLocalName(specHierarchy, ReqIFConst.OBJECT);
 		Element specObjectRef = XmlUtils.firstDescendantByLocalName(object, ReqIFConst.SPEC_OBJECT_REF);

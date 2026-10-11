@@ -31,6 +31,7 @@ import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumeration;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumerationValue;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeInteger;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeString;
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
@@ -202,6 +203,13 @@ public class ReqIFWriter {
 		}
 		reqifContent.appendChild(specRelations);
 
+		Element specifications = element(xml, ReqIFConst.SPECIFICATIONS);
+		for (Specification specification : content.getSpecifications().values()) {
+			specifications.appendChild(specification(xml, specification));
+		}
+		reqifContent.appendChild(specifications);
+
+		// REQ-IF-CONTENT is an xsd:sequence: the relation groups come last
 		if (!content.getRelationGroups().isEmpty()) {
 			Element relationGroups = element(xml, ReqIFConst.SPEC_RELATION_GROUPS);
 			for (RelationGroup relationGroup : content.getRelationGroups().values()) {
@@ -209,12 +217,6 @@ public class ReqIFWriter {
 			}
 			reqifContent.appendChild(relationGroups);
 		}
-
-		Element specifications = element(xml, ReqIFConst.SPECIFICATIONS);
-		for (Specification specification : content.getSpecifications().values()) {
-			specifications.appendChild(specification(xml, specification));
-		}
-		reqifContent.appendChild(specifications);
 
 		return coreContent;
 	}
@@ -233,9 +235,7 @@ public class ReqIFWriter {
 		}
 
 		Element definition = element(xml, elementName);
-		definition.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(datatype.getID()));
-		definition.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(datatype.getName()));
-		appendAlternativeID(xml, definition, datatype.getAlternativeID());
+		identifiable(xml, definition, datatype);
 
 		if (datatype instanceof DatatypeInteger) {
 			DatatypeInteger integer = (DatatypeInteger) datatype;
@@ -260,8 +260,7 @@ public class ReqIFWriter {
 	private Element enumValue(Document xml, DatatypeEnumerationValue value) {
 
 		Element enumValue = element(xml, ReqIFConst.ENUM_VALUE);
-		enumValue.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(value.getID()));
-		enumValue.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(value.getName()));
+		identifiable(xml, enumValue, value);
 
 		Element embedded = element(xml, ReqIFConst.EMBEDDED_VALUE);
 		embedded.setAttribute(ReqIFConst.KEY, nullToEmpty(value.getKey()));
@@ -291,9 +290,7 @@ public class ReqIFWriter {
 		}
 
 		Element type = element(xml, elementName);
-		type.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specType.getID()));
-		type.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(specType.getName()));
-		appendAlternativeID(xml, type, specType.getAlternativeID());
+		identifiable(xml, type, specType);
 
 		Element specAttributes = element(xml, ReqIFConst.SPEC_ATTRIBUTES);
 		for (AttributeDefinition definition : specType.getAttributeDefinitions().values()) {
@@ -323,9 +320,7 @@ public class ReqIFWriter {
 		}
 
 		Element attributeDefinition = element(xml, elementName);
-		attributeDefinition.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(definition.getID()));
-		attributeDefinition.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(definition.getName()));
-		appendAlternativeID(xml, attributeDefinition, definition.getAlternativeID());
+		identifiable(xml, attributeDefinition, definition);
 
 		if (definition instanceof AttributeDefinitionEnumeration
 				&& ((AttributeDefinitionEnumeration) definition).isMultiValued()) {
@@ -383,8 +378,7 @@ public class ReqIFWriter {
 	private Element specObject(Document xml, SpecObject specObject) {
 
 		Element element = element(xml, ReqIFConst.SPEC_OBJECT);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specObject.getID()));
-		appendAlternativeID(xml, element, specObject.getAlternativeID());
+		identifiable(xml, element, specObject);
 		element.appendChild(values(xml, specObject.getAttributes()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_OBJECT_TYPE, specObject.getSpecTypeID()));
 		return element;
@@ -393,8 +387,7 @@ public class ReqIFWriter {
 	private Element specRelation(Document xml, SpecRelation specRelation) {
 
 		Element element = element(xml, ReqIFConst.SPEC_RELATION);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specRelation.getID()));
-		appendAlternativeID(xml, element, specRelation.getAlternativeID());
+		identifiable(xml, element, specRelation);
 		element.appendChild(values(xml, specRelation.getAttributes()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPEC_RELATION_TYPE, specRelation.getRelationTypeRef()));
 		element.appendChild(objectRef(xml, ReqIFConst.SOURCE, specRelation.getSourceObjID()));
@@ -405,9 +398,7 @@ public class ReqIFWriter {
 	private Element specification(Document xml, Specification specification) {
 
 		Element element = element(xml, ReqIFConst.SPECIFICATION);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(specification.getID()));
-		element.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(specification.getName()));
-		appendAlternativeID(xml, element, specification.getAlternativeID());
+		identifiable(xml, element, specification);
 		element.appendChild(values(xml, specification.getAttributes()));
 		element.appendChild(typeRef(xml, ReqIFConst.SPECIFICATION_TYPE, specification.getSpecTypeID()));
 
@@ -430,8 +421,7 @@ public class ReqIFWriter {
 	private Element specHierarchy(Document xml, SpecHierarchy hierarchy) {
 
 		Element element = element(xml, ReqIFConst.SPEC_HIERARCHY);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(hierarchy.getSpecHierarchyID()));
-		appendAlternativeID(xml, element, hierarchy.getAlternativeID());
+		identifiable(xml, element, hierarchy);
 
 		if (hierarchy.getSpecObject() != null) {
 			element.appendChild(objectRef(xml, ReqIFConst.OBJECT, hierarchy.getSpecObjectID()));
@@ -523,14 +513,18 @@ public class ReqIFWriter {
 
 	private Element xhtmlValue(Document xml, AttributeDefinition definition, AttributeValue attributeValue) {
 
+		// THE-VALUE must hold an XHTML div or p; an attribute without content
+		// is left out instead of being written as an invalid empty value
+		Node content = xhtmlContent(xml, attributeValue);
+		if (content == null) {
+			return null;
+		}
+
 		Element element = element(xml, ReqIFElements.attributeValue(ReqIFConst.XHTML));
 		element.appendChild(definitionRef(xml, definition));
 
 		Element theValue = element(xml, ReqIFConst.THE_VALUE);
-		Node content = xhtmlContent(xml, attributeValue);
-		if (content != null) {
-			theValue.appendChild(content);
-		}
+		theValue.appendChild(content);
 		element.appendChild(theValue);
 		return element;
 	}
@@ -589,9 +583,7 @@ public class ReqIFWriter {
 	private Element relationGroup(Document xml, RelationGroup relationGroup) {
 
 		Element element = element(xml, ReqIFConst.RELATION_GROUP);
-		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(relationGroup.getID()));
-		element.setAttribute(ReqIFConst.LONG_NAME, nullToEmpty(relationGroup.getName()));
-		appendAlternativeID(xml, element, relationGroup.getAlternativeID());
+		identifiable(xml, element, relationGroup);
 
 		element.appendChild(wrappedRef(xml, ReqIFConst.TYPE, ReqIFConst.RELATION_GROUP_TYPE_REF,
 				relationGroup.getRelationGroupTypeRef()));
@@ -622,16 +614,35 @@ public class ReqIFWriter {
 	}
 
 	/**
-	 * ALTERNATIVE-ID is the first child of an identifiable element.
+	 * Writes IDENTIFIER, LONG-NAME, DESC, LAST-CHANGE and ALTERNATIVE-ID. Optional
+	 * properties the element does not have are left out rather than written
+	 * empty, so a document round-trips unchanged.
+	 *
+	 * The ALTERNATIVE-ID is wrapped twice, as the schema prescribes:
+	 * {@code <ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>}.
+	 * It must be the first child, so call this right after creating the element.
 	 */
-	private void appendAlternativeID(Document xml, Element parent, String alternativeID) {
+	private void identifiable(Document xml, Element element, Identifiable identifiable) {
 
-		if (alternativeID == null || alternativeID.isEmpty()) {
-			return;
+		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(identifiable.getID()));
+		setAttributeIfPresent(element, ReqIFConst.LONG_NAME, identifiable.getName());
+		setAttributeIfPresent(element, ReqIFConst.DESC, identifiable.getDesc());
+		setAttributeIfPresent(element, ReqIFConst.LAST_CHANGE, identifiable.getLastChange());
+
+		String alternativeID = identifiable.getAlternativeID();
+		if (alternativeID != null && !alternativeID.isEmpty()) {
+			Element wrapper = element(xml, ReqIFConst.ALTERNATIVE_ID);
+			Element alternative = element(xml, ReqIFConst.ALTERNATIVE_ID);
+			alternative.setAttribute(ReqIFConst.IDENTIFIER, alternativeID);
+			wrapper.appendChild(alternative);
+			element.appendChild(wrapper);
 		}
-		Element element = element(xml, ReqIFConst.ALTERNATIVE_ID);
-		element.setAttribute(ReqIFConst.IDENTIFIER, alternativeID);
-		parent.appendChild(element);
+	}
+
+	private static void setAttributeIfPresent(Element element, String name, String value) {
+		if (value != null) {
+			element.setAttribute(name, value);
+		}
 	}
 
 	private Element element(Document xml, String name) {

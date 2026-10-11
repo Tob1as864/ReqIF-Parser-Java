@@ -1,24 +1,15 @@
 package de.uni_stuttgart.ils.reqif4j.datatypes;
 
-public class Datatype {
+import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
+
+public class Datatype extends Identifiable {
 	
 	
-	private String id;
-	private String name;
 	private String type;
 	private String sourceElementName;
-	private String alternativeID;
 
 
 
-
-	public String getID() {
-		return this.id;
-	}
-
-	public String getName() {
-		return this.name;
-	}
 
 	public String getType() {
 		return this.type;
@@ -33,15 +24,9 @@ public class Datatype {
 		return this.sourceElementName;
 	}
 
-	/**
-	 * @return the IDENTIFIER of the optional ALTERNATIVE-ID, or null
-	 */
-	public String getAlternativeID() {
-		return this.alternativeID;
-	}
-
+	@Override
 	public Datatype setAlternativeID(String alternativeID) {
-		this.alternativeID = alternativeID;
+		super.setAlternativeID(alternativeID);
 		return this;
 	}
 
@@ -49,9 +34,8 @@ public class Datatype {
 
 
 	public Datatype(String id, String name, String type) {
+		super(id, name);
 
-		this.id = id;
-		this.name = name;
 		this.type = type;
 	}
 
