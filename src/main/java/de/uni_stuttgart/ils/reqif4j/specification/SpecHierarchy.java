@@ -1,7 +1,6 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,7 +19,7 @@ import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLNode;
 import de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElementDiv;
 
-public class SpecHierarchy extends Identifiable {
+public class SpecHierarchy extends Identifiable implements HierarchyParent {
 	
 	
 	private int hierarchyLvl;
@@ -30,7 +29,8 @@ public class SpecHierarchy extends Identifiable {
 	private Boolean tableInternal;
 	private Boolean editable;
 	private final List<Map.Entry<String, String>> editableAttributes = new ArrayList<Map.Entry<String, String>>();
-	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
+	private final HierarchyChildren children = new HierarchyChildren(this);
+	private HierarchyParent parent;
 	
 	
 	
@@ -60,6 +60,7 @@ public class SpecHierarchy extends Identifiable {
 
 	public SpecHierarchy setTableInternal(Boolean tableInternal) {
 		this.tableInternal = tableInternal;
+		markModified();
 		return this;
 	}
 
@@ -73,6 +74,7 @@ public class SpecHierarchy extends Identifiable {
 
 	public SpecHierarchy setEditable(Boolean editable) {
 		this.editable = editable;
+		markModified();
 		return this;
 	}
 
@@ -217,21 +219,96 @@ public class SpecHierarchy extends Identifiable {
 		}
 	}
 	
+	/**
+	 * @return the direct children in document order (a copy)
+	 */
+	@Override
 	public List<SpecHierarchy> getChildren() {
-        return new ArrayList<SpecHierarchy>(this.children.values());
+		return this.children.list();
 	}
-	
+
+	/**
+	 * @return all nodes below this one, depth-first in document order
+	 */
 	public List<SpecHierarchy> getAllChildren() {
-		
-		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
-			allChildren.add(specHierarchy);
-			for(SpecHierarchy child: specHierarchy.getAllChildren()) {
-				allChildren.add(child);
-			}
+		return this.children.descendants();
+	}
+
+	/**
+	 * Appends a child node.
+	 *
+	 * @throws IllegalArgumentException see {@link #addChild(int, SpecHierarchy)}
+	 */
+	public SpecHierarchy addChild(SpecHierarchy child) {
+		return addChild(this.children.size(), child);
+	}
+
+	/**
+	 * Inserts a child node at a position, 0 for first.
+	 *
+	 * @throws IllegalArgumentException if the node is already placed somewhere
+	 *         (move it with {@link de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent#moveSpecHierarchy}),
+	 *         a child with the same IDENTIFIER exists, the node is this one or
+	 *         above it, or the position is out of range
+	 */
+	@Override
+	public SpecHierarchy addChild(int index, SpecHierarchy child) {
+		this.children.add(index, child);
+		child.place(this.hierarchyLvl + 1, this.section);
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Removes a direct child node, with everything below it.
+	 *
+	 * @return the removed node, or null if there is no such child
+	 */
+	@Override
+	public SpecHierarchy removeChild(String specHierarchyID) {
+		SpecHierarchy removed = this.children.remove(specHierarchyID);
+		if(removed != null) {
+			markModified();
 		}
-		
-		return allChildren;
+		return removed;
+	}
+
+	/**
+	 * @return the specification or hierarchy node this node is placed below,
+	 *         or null if it is not placed
+	 */
+	public HierarchyParent getParent() {
+		return this.parent;
+	}
+
+	void setParent(HierarchyParent parent) {
+		this.parent = parent;
+	}
+
+	HierarchyChildren hierarchyChildren() {
+		return this.children;
+	}
+
+	/**
+	 * Points this node at another spec object.
+	 */
+	public SpecHierarchy setSpecObject(SpecObject specObject) {
+		this.specObject = specObject;
+		this.specObjectRef = specObject == null ? null : specObject.getID();
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Sets level and section of this node and everything below it, after it
+	 * was inserted somewhere.
+	 */
+	void place(int hierarchyLvl, int section) {
+		this.hierarchyLvl = hierarchyLvl;
+		this.section = section;
+		for(SpecHierarchy child: this.children.list()) {
+			child.place(hierarchyLvl + 1, section);
+		}
 	}
 	
 	
@@ -251,7 +328,7 @@ public class SpecHierarchy extends Identifiable {
 
 		if(children != null) {
 			for(SpecHierarchy child: children) {
-				this.children.put(child.getSpecHierarchyID(), child);
+				this.children.put(child);
 			}
 		}
 	}
@@ -292,7 +369,7 @@ public class SpecHierarchy extends Identifiable {
 		for(Element newSpecHierarchy: XmlUtils.childElements(childrenElement)) {
 			SpecHierarchy child = issues.readOrSkip("spec hierarchy",
 					() -> new SpecHierarchy(this.hierarchyLvl+1, section, newSpecHierarchy, specObjects, issues));
-			issues.put(this.children, child, "Spec hierarchy");
+			this.children.put(child, issues);
 		}
 	}
 }

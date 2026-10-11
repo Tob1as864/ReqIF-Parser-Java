@@ -55,6 +55,40 @@ public class RelationGroup extends Identifiable {
 		return Collections.unmodifiableList(this.specRelationRefs);
 	}
 
+	public RelationGroup setSourceSpecificationRef(String sourceSpecificationRef) {
+		this.sourceSpecificationRef = sourceSpecificationRef;
+		markModified();
+		return this;
+	}
+
+	public RelationGroup setTargetSpecificationRef(String targetSpecificationRef) {
+		this.targetSpecificationRef = targetSpecificationRef;
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Adds a relation to the group, unless it already belongs to it.
+	 */
+	public RelationGroup addSpecRelationRef(String specRelationID) {
+		if (!this.specRelationRefs.contains(specRelationID)) {
+			this.specRelationRefs.add(specRelationID);
+			markModified();
+		}
+		return this;
+	}
+
+	/**
+	 * @return whether the relation belonged to the group
+	 */
+	public boolean removeSpecRelationRef(String specRelationID) {
+		boolean removed = this.specRelationRefs.remove(specRelationID);
+		if (removed) {
+			markModified();
+		}
+		return removed;
+	}
+
 
 
 

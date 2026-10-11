@@ -16,6 +16,7 @@ import de.uni_stuttgart.ils.reqif4j.build.ReqIFBuilder;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
 import de.uni_stuttgart.ils.reqif4j.specification.RelationGroup;
+import de.uni_stuttgart.ils.reqif4j.specification.SpecHierarchy;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
 import de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationResult;
@@ -85,19 +86,21 @@ class ReqIFValidatorTest {
 	@Test
 	void missingSpecObjectOfARelationIsReported() {
 		ReqIFDocument document = validBuilder().build();
-		// remove the relation target after building
-		document.getCoreContent().getSpecObjects().remove("so-2");
+		// point the relation at an object that does not exist
+		document.getCoreContent().getSpecRelation("sr-1").setTargetObjID("so-gone");
 
 		ValidationResult result = validate(document);
 
 		assertFalse(result.isValid());
-		assertTrue(hasError(result, "Relation target so-2 is not a known spec object"), result.toString());
+		assertTrue(hasError(result, "Relation target so-gone is not a known spec object"), result.toString());
 	}
 
 	@Test
 	void unknownSpecHierarchyTargetIsReported() {
 		ReqIFDocument document = validBuilder().build();
-		document.getCoreContent().getSpecObjects().remove("so-1");
+		// a node that shows an object the content does not have
+		SpecObject elsewhere = new SpecObject("so-gone", document.getCoreContent().getSpecType("st-req"), List.of());
+		document.getCoreContent().getSpecification("spec-1").addChild(new SpecHierarchy("sh-gone", 1, 2, elsewhere, null));
 
 		ValidationResult result = validate(document);
 
@@ -135,9 +138,10 @@ class ReqIFValidatorTest {
 	@Test
 	void identifierUsedTwiceAcrossCategoriesIsReported() {
 		ReqIFDocument document = validBuilder().build();
-		// reuse the datatype id for a relation group
-		document.getCoreContent().addRelationGroup(
-				new RelationGroup("dt-string", "Clash", "st-rel", "spec-1", "spec-1", List.of()));
+		// reuse the datatype id for a hierarchy node; a document read from a
+		// file may have that
+		SpecObject so1 = document.getCoreContent().getSpecObject("so-1");
+		document.getCoreContent().getSpecification("spec-1").addChild(new SpecHierarchy("dt-string", 1, 2, so1, null));
 
 		ValidationResult result = validate(document);
 
@@ -173,13 +177,13 @@ class ReqIFValidatorTest {
 	@Test
 	void throwIfInvalidReportsEveryError() {
 		ReqIFDocument document = validBuilder().build();
-		document.getCoreContent().getSpecObjects().remove("so-2");
+		document.getCoreContent().getSpecRelation("sr-1").setTargetObjID("so-gone");
 
 		IllegalStateException failure = assertThrows(IllegalStateException.class,
 				() -> validate(document).throwIfInvalid());
 
 		assertTrue(failure.getMessage().contains("ReqIF document is invalid"));
-		assertTrue(failure.getMessage().contains("so-2"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("so-gone"), failure.getMessage());
 	}
 
 	@Test

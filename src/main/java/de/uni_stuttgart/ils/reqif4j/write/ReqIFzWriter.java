@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -130,8 +132,11 @@ public class ReqIFzWriter {
 		// Documents are serialized up front, so a failure leaves no half
 		// written archive behind.
 		Map<String, Content> entries = new LinkedHashMap<String, Content>();
+		List<ReqIFWriter.Stamps> stamps = new ArrayList<ReqIFWriter.Stamps>();
 		for (Map.Entry<String, ReqIFDocument> document : documents.entrySet()) {
-			byte[] bytes = documentBytes(document.getValue());
+			ByteArrayOutputStream serialized = new ByteArrayOutputStream();
+			stamps.add(this.documentWriter.serialize(document.getValue(), serialized));
+			byte[] bytes = serialized.toByteArray();
 			addEntry(entries, normalizeEntryName(document.getKey()), out -> out.write(bytes));
 		}
 		for (Map.Entry<String, Content> attachment : attachments.entrySet()) {
@@ -145,6 +150,10 @@ public class ReqIFzWriter {
 				zip.closeEntry();
 			}
 		}
+		// the documents are saved: modified elements keep the written LAST-CHANGE
+		for (ReqIFWriter.Stamps written : stamps) {
+			written.apply();
+		}
 	}
 
 	private static void addEntry(Map<String, Content> entries, String name, Content content) {
@@ -154,13 +163,6 @@ public class ReqIFzWriter {
 					+ "document and attachment names must be unique within the archive");
 		}
 		entries.put(name, content);
-	}
-
-	private byte[] documentBytes(ReqIFDocument document) throws IOException {
-
-		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-		this.documentWriter.write(document, (OutputStream) bytes);
-		return bytes.toByteArray();
 	}
 
 	/**

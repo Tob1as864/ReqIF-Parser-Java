@@ -50,6 +50,7 @@ public class AttributeDefinition extends Identifiable {
 
 	public AttributeDefinition setEditable(Boolean editable) {
 		this.editable = editable;
+		markModified();
 		return this;
 	}
 

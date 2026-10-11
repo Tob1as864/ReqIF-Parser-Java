@@ -90,6 +90,24 @@ public class SpecRelation extends SpecObject {
     }
 
     /**
+     * Points the relation at another source object.
+     */
+    public SpecRelation setSourceObjID(String sourceObjID) {
+        this.sourceObjID = sourceObjID;
+        markModified();
+        return this;
+    }
+
+    /**
+     * Points the relation at another target object.
+     */
+    public SpecRelation setTargetObjID(String targetObjID) {
+        this.targetObjID = targetObjID;
+        markModified();
+        return this;
+    }
+
+    /**
      * @return the IDENTIFIER of the SPEC-RELATION-TYPE this relation refers to
      *         (SPEC-RELATION-TYPE-REF), or null if the document declares none
      */

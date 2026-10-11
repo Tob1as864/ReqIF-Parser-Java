@@ -1,11 +1,14 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
+import java.util.List;
 import java.util.Map;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueFactory;
 import de.uni_stuttgart.ils.reqif4j.reqif.Identifiable;
 import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
@@ -62,8 +65,36 @@ public abstract class SpecElementWithAttributes extends Identifiable {
 			throw new IllegalArgumentException("A value needs an attribute definition");
 		}
 		this.values.put(value);
+		markModified();
 		valuesChanged();
 		return this;
+	}
+
+	/**
+	 * Sets a scalar value - boolean, integer, real, string or date - of the
+	 * attribute definition with this IDENTIFIER, from e.g. a Boolean, a
+	 * Number or a String.
+	 *
+	 * @throws IllegalArgumentException if the element's spec type has no such
+	 *         attribute definition, or it is an enumeration or XHTML one
+	 */
+	public SpecElementWithAttributes set(String attributeDefinitionID, Object value) {
+		return setValue(AttributeValueFactory.of(definition(attributeDefinitionID), value));
+	}
+
+	/**
+	 * Sets an XHTML value from markup, with or without a surrounding div.
+	 */
+	public SpecElementWithAttributes setXhtml(String attributeDefinitionID, String markup) {
+		return setValue(AttributeValueFactory.xhtml(definition(attributeDefinitionID), markup));
+	}
+
+	/**
+	 * Selects enum values by their IDENTIFIER; none for an empty selection.
+	 */
+	public SpecElementWithAttributes setEnum(String attributeDefinitionID, String... enumValueIDs) {
+		return setValue(AttributeValueFactory.enumeration(definition(attributeDefinitionID),
+				enumValueIDs == null ? null : java.util.Arrays.asList(enumValueIDs)));
 	}
 
 	/**
@@ -74,8 +105,21 @@ public abstract class SpecElementWithAttributes extends Identifiable {
 	 */
 	public AttributeValue removeValue(String attributeDefinitionID) {
 		AttributeValue removed = this.values.remove(attributeDefinitionID);
-		valuesChanged();
+		if (removed != null) {
+			markModified();
+			valuesChanged();
+		}
 		return removed;
+	}
+
+	private AttributeDefinition definition(String attributeDefinitionID) {
+		SpecType specType = this.values.specType();
+		AttributeDefinition definition = specType == null ? null : specType.getAttributeDefinition(attributeDefinitionID);
+		if (definition == null) {
+			throw new IllegalArgumentException((specType == null ? "The type of " + getID() + " is unknown"
+					: "Spec type " + specType.getID() + " has no attribute definition " + attributeDefinitionID));
+		}
+		return definition;
 	}
 
 	/**

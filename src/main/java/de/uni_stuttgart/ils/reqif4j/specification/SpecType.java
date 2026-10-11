@@ -121,6 +121,7 @@ public class SpecType extends Identifiable {
 	public SpecType addAttributeDefinition(AttributeDefinition attributeDefinition) {
 
 		this.attributeDefinitions.put(attributeDefinition.getID(), attributeDefinition);
+		markModified();
 		return this;
 	}
 

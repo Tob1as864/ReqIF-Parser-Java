@@ -257,6 +257,8 @@ public class ReqIFBuilder {
 			content.addSpecification(specification);
 		}
 
+		// the elements are new, not changed: they get the default LAST-CHANGE
+		content.clearModified();
 		return new ReqIFDocument(this.headerBuilder.build(defaultHeaderID()), content);
 	}
 

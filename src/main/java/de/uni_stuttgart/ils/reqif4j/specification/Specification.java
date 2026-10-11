@@ -1,7 +1,6 @@
 package de.uni_stuttgart.ils.reqif4j.specification;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,15 +12,12 @@ import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 
-public class Specification extends SpecElementWithAttributes {
+public class Specification extends SpecElementWithAttributes implements HierarchyParent {
 	
 	
 	private SpecType type;
 	private String specTypeRef;
-	private int numberOfSpecObjects;
-	private int sectionCounter = 0;
-	private Map<String, SpecHierarchy> children = new LinkedHashMap<String, SpecHierarchy>();
-	private List<SpecHierarchy> allSpecHierarchies = new ArrayList<SpecHierarchy>();
+	private final HierarchyChildren children = new HierarchyChildren(this);
 	
 	
 	
@@ -54,31 +50,100 @@ public class Specification extends SpecElementWithAttributes {
 	}
 	
 	
+	/**
+	 * @return the number of hierarchy nodes, at all levels
+	 */
 	public int getNumberOfSpecObjects() {
-		return this.numberOfSpecObjects;
+		return this.children.descendants().size();
 	}
-	
+
+	/**
+	 * @return the number of top-level hierarchy nodes (sections)
+	 */
 	public int getNumberOfSections() {
-		return this.sectionCounter;
+		return this.children.size();
 	}
 
+	/**
+	 * @return the top-level hierarchy nodes in document order (a copy)
+	 */
+	@Override
 	public List<SpecHierarchy> getChildren() {
-
-        return new ArrayList<SpecHierarchy>(this.children.values());
+		return this.children.list();
 	}
 	
 	public List<SpecObject> getLvlOneSpecHierarchies() {
 		
 		List<SpecObject> children = new ArrayList<SpecObject>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
+		for(SpecHierarchy specHierarchy: this.children.list()) {
 			children.add(specHierarchy.getSpecObject());
 		}
 		
 		return children;
 	}
-	
+
+	/**
+	 * @return all hierarchy nodes, depth-first in document order (read-only)
+	 */
 	public List<SpecHierarchy> getAllSpecHierarchies() {
-		return this.allSpecHierarchies;
+		return this.children.descendants();
+	}
+
+	/**
+	 * Appends a top-level hierarchy node.
+	 *
+	 * @throws IllegalArgumentException see {@link #addChild(int, SpecHierarchy)}
+	 */
+	public Specification addChild(SpecHierarchy child) {
+		return addChild(this.children.size(), child);
+	}
+
+	/**
+	 * Inserts a top-level hierarchy node at a position, 0 for first; the
+	 * sections of the following nodes shift.
+	 *
+	 * @throws IllegalArgumentException if the node is already placed somewhere
+	 *         (move it with {@link de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent#moveSpecHierarchy}),
+	 *         a node with the same IDENTIFIER is already at the top level, or
+	 *         the position is out of range
+	 */
+	@Override
+	public Specification addChild(int index, SpecHierarchy child) {
+		this.children.add(index, child);
+		renumber(index);
+		markModified();
+		return this;
+	}
+
+	/**
+	 * Removes a top-level hierarchy node, with everything below it.
+	 *
+	 * @return the removed node, or null if there is no such node
+	 */
+	@Override
+	public SpecHierarchy removeChild(String specHierarchyID) {
+		SpecHierarchy removed = this.children.remove(specHierarchyID);
+		if(removed != null) {
+			renumber(0);
+			markModified();
+		}
+		return removed;
+	}
+
+	/**
+	 * Top-level nodes are the sections, numbered from 1.
+	 *
+	 * @param from the first position whose section may have changed
+	 */
+	private void renumber(int from) {
+		List<SpecHierarchy> children = this.children.list();
+		for(int index = from; index < children.size(); index++) {
+			children.get(index).place(1, index + 1);
+		}
+	}
+
+	HierarchyChildren hierarchyChildren() {
+		return this.children;
 	}
 	
 	
@@ -103,18 +168,9 @@ public class Specification extends SpecElementWithAttributes {
 
 		if(children != null) {
 			for(SpecHierarchy child: children) {
-				this.children.put(child.getSpecHierarchyID(), child);
-				this.sectionCounter++;
+				this.children.put(child);
 			}
 		}
-
-		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
-			allChildren.add(specHierarchy);
-			allChildren.addAll(specHierarchy.getAllChildren());
-		}
-		this.allSpecHierarchies.addAll(allChildren);
-		this.numberOfSpecObjects = allChildren.size();
 	}
 
 	public Specification(Node specification, SpecType specType, Map<String, SpecObject> specObjects) {
@@ -137,25 +193,16 @@ public class Specification extends SpecElementWithAttributes {
 		readValues(specification, specType, this.specTypeRef, issues);
 
 		Element childrenElement = XmlUtils.firstChildElementByLocalName(specification, ReqIFConst.CHILDREN);
+		int sectionCounter = 0;
 		for(Element specHierarchy: XmlUtils.childElements(childrenElement)) {
-			int section = this.sectionCounter + 1;
+			int section = sectionCounter + 1;
 			SpecHierarchy child = issues.readOrSkip("spec hierarchy",
 					() -> new SpecHierarchy(1, section, specHierarchy, specObjects, issues));
 			if(child != null) {
-				this.sectionCounter = section;
+				sectionCounter = section;
 			}
-			issues.put(this.children, child, "Spec hierarchy");
+			this.children.put(child, issues);
 		}
-		
-		List<SpecHierarchy> allChildren = new ArrayList<SpecHierarchy>();
-		for(SpecHierarchy specHierarchy: this.children.values()) {
-			allChildren.add(specHierarchy);
-			for(SpecHierarchy child: specHierarchy.getAllChildren()) {
-				allChildren.add(child);
-			}
-		}
-		this.allSpecHierarchies.addAll(allChildren);
-		this.numberOfSpecObjects = allChildren.size();
 	}
 
 }

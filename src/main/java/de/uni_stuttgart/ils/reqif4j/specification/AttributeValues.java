@@ -33,6 +33,10 @@ final class AttributeValues {
 		this.specType = specType;
 	}
 
+	SpecType specType() {
+		return this.specType;
+	}
+
 	/**
 	 * Adds an explicit value; a second value for the same definition replaces
 	 * the first.

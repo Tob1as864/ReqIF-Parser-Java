@@ -78,8 +78,16 @@ public final class ParseIssues {
 			return;
 		}
 		if (elements.containsKey(element.getID())) {
-			report(element.getID(), kind + " " + element.getID() + " is declared twice; the later one replaces the earlier");
+			reportDuplicate(kind, element.getID());
 		}
 		elements.put(element.getID(), element);
+	}
+
+	/**
+	 * Reports a second element with the same identifier, which replaces the
+	 * first.
+	 */
+	public void reportDuplicate(String kind, String id) {
+		report(id, kind + " " + id + " is declared twice; the later one replaces the earlier");
 	}
 }

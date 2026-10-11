@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.xml.XMLConstants;
@@ -75,8 +76,11 @@ public class ReqIFWriter {
 	public static final String REQIF_VERSION = "1.0";
 
 	private static final String XHTML_PREFIX = "xhtml";
-	/** user data key of the output DOM holding the LAST-CHANGE default */
+	/** user data keys of the output DOM holding the LAST-CHANGE defaults */
 	private static final String DEFAULT_LAST_CHANGE = "reqif4j.defaultLastChange";
+	private static final String NOW = "reqif4j.now";
+	/** the modified elements, which take the time of writing as LAST-CHANGE */
+	private static final String STAMPED = "reqif4j.stamped";
 
 	private boolean indent = false;
 	private Clock clock = Clock.systemUTC();
@@ -119,20 +123,55 @@ public class ReqIFWriter {
 	 * Writes the document to the given stream. The stream is not closed.
 	 */
 	public void write(ReqIFDocument document, OutputStream out) throws IOException {
+		serialize(document, out).apply();
+	}
+
+	/**
+	 * Writes the document without yet taking the new LAST-CHANGE of modified
+	 * elements into the model, for writers that store the output further and
+	 * apply the stamps only once that succeeded.
+	 */
+	Stamps serialize(ReqIFDocument document, OutputStream out) throws IOException {
+		Stamps stamps = new Stamps();
 		try {
-			transformer().transform(new DOMSource(buildDocument(document)), new StreamResult(out));
+			transformer().transform(new DOMSource(build(document, stamps)), new StreamResult(out));
 		} catch (TransformerException e) {
 			throw new IOException("Failed to write ReqIF document", e);
+		}
+		return stamps;
+	}
+
+	/**
+	 * The modified elements of a written document and the LAST-CHANGE they
+	 * were written with.
+	 */
+	static final class Stamps {
+
+		private final List<Identifiable> elements = new ArrayList<Identifiable>();
+		private String lastChange;
+
+		/**
+		 * Takes the written LAST-CHANGE into the model; the elements are no
+		 * longer modified.
+		 */
+		void apply() {
+			for (Identifiable element : this.elements) {
+				element.setLastChange(this.lastChange);
+			}
 		}
 	}
 
 	/**
-	 * @return the document serialized as an XML string
+	 * @return the document serialized as an XML string; like the other
+	 *         output methods, this takes the LAST-CHANGE of modified elements
+	 *         into the model, see {@link #buildDocument(ReqIFDocument)}
 	 */
 	public String toXml(ReqIFDocument document) {
 		try {
 			StringWriter writer = new StringWriter();
-			transformer().transform(new DOMSource(buildDocument(document)), new StreamResult(writer));
+			Stamps stamps = new Stamps();
+			transformer().transform(new DOMSource(build(document, stamps)), new StreamResult(writer));
+			stamps.apply();
 			return writer.toString();
 		} catch (TransformerException e) {
 			throw new ReqIFWriteException("Failed to serialize ReqIF document", e);
@@ -144,12 +183,14 @@ public class ReqIFWriter {
 	 * Builds the output DOM from the object model.
 	 *
 	 * The schema requires some values a model may lack, typically one that was
-	 * generated rather than parsed. They are filled in on output only; the
-	 * model is not changed:
+	 * generated rather than parsed. They are filled in on output only; this
+	 * method does not change the model:
 	 *
 	 * <ul>
-	 * <li>LAST-CHANGE of an element: the header's CREATION-TIME, or the time
-	 * of writing if the header has none;</li>
+	 * <li>LAST-CHANGE of an element: the time of writing if the element was
+	 * {@link Identifiable#isModified() modified}; otherwise, if it has none,
+	 * the header's CREATION-TIME, or the time of writing if the header has
+	 * none either;</li>
 	 * <li>header CREATION-TIME: the time of writing;</li>
 	 * <li>header REQ-IF-TOOL-ID and SOURCE-TOOL-ID: {@value #DEFAULT_TOOL_ID};
 	 * REQ-IF-VERSION: {@value #REQIF_VERSION}; TITLE: empty.</li>
@@ -158,8 +199,18 @@ public class ReqIFWriter {
 	 * Not filled in, because no default would be meaningful: a missing header
 	 * and missing identifiers. {@link de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator}
 	 * reports both.
+	 *
+	 * The output methods ({@link #write(ReqIFDocument, OutputStream)},
+	 * {@link #toXml(ReqIFDocument)}, ...) in addition give modified elements
+	 * the LAST-CHANGE they were written with once the output succeeded; they
+	 * are then no longer modified, so writing again does not report a new
+	 * change.
 	 */
 	public Document buildDocument(ReqIFDocument document) {
+		return build(document, new Stamps());
+	}
+
+	private Document build(ReqIFDocument document, Stamps stamps) {
 
 		if (document == null) {
 			throw new ReqIFWriteException("Cannot write a null ReqIF document");
@@ -170,6 +221,9 @@ public class ReqIFWriter {
 		String now = this.clock.instant().truncatedTo(ChronoUnit.SECONDS).toString();
 		String creationTime = document.getHeader() == null ? "" : document.getHeader().getCreationTime();
 		xml.setUserData(DEFAULT_LAST_CHANGE, isBlank(creationTime) ? now : creationTime, null);
+		xml.setUserData(NOW, now, null);
+		stamps.lastChange = now;
+		xml.setUserData(STAMPED, stamps.elements, null);
 
 		Element root = xml.createElementNS(REQIF_NAMESPACE, "REQ-IF");
 		root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:" + XHTML_PREFIX, XHTML_NAMESPACE);
@@ -190,6 +244,8 @@ public class ReqIFWriter {
 
 		// only needed while building; not part of the returned document
 		xml.setUserData(DEFAULT_LAST_CHANGE, null, null);
+		xml.setUserData(NOW, null, null);
+		xml.setUserData(STAMPED, null, null);
 		return xml;
 	}
 
@@ -721,10 +777,17 @@ public class ReqIFWriter {
 		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(identifiable.getID()));
 		setAttributeIfPresent(element, ReqIFConst.LONG_NAME, identifiable.getName());
 		setAttributeIfPresent(element, ReqIFConst.DESC, identifiable.getDesc());
-		// required by the schema; see buildDocument for the default
-		element.setAttribute(ReqIFConst.LAST_CHANGE, isBlank(identifiable.getLastChange())
-				? (String) xml.getUserData(DEFAULT_LAST_CHANGE)
-				: identifiable.getLastChange());
+		// required by the schema; a modified element changed now, see
+		// buildDocument for the default of one that never had a value
+		if (identifiable.isModified()) {
+			@SuppressWarnings("unchecked")
+			List<Identifiable> stamped = (List<Identifiable>) xml.getUserData(STAMPED);
+			stamped.add(identifiable);
+		}
+		String lastChange = identifiable.isModified() ? (String) xml.getUserData(NOW)
+				: isBlank(identifiable.getLastChange()) ? (String) xml.getUserData(DEFAULT_LAST_CHANGE)
+				: identifiable.getLastChange();
+		element.setAttribute(ReqIFConst.LAST_CHANGE, lastChange);
 
 		String alternativeID = identifiable.getAlternativeID();
 		if (alternativeID != null && !alternativeID.isEmpty()) {

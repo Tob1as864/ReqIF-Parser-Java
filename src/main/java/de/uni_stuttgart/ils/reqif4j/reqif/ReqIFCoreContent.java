@@ -22,57 +22,76 @@ public class ReqIFCoreContent {
     private ParseIssues parseIssues = ParseIssues.collecting();
 
 
+    /**
+     * @return the dataTypes by IDENTIFIER, in document order (read-only; change
+     *         them with the add and remove methods)
+     */
     public Map<String, Datatype> getDatatypes() {
-        return this.dataTypes;
+        return java.util.Collections.unmodifiableMap(this.dataTypes);
     }
 
     public Datatype getDatatype(String id) {
         return this.dataTypes.get(id);
     }
 
+    /**
+     * @return the specTypes by IDENTIFIER, in document order (read-only; change
+     *         them with the add and remove methods)
+     */
     public Map<String, SpecType> getSpecTypes() {
-        return this.specTypes;
+        return java.util.Collections.unmodifiableMap(this.specTypes);
     }
 
     public SpecType getSpecType(String id) {
         return this.specTypes.get(id);
     }
 
+    /**
+     * @return the specObjects by IDENTIFIER, in document order (read-only; change
+     *         them with the add and remove methods)
+     */
     public Map<String, SpecObject> getSpecObjects() {
-        return this.specObjects;
+        return java.util.Collections.unmodifiableMap(this.specObjects);
     }
 
     public SpecObject getSpecObject(String id) {
         return this.specObjects.get(id);
     }
 
+    /**
+     * @return the relations by IDENTIFIER, in document order (read-only; change
+     *         them with the add and remove methods)
+     */
     public Map<String, SpecRelation> getSpecRelation() {
-        return this.specRelation;
+        return java.util.Collections.unmodifiableMap(this.specRelation);
     }
 
     public SpecRelation getSpecRelation(String id) {
         return this.specRelation.get(id);
     }
 
+    /**
+     * @return the specifications by IDENTIFIER, in document order (read-only; change
+     *         them with the add and remove methods)
+     */
     public Map<String, Specification> getSpecifications() {
-        return this.specifications;
+        return java.util.Collections.unmodifiableMap(this.specifications);
     }
 
     public Specification getSpecification(String id) {
         return this.specifications.get(id);
     }
 
+    /**
+     * @return the relationGroups by IDENTIFIER, in document order (read-only; change
+     *         them with the add and remove methods)
+     */
     public Map<String, RelationGroup> getRelationGroups() {
-        return this.relationGroups;
+        return java.util.Collections.unmodifiableMap(this.relationGroups);
     }
 
     public RelationGroup getRelationGroup(String id) {
         return this.relationGroups.get(id);
-    }
-
-    public ReqIFCoreContent addRelationGroup(RelationGroup relationGroup) {
-        this.relationGroups.put(relationGroup.getID(), relationGroup);
-        return this;
     }
 
     public List<Specification> getSpecificationsList() {
@@ -101,29 +120,450 @@ public class ReqIFCoreContent {
     public ReqIFCoreContent() {
     }
 
+    /*
+     * Adding and removing elements. The add methods refuse an element whose
+     * IDENTIFIER a datatype, spec type, spec object, relation, specification,
+     * hierarchy node or relation group already has (attribute definitions and
+     * enum values are not checked; the validator reports any clash); the
+     * remove methods keep the references between the elements consistent.
+     */
+
+    /**
+     * @throws IllegalArgumentException if the IDENTIFIER is missing or taken
+     */
     public ReqIFCoreContent addDatatype(Datatype datatype) {
-        this.dataTypes.put(datatype.getID(), datatype);
-        return this;
+        return add(this.dataTypes, datatype);
     }
 
+    /**
+     * @throws IllegalArgumentException if the IDENTIFIER is missing or taken
+     */
     public ReqIFCoreContent addSpecType(SpecType specType) {
-        this.specTypes.put(specType.getID(), specType);
-        return this;
+        return add(this.specTypes, specType);
     }
 
+    /**
+     * @throws IllegalArgumentException if the IDENTIFIER is missing or taken
+     */
     public ReqIFCoreContent addSpecObject(SpecObject specObject) {
-        this.specObjects.put(specObject.getID(), specObject);
-        return this;
+        return add(this.specObjects, specObject);
     }
 
+    /**
+     * @throws IllegalArgumentException if the IDENTIFIER is missing or taken
+     */
     public ReqIFCoreContent addSpecRelation(SpecRelation relation) {
-        this.specRelation.put(relation.getID(), relation);
+        return add(this.specRelation, relation);
+    }
+
+    /**
+     * @throws IllegalArgumentException if the IDENTIFIER is missing or taken
+     */
+    public ReqIFCoreContent addSpecification(Specification specification) {
+        if (specification != null && this.specifications.get(specification.getID()) != specification) {
+            for (SpecHierarchy node : specification.getAllSpecHierarchies()) {
+                checkUnused(node.getID());
+            }
+        }
+        return add(this.specifications, specification);
+    }
+
+    /**
+     * @throws IllegalArgumentException if the IDENTIFIER is missing or taken
+     */
+    public ReqIFCoreContent addRelationGroup(RelationGroup relationGroup) {
+        return add(this.relationGroups, relationGroup);
+    }
+
+    private <T extends Identifiable> ReqIFCoreContent add(Map<String, T> elements, T element) {
+
+        if (element == null) {
+            throw new IllegalArgumentException("Cannot add null");
+        }
+        if (elements.get(element.getID()) == element) {
+            return this;
+        }
+        checkUnused(element.getID());
+        elements.put(element.getID(), element);
         return this;
     }
 
-    public ReqIFCoreContent addSpecification(Specification specification) {
-        this.specifications.put(specification.getID(), specification);
-        return this;
+    /**
+     * @throws IllegalArgumentException if the identifier is blank or an
+     *         element of this content has it
+     */
+    private void checkUnused(String id) {
+
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("An element needs an identifier");
+        }
+        for (Map<String, ? extends Identifiable> map : List.of(this.dataTypes, this.specTypes, this.specObjects,
+                this.specRelation, this.specifications, this.relationGroups)) {
+            if (map.containsKey(id)) {
+                throw new IllegalArgumentException("Identifier " + id + " is already in use");
+            }
+        }
+        if (find(id) != null) {
+            throw new IllegalArgumentException("Identifier " + id + " is already in use by a spec hierarchy");
+        }
+    }
+
+    /**
+     * Inserts a new hierarchy node, with any nodes below it. Unlike
+     * {@link HierarchyParent#addChild(int, SpecHierarchy)}, this checks that
+     * no element of the document has the identifiers already.
+     *
+     * @param parentID the specification or hierarchy node to insert it below
+     * @param index    the position among the parent's children, 0 for first
+     * @throws IllegalArgumentException if the parent does not exist, an
+     *         identifier is taken, the node is already placed somewhere, or
+     *         the position is out of range
+     */
+    public SpecHierarchy addSpecHierarchy(String parentID, int index, SpecHierarchy node) {
+
+        HierarchyParent parent = parent(parentID);
+        if (node == null) {
+            throw new IllegalArgumentException("Cannot add null");
+        }
+        checkUnused(node.getID());
+        for (SpecHierarchy below : node.getAllChildren()) {
+            checkUnused(below.getID());
+        }
+        parent.addChild(index, node);
+        return node;
+    }
+
+    /**
+     * @throws IllegalArgumentException if there is no such specification or
+     *         hierarchy node
+     */
+    private HierarchyParent parent(String parentID) {
+        HierarchyParent parent = this.specifications.get(parentID);
+        if (parent == null) {
+            Placement placement = find(parentID);
+            if (placement == null) {
+                throw new IllegalArgumentException("There is no specification or spec hierarchy " + parentID);
+            }
+            parent = placement.node;
+        }
+        return parent;
+    }
+
+    /**
+     * Removes a spec object, the hierarchy nodes that show it - their children
+     * move up into their place - and the relations from or to it.
+     *
+     * @return the removed object, or null if there is no such object
+     */
+    public SpecObject removeSpecObject(String id) {
+
+        if (!this.specObjects.containsKey(id)) {
+            return null;
+        }
+        // checked before anything changes, so a refusal leaves all as it was
+        for (Specification specification : this.specifications.values()) {
+            checkLiftable(specification, id);
+        }
+        SpecObject removed = this.specObjects.remove(id);
+        for (Specification specification : this.specifications.values()) {
+            removeNodesShowing(specification, id);
+        }
+        for (SpecRelation relation : new ArrayList<SpecRelation>(this.specRelation.values())) {
+            if (id.equals(relation.getSourceObjID()) || id.equals(relation.getTargetObjID())) {
+                removeSpecRelation(relation.getID());
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Replaces each node below {@code parent} that shows the object by its
+     * children; {@link #checkLiftable} ensures this cannot fail halfway.
+     */
+    private static void removeNodesShowing(HierarchyParent parent, String specObjectID) {
+
+        List<SpecHierarchy> children = parent.getChildren();
+        List<SpecHierarchy> lifted = liftedChildren(parent, specObjectID);
+        if (!lifted.equals(children)) {
+            // all children are taken out first, so no two with the same
+            // identifier are ever side by side
+            for (SpecHierarchy child : children) {
+                parent.removeChild(child.getID());
+            }
+            for (SpecHierarchy node : lifted) {
+                if (node.getParent() != null) {
+                    node.getParent().removeChild(node.getID());
+                }
+                parent.addChild(parent.getChildren().size(), node);
+            }
+        }
+        for (SpecHierarchy node : lifted) {
+            removeNodesShowing(node, specObjectID);
+        }
+    }
+
+    /**
+     * @throws IllegalStateException if lifting the children of the nodes that
+     *         show the object would put two nodes with the same IDENTIFIER
+     *         side by side (only in documents that already repeat one)
+     */
+    private static void checkLiftable(HierarchyParent parent, String specObjectID) {
+        List<String> ids = new ArrayList<String>();
+        for (SpecHierarchy child : liftedChildren(parent, specObjectID)) {
+            if (ids.contains(child.getID())) {
+                throw new IllegalStateException("Removing spec object " + specObjectID + " would put spec hierarchy "
+                        + child.getID() + " twice below " + parent.getID());
+            }
+            ids.add(child.getID());
+            checkLiftable(child, specObjectID);
+        }
+    }
+
+    /**
+     * @return the children {@code parent} has once the nodes showing the
+     *         object are replaced by their children
+     */
+    private static List<SpecHierarchy> liftedChildren(HierarchyParent parent, String specObjectID) {
+        List<SpecHierarchy> lifted = new ArrayList<SpecHierarchy>();
+        for (SpecHierarchy child : parent.getChildren()) {
+            if (specObjectID.equals(child.getSpecObjectID())) {
+                lifted.addAll(liftedChildren(child, specObjectID));
+            } else {
+                lifted.add(child);
+            }
+        }
+        return lifted;
+    }
+
+    /**
+     * Removes a relation, also from the relation groups it belongs to.
+     *
+     * @return the removed relation, or null if there is no such relation
+     */
+    public SpecRelation removeSpecRelation(String id) {
+
+        SpecRelation removed = this.specRelation.remove(id);
+        if (removed != null) {
+            for (RelationGroup group : this.relationGroups.values()) {
+                group.removeSpecRelationRef(id);
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Removes a specification with its hierarchy, and the relation groups
+     * between it and another specification. The spec objects stay.
+     *
+     * @return the removed specification, or null if there is no such one
+     */
+    public Specification removeSpecification(String id) {
+
+        Specification removed = this.specifications.remove(id);
+        if (removed != null) {
+            this.relationGroups.values().removeIf(group -> id.equals(group.getSourceSpecificationRef())
+                    || id.equals(group.getTargetSpecificationRef()));
+        }
+        return removed;
+    }
+
+    /**
+     * Removes a relation group; its relations stay.
+     *
+     * @return the removed group, or null if there is no such group
+     */
+    public RelationGroup removeRelationGroup(String id) {
+        return this.relationGroups.remove(id);
+    }
+
+    /**
+     * Removes a spec type that no element uses.
+     *
+     * @return the removed type, or null if there is no such type
+     * @throws IllegalStateException if a spec object, relation, specification
+     *         or relation group still has this type
+     */
+    public SpecType removeSpecType(String id) {
+
+        if (!this.specTypes.containsKey(id)) {
+            return null;
+        }
+        List<String> users = new ArrayList<String>();
+        for (Map<String, ? extends SpecElementWithAttributes> elements : List.of(this.specObjects,
+                this.specRelation, this.specifications)) {
+            for (SpecElementWithAttributes element : elements.values()) {
+                if (id.equals(typeID(element))) {
+                    users.add(element.getID());
+                }
+            }
+        }
+        for (RelationGroup group : this.relationGroups.values()) {
+            if (id.equals(group.getRelationGroupTypeRef())) {
+                users.add(group.getID());
+            }
+        }
+        if (!users.isEmpty()) {
+            throw new IllegalStateException("Spec type " + id + " is still used by " + String.join(", ", users));
+        }
+        return this.specTypes.remove(id);
+    }
+
+    private static String typeID(SpecElementWithAttributes element) {
+        if (element instanceof SpecObject) {
+            return ((SpecObject) element).getSpecTypeID();
+        }
+        return element instanceof Specification ? ((Specification) element).getSpecTypeID() : null;
+    }
+
+    /**
+     * Removes a datatype that no attribute definition uses.
+     *
+     * @return the removed datatype, or null if there is no such datatype
+     * @throws IllegalStateException if an attribute definition still has
+     *         this datatype
+     */
+    public Datatype removeDatatype(String id) {
+
+        Datatype datatype = this.dataTypes.get(id);
+        if (datatype == null) {
+            return null;
+        }
+        List<String> users = new ArrayList<String>();
+        for (SpecType specType : this.specTypes.values()) {
+            for (de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition definition
+                    : specType.getAttributeDefinitions().values()) {
+                if (definition.getDataType() == datatype) {
+                    users.add(definition.getID());
+                }
+            }
+        }
+        if (!users.isEmpty()) {
+            throw new IllegalStateException("Datatype " + id + " is still used by " + String.join(", ", users));
+        }
+        return this.dataTypes.remove(id);
+    }
+
+    /**
+     * @return the hierarchy node with this IDENTIFIER in any specification, or
+     *         null if there is none
+     */
+    public SpecHierarchy getSpecHierarchy(String id) {
+        Placement placement = find(id);
+        return placement == null ? null : placement.node;
+    }
+
+    /**
+     * Removes a hierarchy node with everything below it. The spec objects
+     * stay.
+     *
+     * @return the removed node, or null if there is no such node
+     */
+    public SpecHierarchy removeSpecHierarchy(String id) {
+        Placement placement = find(id);
+        return placement == null ? null : placement.parent.removeChild(id);
+    }
+
+    /**
+     * Moves a hierarchy node, with everything below it, to another place, in
+     * the same or another specification.
+     *
+     * @param newParentID the specification or hierarchy node to move it to
+     * @param index       the position among the new parent's children after
+     *                    the move, 0 for first
+     * @throws IllegalArgumentException if the node or the new parent does not
+     *         exist, the new parent is the node itself or below it, or the
+     *         position is out of range
+     */
+    public SpecHierarchy moveSpecHierarchy(String id, String newParentID, int index) {
+
+        Placement placement = find(id);
+        if (placement == null) {
+            throw new IllegalArgumentException("There is no spec hierarchy " + id);
+        }
+        HierarchyParent newParent = parent(newParentID);
+        if (newParent == placement.node || placement.node.getAllChildren().contains(newParent)) {
+            throw new IllegalArgumentException("Spec hierarchy " + id + " cannot be moved below itself");
+        }
+        boolean sameParent = newParent == placement.parent;
+        int size = newParent.getChildren().size() - (sameParent ? 1 : 0);
+        if (index < 0 || index > size) {
+            throw new IllegalArgumentException("Position " + index + " is outside 0.." + size);
+        }
+        if (!sameParent) {
+            for (SpecHierarchy sibling : newParent.getChildren()) {
+                if (id.equals(sibling.getID())) {
+                    throw new IllegalArgumentException("Spec hierarchy " + id + " is already a child of " + newParentID);
+                }
+            }
+        }
+        placement.parent.removeChild(id);
+        newParent.addChild(index, placement.node);
+        return placement.node;
+    }
+
+    private static final class Placement {
+        final HierarchyParent parent;
+        final SpecHierarchy node;
+
+        Placement(HierarchyParent parent, SpecHierarchy node) {
+            this.parent = parent;
+            this.node = node;
+        }
+    }
+
+    private Placement find(String id) {
+        if (id == null) {
+            return null;
+        }
+        for (Specification specification : this.specifications.values()) {
+            Placement placement = find(specification, id);
+            if (placement != null) {
+                return placement;
+            }
+        }
+        return null;
+    }
+
+    private static Placement find(HierarchyParent parent, String id) {
+        for (SpecHierarchy child : parent.getChildren()) {
+            if (id.equals(child.getID())) {
+                return new Placement(parent, child);
+            }
+            Placement placement = find(child, id);
+            if (placement != null) {
+                return placement;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Marks every element as unchanged, so that the writer keeps their
+     * LAST-CHANGE instead of giving them the time of writing.
+     */
+    public void clearModified() {
+
+        List<Identifiable> all = new ArrayList<Identifiable>();
+        for (Datatype datatype : this.dataTypes.values()) {
+            all.add(datatype);
+            if (datatype instanceof DatatypeEnumeration) {
+                all.addAll(((DatatypeEnumeration) datatype).getEnumValues().values());
+            }
+        }
+        for (SpecType specType : this.specTypes.values()) {
+            all.add(specType);
+            all.addAll(specType.getAttributeDefinitions().values());
+        }
+        all.addAll(this.specObjects.values());
+        all.addAll(this.specRelation.values());
+        for (Specification specification : this.specifications.values()) {
+            all.add(specification);
+            all.addAll(specification.getAllSpecHierarchies());
+        }
+        all.addAll(this.relationGroups.values());
+        for (Identifiable identifiable : all) {
+            identifiable.clearModified();
+        }
     }
 
 

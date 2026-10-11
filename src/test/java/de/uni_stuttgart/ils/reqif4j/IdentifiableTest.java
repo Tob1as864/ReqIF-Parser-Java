@@ -180,10 +180,11 @@ class IdentifiableTest {
 				.specObjectType("st-req", "Requirement", t -> t.stringAttribute("ad-name", "Name", "dt-string"))
 				.specObject("so-1", "st-req", o -> o.set("ad-name", "x"))
 				.build();
+		// LAST-CHANGE set last: a change after it would count as newer
 		document.getCoreContent().getSpecObject("so-1")
 				.setDesc("generated")
-				.setLastChange("2026-10-11T12:00:00Z")
-				.setAlternativeID("ALT-1");
+				.setAlternativeID("ALT-1")
+				.setLastChange("2026-10-11T12:00:00Z");
 
 		String xml = new ReqIFWriter().toXml(document);
 
