@@ -93,6 +93,8 @@ public class ReqIFBuilder {
 	private String lang;
 
 	private final Map<String, String> identifiers = new LinkedHashMap<String, String>();
+	/** the identifiers claimed during the running call, to undo it if it fails */
+	private List<String> claimed;
 	/** every element by IDENTIFIER, for with(); rebuilt after elements were added */
 	private Map<String, Identifiable> elements;
 	private final HeaderBuilder headerBuilder = new HeaderBuilder();
@@ -506,6 +508,9 @@ public class ReqIFBuilder {
 					+ "; identifiers must be unique across the document");
 		}
 		this.identifiers.put(id, kind);
+		if (this.claimed != null) {
+			this.claimed.add(id);
+		}
 		this.elements = null;
 	}
 
@@ -515,13 +520,20 @@ public class ReqIFBuilder {
 	 * repeated with corrected arguments.
 	 */
 	private ReqIFBuilder atomically(Runnable add) {
-		Set<String> before = new HashSet<String>(this.identifiers.keySet());
+		List<String> outer = this.claimed;
+		this.claimed = new ArrayList<String>();
 		try {
 			add.run();
+			if (outer != null) {
+				outer.addAll(this.claimed);
+			}
 		} catch (RuntimeException e) {
-			this.identifiers.keySet().retainAll(before);
+			for (String id : this.claimed) {
+				this.identifiers.remove(id);
+			}
 			throw e;
 		} finally {
+			this.claimed = outer;
 			this.elements = null;
 		}
 		return this;

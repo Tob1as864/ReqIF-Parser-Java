@@ -310,6 +310,26 @@ public class SpecHierarchy extends Identifiable implements HierarchyParent {
 		return this;
 	}
 
+	@Override
+	public int getChildCount() {
+		return this.children.size();
+	}
+
+	@Override
+	public SpecHierarchy getChild(String specHierarchyID) {
+		return this.children.get(specHierarchyID);
+	}
+
+	@Override
+	public SpecHierarchy setChildren(List<SpecHierarchy> children) {
+		this.children.replace(children);
+		for(SpecHierarchy child: children) {
+			child.place(this.hierarchyLvl + 1, this.section);
+		}
+		markModified();
+		return this;
+	}
+
 	/**
 	 * Removes a direct child node, with everything below it.
 	 *
@@ -357,7 +377,7 @@ public class SpecHierarchy extends Identifiable implements HierarchyParent {
 	void place(int hierarchyLvl, int section) {
 		this.hierarchyLvl = hierarchyLvl;
 		this.section = section;
-		for(SpecHierarchy child: this.children.list()) {
+		for(SpecHierarchy child: this.children.values()) {
 			child.place(hierarchyLvl + 1, section);
 		}
 	}
@@ -378,9 +398,7 @@ public class SpecHierarchy extends Identifiable implements HierarchyParent {
 		this.specObject = specObject;
 
 		if(children != null) {
-			for(SpecHierarchy child: children) {
-				this.children.put(child);
-			}
+			this.children.putAll(children);
 		}
 	}
 

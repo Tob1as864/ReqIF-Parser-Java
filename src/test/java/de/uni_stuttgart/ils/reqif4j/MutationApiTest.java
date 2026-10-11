@@ -298,6 +298,21 @@ class MutationApiTest {
 	}
 
 	@Test
+	void aNodeOfAnotherParentIsNotTakenByAConstructor(@TempDir Path dir) throws Exception {
+
+		ReqIFCoreContent content = read(dir).getCoreContent();
+		SpecObject so1 = content.getSpecObject("so-1");
+		SpecHierarchy fresh = new SpecHierarchy("sh-fresh", 0, 0, so1, null);
+		SpecHierarchy placed = content.getSpecHierarchy("sh-2");
+
+		assertThrows(IllegalArgumentException.class,
+				() -> new SpecHierarchy("sh-x", 0, 0, so1, List.of(fresh, placed)));
+		assertNull(fresh.getParent(), "nothing was taken");
+		assertSame(content.getSpecHierarchy("sh-1"), placed.getParent());
+		content.addSpecHierarchy("spec-1", 0, fresh);
+	}
+
+	@Test
 	void aRefusedRemovalChangesNothing() {
 
 		ReqIFCoreContent content = new ReqIFCoreContent();

@@ -24,6 +24,18 @@ schemagültigen Round-Trip verhinderten:
 
 | Phase | Stand | Ergebnis |
 |---|---|---|
+| **5.1** Testkorpus | ✅ erledigt (ohne Zielwerkzeuge) | 25 echte Exporte (IBM DOORS, Siemens Polarion, ReqIF Studio, Enterprise Architect, Capella, StrictDoc) und die Referenzdateien des ReqIF Implementor Forum aus dem Apache-2.0-lizenzierten Projekt *reqif* (`src/test/resources/corpus`, Herkunft im README dort). `CorpusTest` prüft für jede Datei: Lesen ohne Abbruch, Zurückschreiben wie gelesen (sonst mit dokumentiertem Grund), zweites Schreiben ohne Änderung, Validator und offizielles Schema stimmen überein. Archive werden mit allen Einträgen neu gepackt. Gefunden und behoben: Werte von Elementen mit fehlendem Typ, von unbekannten Definitionen und von unpassender Art (Polarion schreibt XHTML-`ReqIF.Text` als `ATTRIBUTE-VALUE-STRING`) gingen verloren oder wurden umgedeutet. Sie bleiben jetzt als `UninterpretedAttributeValue` unverändert erhalten. Ebenso Attributdefinitionen ohne Datentyp. `xsi:schemaLocation` ging verloren. Relationen dürfen Objekte eines anderen Dokuments im Archiv referenzieren (`GLOBAL-REF`, Testfall TC1700), dafür gibt es `ReqIFValidator.validate(ReqIFz)`. Offen bleibt der Import in ReqIF Studio und Zielwerkzeuge: Das braucht die Werkzeuge und ist ein manueller Schritt. |
+| **5.2** Implementation Guide | ✅ erledigt | `ImplementationGuideCheck` prüft Datentypen der Standardattribute (aus den Exporten abgeleitet: Datumsattribute DATE, `ReqIF.ForeignDeleted` BOOLEAN, `ReqIF.Text` XHTML, Namen STRING oder XHTML), eingebettete Objekte (MIME-Typ, relativer Pfad, PNG-Vorschau für OLE und andere Formate, auch in XHTML-Defaults), `IS-SIMPLIFIED` zusammen mit `THE-ORIGINAL-VALUE` sowie bei Archiven, ob referenzierte Dateien vorhanden sind (relativ zum Dokument, Percent-Encoding aufgelöst). Die Referenzdateien des Implementor Forum ergeben keinen Befund. |
+| **5.3** Große Dateien | ✅ gemessen und beschleunigt, StAX zurückgestellt | Messung mit der 19-MB-Referenzdatei TC4000 (10.000 Objekte): Lesen 2,5 s → 0,5 s, Schreiben 0,3 s, Validieren 0,2 s, 99 MB Heap (läuft mit `-Xmx160m`). Behoben wurden quadratische Stellen: `NodeList.item(i)` in verschachtelten Schleifen, Löschen mit Nachrücken, Neunummerierung beim Anhängen, Kopieren der ID-Menge im Builder, Suche nach Hierarchieknoten (jetzt ein inkrementell gepflegter Index), dazu eine Factory pro XHTML-Wert. `LargeDocumentTest` sichert das mit 20.000 Objekten ab. Ein StAX-Reader/-Writer würde den Speicher etwa halbieren (kein zweites DOM beim Schreiben), lohnt den Aufwand bei linear ~10 KB Heap pro Objekt aber erst für Exporte mit deutlich über 100.000 Objekten. |
+
+Ergebnis von Phase 5: Die Bibliothek ist gegen reale Exporte und die Referenzdateien des Implementor Forum
+getestet, prüft die Konventionen des Implementation Guide und verarbeitet große Dateien in linearer Zeit.
+Der Interop-Nachweis im Zielwerkzeug (Abnahmekriterium 6) braucht die Werkzeuge selbst. Er bleibt ein
+manueller Schritt: Die von `CorpusTest` geschriebenen Dateien in ReqIF Studio, DOORS oder Polarion
+importieren.
+
+| Phase | Stand | Ergebnis |
+|---|---|---|
 | **4.1** Mutations-API | ✅ erledigt | Werte per Definitions-ID setzen (`set`, `setXhtml`, `setEnum`, `removeValue`), Hierarchieknoten einfügen, verschieben und löschen (`addChild`, `addSpecHierarchy`, `moveSpecHierarchy`, `removeSpecHierarchy`), Relationen und Relationsgruppen umhängen. Löschen hält Referenzen konsistent: Ein entferntes Spec-Objekt nimmt seine Relationen mit, die Kinder seiner Knoten rücken nach. Entfernte Relationen verlassen ihre Gruppen, entfernte Spezifikationen nehmen ihre Gruppen mit. Typen und Datentypen in Verwendung werden nicht gelöscht. IDs müssen dokumentweit frei sein. Neue und geänderte Elemente bekommen beim Schreiben den Schreibzeitpunkt als `LAST-CHANGE`, der nach erfolgreicher Ausgabe ins Modell übernommen wird. |
 | **4.2** Builder | ✅ erledigt | Relationsgruppen und ihre Typen, `with(id, …)` für `LONG-NAME`/`DESC`/`LAST-CHANGE`/`ALTERNATIVE-ID` jedes Elements, `lang`, Tool-Extensions (nur Elemente eines eigenen Namespace, wie das Schema verlangt), `IS-EDITABLE` an Attributdefinitionen und Knoten, `IS-TABLE-INTERNAL`, `EDITABLE-ATTS`, XHTML mit `THE-ORIGINAL-VALUE`/`IS-SIMPLIFIED`. Der Validator prüft jetzt auch `EDITABLE-ATTS`. |
 
@@ -290,7 +302,7 @@ z. B. `REAL` im Wert-Switch gegenüber `DOUBLE` im Default-Switch. Jede Erweiter
 müsste doppelt umgesetzt werden. Vorher sollte eine gemeinsame Basisklasse
 `Identifiable`/`SpecElementWithAttributes` (wie im ReqIF-Metamodell) eingeführt werden.
 
-**4.16 Speicher und Dateisystem.**
+**4.16 Speicher und Dateisystem.** *(Dateisystem in 3.5, Laufzeit in 5.3; StAX zurückgestellt)*
 - Rein DOM-basiert: Große Exporte (z. B. 100.000 Objekte mit XHTML) liegen vollständig im Speicher,
   der Writer baut zusätzlich ein zweites DOM auf. Für große Dateien wären StAX zum Lesen und
   Streaming zum Schreiben sinnvoll.
@@ -299,7 +311,7 @@ müsste doppelt umgesetzt werden. Vorher sollte eine gemeinsame Basisklasse
   Eine `InputStream`-Variante für `.reqifz` fehlt.
 - Bild-`InputStream`s sind nur einmal lesbar. Hier wäre `byte[]` bzw. `Path`-Zugriff besser.
 
-**4.17 Interoperabilität und Profile.**
+**4.17 Interoperabilität und Profile.** *(Prüfungen in 5.2)*
 Die Klassifizierung nach Implementation Guide existiert. Es fehlen aber Prüfungen und Hilfen für die
 Regeln des *ReqIF Implementation Guide* (ProSTEP iViP), z. B. die erlaubte XHTML-Teilmenge,
 OLE-Konventionen (`object` mit Vorschaubild), `ReqIF.ForeignID`/`ReqIF.ChapterName` und den

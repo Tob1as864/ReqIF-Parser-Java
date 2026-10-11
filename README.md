@@ -623,6 +623,15 @@ for a stated reason, such as a document in the namespace of a ReqIF draft
 for a schema-valid file, and a document it finds no error in is written
 schema-valid. Archives are re-packed with all their entries.
 
+# Large documents
+
+Reading, changing and writing take time in proportion to the size of a
+document. The 19 MB reference file of the ReqIF Implementor Forum with
+10,000 objects is read in about half a second and written in less;
+the model needs about 100 MB of heap for it (roughly 10 KB per object).
+`LargeDocumentTest` builds, writes, reads and changes 20,000 objects to
+keep it that way.
+
 # Reading imperfect documents
 
 Real exports are not always schema-valid. A document with broken parts is

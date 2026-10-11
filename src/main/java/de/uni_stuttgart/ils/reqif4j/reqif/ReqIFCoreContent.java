@@ -260,13 +260,39 @@ public class ReqIFCoreContent {
         if (!this.specObjects.containsKey(id)) {
             return null;
         }
-        // checked before anything changes, so a refusal leaves all as it was
+        // only the parents of the nodes that show the object change: the
+        // nearest ancestor that does not show it itself
+        List<HierarchyParent> parents = new ArrayList<HierarchyParent>();
+        java.util.Set<HierarchyParent> seen = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<HierarchyParent, Boolean>());
         for (Specification specification : this.specifications.values()) {
-            checkLiftable(specification, id);
+            for (SpecHierarchy node : specification.getAllSpecHierarchies()) {
+                if (id.equals(node.getSpecObjectID())) {
+                    HierarchyParent parent = node.getParent();
+                    while (parent instanceof SpecHierarchy && id.equals(((SpecHierarchy) parent).getSpecObjectID())) {
+                        parent = ((SpecHierarchy) parent).getParent();
+                    }
+                    if (seen.add(parent)) {
+                        parents.add(parent);
+                    }
+                }
+            }
+        }
+        // checked before anything changes, so a refusal leaves all as it was
+        List<List<SpecHierarchy>> lifted = new ArrayList<List<SpecHierarchy>>();
+        for (HierarchyParent parent : parents) {
+            lifted.add(checkedLifted(parent, id));
         }
         SpecObject removed = this.specObjects.remove(id);
-        for (Specification specification : this.specifications.values()) {
-            removeNodesShowing(specification, id);
+        for (int i = 0; i < parents.size(); i++) {
+            for (SpecHierarchy node : lifted.get(i)) {
+                if (node.getParent() != parents.get(i)) {
+                    // below a node that shows the object, which goes
+                    node.getParent().removeChild(node.getID());
+                }
+            }
+            // in one step, so the siblings are renumbered once
+            parents.get(i).setChildren(lifted.get(i));
         }
         for (SpecRelation relation : new ArrayList<SpecRelation>(this.specRelation.values())) {
             if (id.equals(relation.getSourceObjID()) || id.equals(relation.getTargetObjID())) {
@@ -277,46 +303,22 @@ public class ReqIFCoreContent {
     }
 
     /**
-     * Replaces each node below {@code parent} that shows the object by its
-     * children; {@link #checkLiftable} ensures this cannot fail halfway.
+     * @return the children {@code parent} has once the nodes showing the
+     *         object are replaced by their children
+     * @throws IllegalStateException if that would put two nodes with the same
+     *         IDENTIFIER side by side (only in documents that already repeat
+     *         one)
      */
-    private static void removeNodesShowing(HierarchyParent parent, String specObjectID) {
-
-        List<SpecHierarchy> children = parent.getChildren();
+    private static List<SpecHierarchy> checkedLifted(HierarchyParent parent, String specObjectID) {
         List<SpecHierarchy> lifted = liftedChildren(parent, specObjectID);
-        if (!lifted.equals(children)) {
-            // all children are taken out first, so no two with the same
-            // identifier are ever side by side
-            for (SpecHierarchy child : children) {
-                parent.removeChild(child.getID());
-            }
-            for (SpecHierarchy node : lifted) {
-                if (node.getParent() != null) {
-                    node.getParent().removeChild(node.getID());
-                }
-                parent.addChild(parent.getChildren().size(), node);
-            }
-        }
-        for (SpecHierarchy node : lifted) {
-            removeNodesShowing(node, specObjectID);
-        }
-    }
-
-    /**
-     * @throws IllegalStateException if lifting the children of the nodes that
-     *         show the object would put two nodes with the same IDENTIFIER
-     *         side by side (only in documents that already repeat one)
-     */
-    private static void checkLiftable(HierarchyParent parent, String specObjectID) {
-        List<String> ids = new ArrayList<String>();
-        for (SpecHierarchy child : liftedChildren(parent, specObjectID)) {
-            if (ids.contains(child.getID())) {
+        java.util.Set<String> ids = new java.util.HashSet<String>();
+        for (SpecHierarchy child : lifted) {
+            if (!ids.add(child.getID())) {
                 throw new IllegalStateException("Removing spec object " + specObjectID + " would put spec hierarchy "
                         + child.getID() + " twice below " + parent.getID());
             }
-            ids.add(child.getID());
-            checkLiftable(child, specObjectID);
         }
+        return lifted;
     }
 
     /**
@@ -481,20 +483,20 @@ public class ReqIFCoreContent {
             throw new IllegalArgumentException("There is no spec hierarchy " + id);
         }
         HierarchyParent newParent = parent(newParentID);
-        if (newParent == placement.node || placement.node.getAllChildren().contains(newParent)) {
-            throw new IllegalArgumentException("Spec hierarchy " + id + " cannot be moved below itself");
+        // the new parent must not be the node or below it
+        for (HierarchyParent above = newParent; above instanceof SpecHierarchy;
+                above = ((SpecHierarchy) above).getParent()) {
+            if (above == placement.node) {
+                throw new IllegalArgumentException("Spec hierarchy " + id + " cannot be moved below itself");
+            }
         }
         boolean sameParent = newParent == placement.parent;
-        int size = newParent.getChildren().size() - (sameParent ? 1 : 0);
+        int size = newParent.getChildCount() - (sameParent ? 1 : 0);
         if (index < 0 || index > size) {
             throw new IllegalArgumentException("Position " + index + " is outside 0.." + size);
         }
-        if (!sameParent) {
-            for (SpecHierarchy sibling : newParent.getChildren()) {
-                if (id.equals(sibling.getID())) {
-                    throw new IllegalArgumentException("Spec hierarchy " + id + " is already a child of " + newParentID);
-                }
-            }
+        if (!sameParent && newParent.getChild(id) != null) {
+            throw new IllegalArgumentException("Spec hierarchy " + id + " is already a child of " + newParentID);
         }
         placement.parent.removeChild(id);
         newParent.addChild(index, placement.node);
@@ -516,22 +518,9 @@ public class ReqIFCoreContent {
             return null;
         }
         for (Specification specification : this.specifications.values()) {
-            Placement placement = find(specification, id);
-            if (placement != null) {
-                return placement;
-            }
-        }
-        return null;
-    }
-
-    private static Placement find(HierarchyParent parent, String id) {
-        for (SpecHierarchy child : parent.getChildren()) {
-            if (id.equals(child.getID())) {
-                return new Placement(parent, child);
-            }
-            Placement placement = find(child, id);
-            if (placement != null) {
-                return placement;
+            SpecHierarchy node = specification.getSpecHierarchy(id);
+            if (node != null) {
+                return new Placement(node.getParent(), node);
             }
         }
         return null;

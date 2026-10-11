@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  * Helper methods for namespace- and whitespace-independent DOM navigation.
@@ -39,17 +38,20 @@ public final class XmlUtils {
 	}
 
 	/**
-	 * @return all direct child nodes of type ELEMENT_NODE.
+	 * @return all direct child nodes of type ELEMENT_NODE. Like all methods
+	 *         here, it walks the children with getFirstChild/getNextSibling:
+	 *         a NodeList's item(i) can cost as much as the list is long when
+	 *         lists are walked nested, which made reading large documents
+	 *         quadratic.
 	 */
 	public static List<Element> childElements(Node parent) {
 		List<Element> elements = new ArrayList<Element>();
 		if (parent == null) {
 			return elements;
 		}
-		NodeList children = parent.getChildNodes();
-		for (int i = 0; i < children.getLength(); i++) {
-			if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
-				elements.add((Element) children.item(i));
+		for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+			if (child.getNodeType() == Node.ELEMENT_NODE) {
+				elements.add((Element) child);
 			}
 		}
 		return elements;
@@ -62,10 +64,9 @@ public final class XmlUtils {
 		if (parent == null) {
 			return null;
 		}
-		NodeList children = parent.getChildNodes();
-		for (int i = 0; i < children.getLength(); i++) {
-			if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
-				return (Element) children.item(i);
+		for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+			if (child.getNodeType() == Node.ELEMENT_NODE) {
+				return (Element) child;
 			}
 		}
 		return null;
@@ -78,9 +79,7 @@ public final class XmlUtils {
 		if (parent == null) {
 			return null;
 		}
-		NodeList children = parent.getChildNodes();
-		for (int i = 0; i < children.getLength(); i++) {
-			Node child = children.item(i);
+		for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
 			if (child.getNodeType() == Node.ELEMENT_NODE && localName(child).equals(localName)) {
 				return (Element) child;
 			}
@@ -93,7 +92,7 @@ public final class XmlUtils {
 	 */
 	public static List<Element> descendantsByLocalName(Node root, String localName) {
 		List<Element> result = new ArrayList<Element>();
-		collectDescendants(root, localName, result);
+		collectDescendants(root, localName, result, false);
 		return result;
 	}
 
@@ -102,24 +101,33 @@ public final class XmlUtils {
 	 *         name, or null.
 	 */
 	public static Element firstDescendantByLocalName(Node root, String localName) {
-		List<Element> descendants = descendantsByLocalName(root, localName);
-		return descendants.isEmpty() ? null : descendants.get(0);
+		List<Element> first = new ArrayList<Element>(1);
+		collectDescendants(root, localName, first, true);
+		return first.isEmpty() ? null : first.get(0);
 	}
 
-	private static void collectDescendants(Node node, String localName, List<Element> result) {
+	/**
+	 * @param firstOnly stop at the first match
+	 * @return whether to stop
+	 */
+	private static boolean collectDescendants(Node node, String localName, List<Element> result, boolean firstOnly) {
 		if (node == null) {
-			return;
+			return false;
 		}
-		NodeList children = node.getChildNodes();
-		for (int i = 0; i < children.getLength(); i++) {
-			Node child = children.item(i);
+		for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling()) {
 			if (child.getNodeType() == Node.ELEMENT_NODE) {
 				if (localName(child).equals(localName)) {
 					result.add((Element) child);
+					if (firstOnly) {
+						return true;
+					}
 				}
-				collectDescendants(child, localName, result);
+				if (collectDescendants(child, localName, result, firstOnly)) {
+					return true;
+				}
 			}
 		}
+		return false;
 	}
 
 	/**

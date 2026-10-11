@@ -90,6 +90,13 @@ public class Specification extends SpecElementWithAttributes implements Hierarch
 	}
 
 	/**
+	 * @return the hierarchy node with this IDENTIFIER at any level, or null
+	 */
+	public SpecHierarchy getSpecHierarchy(String specHierarchyID) {
+		return specHierarchyID == null ? null : this.children.descendant(specHierarchyID);
+	}
+
+	/**
 	 * Appends a top-level hierarchy node.
 	 *
 	 * @throws IllegalArgumentException see {@link #addChild(int, SpecHierarchy)}
@@ -110,7 +117,12 @@ public class Specification extends SpecElementWithAttributes implements Hierarch
 	@Override
 	public Specification addChild(int index, SpecHierarchy child) {
 		this.children.add(index, child);
-		renumber(index);
+		if(index == this.children.size() - 1) {
+			// appended: nothing else moves
+			child.place(1, index + 1);
+		} else {
+			renumber(index);
+		}
 		markModified();
 		return this;
 	}
@@ -122,12 +134,32 @@ public class Specification extends SpecElementWithAttributes implements Hierarch
 	 */
 	@Override
 	public SpecHierarchy removeChild(String specHierarchyID) {
+		int position = this.children.indexOf(specHierarchyID);
 		SpecHierarchy removed = this.children.remove(specHierarchyID);
 		if(removed != null) {
-			renumber(0);
+			// the sections before it stay as they are
+			renumber(position);
 			markModified();
 		}
 		return removed;
+	}
+
+	@Override
+	public int getChildCount() {
+		return this.children.size();
+	}
+
+	@Override
+	public SpecHierarchy getChild(String specHierarchyID) {
+		return this.children.get(specHierarchyID);
+	}
+
+	@Override
+	public Specification setChildren(List<SpecHierarchy> children) {
+		this.children.replace(children);
+		renumber(0);
+		markModified();
+		return this;
 	}
 
 	/**
@@ -136,9 +168,12 @@ public class Specification extends SpecElementWithAttributes implements Hierarch
 	 * @param from the first position whose section may have changed
 	 */
 	private void renumber(int from) {
-		List<SpecHierarchy> children = this.children.list();
-		for(int index = from; index < children.size(); index++) {
-			children.get(index).place(1, index + 1);
+		int index = 0;
+		for(SpecHierarchy child: this.children.values()) {
+			if(index >= from) {
+				child.place(1, index + 1);
+			}
+			index++;
 		}
 	}
 
@@ -167,9 +202,7 @@ public class Specification extends SpecElementWithAttributes implements Hierarch
 		}
 
 		if(children != null) {
-			for(SpecHierarchy child: children) {
-				this.children.put(child);
-			}
+			this.children.putAll(children);
 		}
 	}
 

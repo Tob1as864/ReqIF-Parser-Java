@@ -30,6 +30,22 @@ public final class SecureXml {
 	 *         not resolve external entities
 	 */
 	public static DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
+		synchronized (SecureXml.class) {
+			if (factory == null) {
+				factory = newDocumentBuilderFactory();
+			}
+			// a factory is not required to be thread-safe
+			return factory.newDocumentBuilder();
+		}
+	}
+
+	/**
+	 * Looking up and configuring a factory costs more than parsing a small
+	 * XHTML value, so one is kept; the builders it creates are not shared.
+	 */
+	private static DocumentBuilderFactory factory;
+
+	private static DocumentBuilderFactory newDocumentBuilderFactory() throws ParserConfigurationException {
 
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setNamespaceAware(true);
@@ -45,8 +61,7 @@ public final class SecureXml {
 		} catch (IllegalArgumentException ignored) {
 			// parser implementation does not support these attributes
 		}
-
-		return factory.newDocumentBuilder();
+		return factory;
 	}
 
 	/**

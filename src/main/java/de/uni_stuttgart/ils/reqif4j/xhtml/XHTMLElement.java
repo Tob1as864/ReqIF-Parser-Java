@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.XHTML;
 import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
@@ -43,11 +42,8 @@ public class XHTMLElement extends XHTMLNode {
 	
 	private void addChildren(Node xhtmlElement) {
 		
-		NodeList children = xhtmlElement.getChildNodes();
-		
-		for(int child = 0; child < children.getLength(); child++) {
-				
-			Node childNode = children.item(child);
+		for(Node childNode = xhtmlElement.getFirstChild(); childNode != null; childNode = childNode.getNextSibling()) {
+
 			// Match by local name so namespace-prefixed XHTML (xhtml:p,
 			// reqif-xhtml:object, ...) is recognized; strip digits to map h1-h6 to h.
 			String nodeName = XmlUtils.localName(childNode);
