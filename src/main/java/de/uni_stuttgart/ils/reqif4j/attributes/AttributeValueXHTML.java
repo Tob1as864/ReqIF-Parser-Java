@@ -152,6 +152,21 @@ public class AttributeValueXHTML extends AttributeValue {
 	}
 
 	/**
+	 * @return the block elements of THE-VALUE (paragraphs, tables, lists ...),
+	 *         empty if the value has no content
+	 */
+	public List<XHTMLNode> getBlocks() {
+		return this.divValue == null ? Collections.<XHTMLNode>emptyList() : blocksOf(this.divValue);
+	}
+
+	/**
+	 * THE-VALUE holds a div or, as the schema allows, a single p.
+	 */
+	private static List<XHTMLNode> blocksOf(XHTMLElementDiv value) {
+		return XHTML.P.equals(value.getTagName()) ? List.of(value) : childrenOf(value);
+	}
+
+	/**
 	 * @return the deconstructed element list (P/TBL/L/H/OBJ tokens with their
 	 *         content), never null
 	 */
@@ -176,8 +191,7 @@ public class AttributeValueXHTML extends AttributeValue {
 			return xhtmlElementList;
 		}
 
-		// THE-VALUE may hold a single p instead of a div
-		List<XHTMLNode> blocks = XHTML.P.equals(div.getTagName()) ? List.of(div) : childrenOf(div);
+		List<XHTMLNode> blocks = blocksOf(div);
 		for(XHTMLNode child: blocks) {
 			String elementType = elementToken(child.getTagName());
 			if(elementType != null) {

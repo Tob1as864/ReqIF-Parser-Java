@@ -1,5 +1,7 @@
 package de.uni_stuttgart.ils.reqif4j.xhtml;
 
+import javax.xml.XMLConstants;
+
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 
@@ -97,18 +99,46 @@ public class XHTMLNode {
 
 		StringBuilder sb = new StringBuilder();
 		NamedNodeMap attributes = this.node.getAttributes();
+		Set<String> plainNames = new HashSet<String>();
+		for(int attribute = 0; attribute < attributes.getLength(); attribute++) {
+			String namespace = attributes.item(attribute).getNamespaceURI();
+			if(namespace == null || namespace.isEmpty()) {
+				plainNames.add(XmlUtils.localName(attributes.item(attribute)));
+			}
+		}
+		Set<String> declaredPrefixes = new HashSet<String>();
 		for(int attribute = 0; attribute < attributes.getLength(); attribute++) {
 
 			Node attributeNode = attributes.item(attribute);
 			String name = attributeNode.getNodeName();
-			if(name.equals("xmlns") || name.startsWith("xmlns:")) {
+			if(name.equals(XMLConstants.XMLNS_ATTRIBUTE) || name.startsWith(XMLConstants.XMLNS_ATTRIBUTE + ":")) {
 				continue;
 			}
-			// xml:lang and xml:space keep their prefix: "lang" next to "xml:lang"
-			// would be a duplicate attribute, and the XHTML schema has no "space"
-			String attributeName = "http://www.w3.org/XML/1998/namespace".equals(attributeNode.getNamespaceURI())
-					? "xml:" + XmlUtils.localName(attributeNode)
-					: XmlUtils.localName(attributeNode);
+			String namespace = attributeNode.getNamespaceURI();
+			String localName = XmlUtils.localName(attributeNode);
+			String attributeName;
+			if(namespace == null || namespace.isEmpty()) {
+				attributeName = localName;
+			} else if(XMLConstants.XML_NS_URI.equals(namespace)) {
+				// xml:lang and xml:space keep their prefix: "lang" next to "xml:lang"
+				// would be a duplicate attribute, and the XHTML schema has no "space"
+				attributeName = XMLConstants.XML_NS_PREFIX + ":" + localName;
+			} else if(de.uni_stuttgart.ils.reqif4j.util.XhtmlParser.XHTML_NAMESPACE.equals(namespace)) {
+				// xhtml:class means class; next to a plain class it is a duplicate
+				if(plainNames.contains(localName)) {
+					continue;
+				}
+				attributeName = localName;
+			} else {
+				// an attribute of another vocabulary keeps its namespace, so the
+				// markup stays well-formed and nothing is lost
+				String prefix = attributeNode.getPrefix() == null ? "ns" : attributeNode.getPrefix();
+				if(declaredPrefixes.add(prefix)) {
+					sb.append(' ').append(XMLConstants.XMLNS_ATTRIBUTE).append(':').append(prefix)
+					  .append("=\"").append(escapeAttribute(namespace)).append('"');
+				}
+				attributeName = prefix + ":" + localName;
+			}
 			sb.append(' ').append(attributeName)
 			  .append("=\"").append(escapeAttribute(attributeNode.getNodeValue())).append('"');
 		}

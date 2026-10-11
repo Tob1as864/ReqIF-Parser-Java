@@ -160,36 +160,58 @@ public class SpecHierarchy extends Identifiable implements HierarchyParent {
 
 	/**
 	 * @return the block elements of the object's first XHTML value (see
-	 *         {@link #getXHTMLContent()}), or null if it has none
+	 *         {@link #getXHTMLContent()}), or null if it has none or no content
 	 */
 	public List<XHTMLNode> getXHTMLDivContent() {
 		AttributeValueXHTML xhtml = firstXhtmlValue();
-		XHTMLElementDiv value = xhtml == null ? null : xhtml.getDivValue();
-		if(value == null) {
-			return null;
-		}
-		// a value may consist of a single p instead of a div
-		return XHTML.P.equals(value.getTagName()) ? List.of(value) : value.getChildren();
+		return xhtml == null || xhtml.getDivValue() == null ? null : xhtml.getBlocks();
 	}
 
 	/**
-	 * @return the first XHTML value with content, the object's own values
-	 *         first; failing that any XHTML value, as earlier versions returned
-	 *         an empty token list rather than null for it
+	 * @return the object's first XHTML value, in the order of its spec type's
+	 *         attribute definitions: one of its own values if it has any - one
+	 *         with content first - otherwise a default; null if there is none
+	 *         or the node's object is unknown
 	 */
 	private AttributeValueXHTML firstXhtmlValue() {
+		if(this.specObject == null) {
+			return null;
+		}
+		Map<String, AttributeValue> own = this.specObject.getValues();
+		List<AttributeValue> ordered = new ArrayList<AttributeValue>();
+		SpecType type = this.specObject.getResolvedSpecType();
+		if(type != null) {
+			for(String definitionID: type.getAttributeDefinitions().keySet()) {
+				if(own.containsKey(definitionID)) {
+					ordered.add(own.get(definitionID));
+				}
+			}
+		}
+		for(AttributeValue value: own.values()) {
+			if(!ordered.contains(value)) {
+				ordered.add(value);
+			}
+		}
+		AttributeValueXHTML first = firstXhtml(ordered);
+		// the defaults only matter if the object has no XHTML value of its own
+		return first != null ? first : firstXhtml(this.specObject.getAttributes().values());
+	}
+
+	/**
+	 * @return the first XHTML value with content, failing that the first
+	 *         without, as earlier versions returned an empty token list rather
+	 *         than null for it
+	 */
+	private static AttributeValueXHTML firstXhtml(java.util.Collection<AttributeValue> values) {
 		AttributeValueXHTML withoutContent = null;
-		for(java.util.Collection<AttributeValue> values: List.of(this.specObject.getValues().values(),
-				this.specObject.getAttributes().values())) {
-			for(AttributeValue attributeValue: values) {
-				if(attributeValue instanceof AttributeValueXHTML) {
-					AttributeValueXHTML xhtml = (AttributeValueXHTML) attributeValue;
-					if(xhtml.getDivValue() != null) {
-						return xhtml;
-					}
-					if(withoutContent == null) {
-						withoutContent = xhtml;
-					}
+		for(AttributeValue value: values) {
+			if(value instanceof AttributeValueXHTML) {
+				AttributeValueXHTML xhtml = (AttributeValueXHTML) value;
+				if(xhtml.getDivValue() != null) {
+					return xhtml;
+				}
+				if(withoutContent == null) {
+					withoutContent = xhtml;
 				}
 			}
 		}

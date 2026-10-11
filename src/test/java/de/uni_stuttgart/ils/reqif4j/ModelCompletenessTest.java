@@ -125,7 +125,10 @@ class ModelCompletenessTest {
 		de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition text =
 				withOriginalFirst.getReqIFCoreContent().getSpecType("st-req").getAttributeDefinition("ad-text");
 
-		assertEquals("<p lang=\"de\" xml:lang=\"de\">to be written</p>", text.getDefaultValue());
+		// the attribute order is the DOM's; what counts is that both survive once
+		String rendered = text.getDefaultValue();
+		assertTrue(rendered.matches("<p( lang=\"de\"| xml:lang=\"de\"){2}>to be written</p>")
+				&& rendered.contains(" lang=") && rendered.contains("xml:lang="), rendered);
 		assertTrue(new ReqIFValidator().validate(withOriginalFirst.getReqIFDocument()).isValid());
 	}
 
@@ -161,6 +164,8 @@ class ModelCompletenessTest {
 
 		assertNull(row.getSpecObject());
 		assertEquals("so-gone", row.getSpecObjectID());
+		assertNull(row.getXHTMLContent());
+		assertNull(row.getXHTMLDivContent());
 		assertTrue(new ReqIFWriter().toXml(withDangling.getReqIFDocument()).contains("<SPEC-OBJECT-REF>so-gone</SPEC-OBJECT-REF>"));
 		assertTrue(new ReqIFValidator().validate(withDangling.getReqIFDocument()).getErrors().stream()
 				.anyMatch(issue -> issue.getMessage().contains("references spec object so-gone")));
