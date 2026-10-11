@@ -369,12 +369,27 @@ new ReqIFWriter().write(document, Path.of("out.reqif"));
 
 This is a model-level check. The OMG ReqIF XSD is **not bundled** with
 this library for licensing reasons; if you have it, run a full XML
-Schema validation on top:
+Schema validation on top - either of the XML the writer produces for a
+document, or of a file on disk (findings then carry line numbers):
 
 ```java
 ValidationResult schemaIssues =
-        new ReqIFValidator().validateAgainstSchema(document, Path.of("reqif.xsd"));
+        new ReqIFValidator().validateAgainstSchema(document, Path.of("schema/reqif.xsd"));
+ValidationResult fileIssues =
+        new ReqIFValidator().validateAgainstSchema(Path.of("in.reqif"), Path.of("schema/reqif.xsd"));
 ```
+
+`reqif.xsd` imports further schemas by http URL: `xml.xsd`,
+[`driver.xsd`](http://www.omg.org/spec/ReqIF/20110402/driver.xsd) and the
+XHTML modules it references (`xhtml-*-1.xsd`). Validation never goes
+online; these imports are looked up by file name in the directory of
+`reqif.xsd`, so download them into the same folder. A missing import is
+reported by name together with its original URL.
+
+The test suite validates against the official schema. It downloads the
+schema files on first use into `target/reqif-schema` (or the directory
+in the `REQIF_SCHEMA_DIR` environment variable); without network access
+these tests are skipped locally and fail on CI.
 
 Not covered yet: identifiers duplicated within one category (the parser
 keys its maps by identifier, so a duplicate has already replaced its

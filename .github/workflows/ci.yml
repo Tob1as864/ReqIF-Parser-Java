@@ -18,7 +18,17 @@ jobs:
           java-version: '17'
           cache: maven
 
+      # The schema conformance tests download the official OMG ReqIF XSD and its
+      # imports on first use; the schemas are frozen, so the cache key never changes.
+      - name: Cache ReqIF schema
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/reqif-schema
+          key: reqif-schema-20110401
+
       - name: Build and run tests
+        env:
+          REQIF_SCHEMA_DIR: ${{ runner.temp }}/reqif-schema
         run: mvn -B --no-transfer-progress verify
 
       - name: Upload test reports

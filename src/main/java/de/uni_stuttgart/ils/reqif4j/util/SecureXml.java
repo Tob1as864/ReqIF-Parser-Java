@@ -4,10 +4,14 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.validation.SchemaFactory;
+
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
 
 /**
  * Factories for XML components with the same hardening applied everywhere.
@@ -43,6 +47,31 @@ public final class SecureXml {
 		}
 
 		return factory.newDocumentBuilder();
+	}
+
+	/**
+	 * @return a namespace-aware SAX reader with the same hardening as
+	 *         {@link #newDocumentBuilder()}. Unlike a DOM it keeps line numbers,
+	 *         which makes schema violations of a file traceable.
+	 */
+	public static XMLReader newXMLReader() throws ParserConfigurationException, SAXException {
+
+		SAXParserFactory factory = SAXParserFactory.newInstance();
+		factory.setNamespaceAware(true);
+		factory.setXIncludeAware(false);
+
+		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+
+		XMLReader reader = factory.newSAXParser().getXMLReader();
+		try {
+			reader.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+			reader.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+		} catch (SAXException ignored) {
+			// parser implementation does not support these properties
+		}
+		return reader;
 	}
 
 	/**

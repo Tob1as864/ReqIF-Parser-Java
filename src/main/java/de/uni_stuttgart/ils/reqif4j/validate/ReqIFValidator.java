@@ -2,17 +2,24 @@ package de.uni_stuttgart.ils.reqif4j.validate;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Source;
 import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.sax.SAXSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 
 import org.xml.sax.ErrorHandler;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
@@ -49,8 +56,9 @@ import de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter;
  *
  * This is a model-level check, not a schema check. The OMG ReqIF XSD is not
  * bundled with this library; if you have it, pass it to
- * {@link #validateAgainstSchema(ReqIFDocument, Path)} for a full XML Schema
- * validation on top.
+ * {@link #validateAgainstSchema(ReqIFDocument, Path)} (or, for a file on disk,
+ * {@link #validateAgainstSchema(Path, Path)}) for a full XML Schema validation
+ * on top.
  */
 public class ReqIFValidator {
 
@@ -306,48 +314,143 @@ public class ReqIFValidator {
 
 
 	/**
-	 * Validates the written XML against an XML Schema. The OMG ReqIF XSD is not
-	 * bundled with this library for licensing reasons; download it from the OMG
-	 * and pass its path here.
+	 * Validates the XML the writer produces for this document against an XML
+	 * Schema. The OMG ReqIF XSD is not bundled with this library for licensing
+	 * reasons; download it from the OMG and pass its path here.
+	 *
+	 * The official {@code reqif.xsd} imports {@code xml.xsd}, {@code driver.xsd}
+	 * and the XHTML modules ({@code xhtml-*-1.xsd}) by http URL. Validation never
+	 * goes online: these imports are looked up by file name in the directory of
+	 * {@code schema}, so place them next to it.
 	 *
 	 * @param schema path to reqif.xsd
 	 * @return the schema violations, empty if the document is schema-valid
 	 */
 	public ValidationResult validateAgainstSchema(ReqIFDocument document, Path schema) throws IOException {
 
+		return validate(new DOMSource(new ReqIFWriter().buildDocument(document)), schema);
+	}
+
+	/**
+	 * Validates a ReqIF file as it is on disk, e.g. a file received from another
+	 * tool or one written by {@link ReqIFWriter}. Unlike
+	 * {@link #validateAgainstSchema(ReqIFDocument, Path)} the findings carry the
+	 * line numbers of the file.
+	 *
+	 * @param reqifFile the .reqif file to check
+	 * @param schema    path to reqif.xsd, with its imports next to it
+	 * @return the schema violations, empty if the file is schema-valid
+	 */
+	public ValidationResult validateAgainstSchema(Path reqifFile, Path schema) throws IOException {
+
+		try {
+			InputSource input = new InputSource(reqifFile.toUri().toString());
+			return validate(new SAXSource(SecureXml.newXMLReader(), input), schema);
+		} catch (ParserConfigurationException | SAXException e) {
+			throw new IOException("Failed to create an XML reader", e);
+		}
+	}
+
+	private ValidationResult validate(Source source, Path schema) throws IOException {
+
 		ValidationResult result = new ValidationResult();
+		Path schemaFile = schema.toAbsolutePath();
+		LocalSchemaResolver resolver = new LocalSchemaResolver(schemaFile.getParent());
+
+		// Problems while loading the schema itself - an unreadable import is only a
+		// warning to the parser - would make every finding below meaningless.
+		ValidationResult schemaProblems = new ValidationResult();
+		IssueCollector schemaCollector = new IssueCollector(schemaProblems);
+		Schema xsd = null;
 		try {
 			SchemaFactory factory = SecureXml.newSchemaFactory(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-			Schema xsd = factory.newSchema(schema.toFile());
-
-			Validator validator = xsd.newValidator();
-			validator.setErrorHandler(new ErrorHandler() {
-
-				@Override
-				public void warning(SAXParseException exception) {
-					result.warning(null, message(exception));
-				}
-
-				@Override
-				public void error(SAXParseException exception) {
-					result.error(null, message(exception));
-				}
-
-				@Override
-				public void fatalError(SAXParseException exception) {
-					result.error(null, message(exception));
-				}
-
-				private String message(SAXParseException exception) {
-					return "line " + exception.getLineNumber() + ": " + exception.getMessage();
-				}
-			});
-			validator.validate(new DOMSource(new ReqIFWriter().buildDocument(document)));
-
+			factory.setResourceResolver(resolver);
+			factory.setErrorHandler(schemaCollector);
+			xsd = factory.newSchema(schemaFile.toFile());
 		} catch (SAXException e) {
-			result.error(null, "Schema validation failed: " + e.getMessage());
+			schemaCollector.reportUnlessReported(e);
+		}
+		if (xsd == null || !schemaProblems.getIssues().isEmpty() || !resolver.getMissing().isEmpty()) {
+			StringBuilder message = new StringBuilder("Schema could not be loaded: ").append(schemaFile);
+			for (ValidationIssue problem : schemaProblems.getIssues()) {
+				message.append("\n  ").append(problem.getMessage());
+			}
+			appendMissingImports(message, resolver, schemaFile);
+			result.error(null, message.toString());
+			return result;
+		}
+
+		IssueCollector collector = new IssueCollector(result);
+		try {
+			Validator validator = xsd.newValidator();
+			validator.setErrorHandler(collector);
+			validator.validate(source);
+		} catch (SAXException e) {
+			// normally reported through the error handler already; anything else
+			// stopped the validation and must not be lost
+			collector.reportUnlessReported(e);
 		}
 		return result;
+	}
+
+	private static void appendMissingImports(StringBuilder message, LocalSchemaResolver resolver, Path schemaFile) {
+
+		if (resolver.getMissing().isEmpty()) {
+			return;
+		}
+		message.append("\nThe schema imports files that are not available locally. Download them and place them next to ")
+				.append(schemaFile.getFileName()).append(" in ").append(schemaFile.getParent()).append(':');
+		for (Map.Entry<String, String> missing : resolver.getMissing().entrySet()) {
+			message.append("\n  ").append(missing.getValue()).append(" (").append(missing.getKey()).append(')');
+		}
+	}
+
+	/**
+	 * Records parser findings as issues. Warnings stay warnings; errors and
+	 * fatal errors are errors.
+	 */
+	private static final class IssueCollector implements ErrorHandler {
+
+		private final ValidationResult result;
+		private final Set<SAXException> reported = Collections.newSetFromMap(new IdentityHashMap<SAXException, Boolean>());
+
+		IssueCollector(ValidationResult result) {
+			this.result = result;
+		}
+
+		@Override
+		public void warning(SAXParseException exception) {
+			this.reported.add(exception);
+			this.result.warning(null, message(exception));
+		}
+
+		@Override
+		public void error(SAXParseException exception) {
+			this.reported.add(exception);
+			this.result.error(null, message(exception));
+		}
+
+		@Override
+		public void fatalError(SAXParseException exception) {
+			this.reported.add(exception);
+			this.result.error(null, message(exception));
+		}
+
+		void reportUnlessReported(SAXException exception) {
+			if (!this.reported.contains(exception)) {
+				this.reported.add(exception);
+				this.result.error(null, exception instanceof SAXParseException
+						? message((SAXParseException) exception)
+						: exception.getMessage());
+			}
+		}
+
+		private static String message(SAXParseException exception) {
+			// a DOM source has no line numbers
+			return exception.getLineNumber() < 0
+					? exception.getMessage()
+					: "line " + exception.getLineNumber() + ": " + exception.getMessage();
+		}
 	}
 
 	private static boolean isBlank(String value) {
