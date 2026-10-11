@@ -571,9 +571,31 @@ schema files on first use into `target/reqif-schema` (or the directory
 in the `REQIF_SCHEMA_DIR` environment variable); without network access
 these tests are skipped locally and fail on CI.
 
+Relations may connect spec objects, and relation groups specifications,
+of another document of the same .reqifz archive (the schema types these
+references `GLOBAL-REF`). Validate the documents of an archive together
+to resolve them across documents:
+
+```java
+try (ReqIFz archive = new ReqIFz("export.reqifz")) {
+    new ReqIFValidator().validate(archive).throwIfInvalid();
+}
+```
+
 Identifiers duplicated within one category cannot be seen in the model
 (maps are keyed by identifier, so the later element has replaced the
 earlier); the parser reports them while reading, see below.
+
+# Tested against real exports
+
+`CorpusTest` reads exports of IBM DOORS, Siemens Polarion, ReqIF Studio,
+Enterprise Architect, Capella and StrictDoc as well as the reference files
+of the ReqIF Implementor Forum (`src/test/resources/corpus`, with their
+origin and license). Each document is written back as read - or differs
+for a stated reason, such as a document in the namespace of a ReqIF draft
+- and written the same way a second time; the validator raises no error
+for a schema-valid file, and a document it finds no error in is written
+schema-valid. Archives are re-packed with all their entries.
 
 # Reading imperfect documents
 
@@ -591,8 +613,12 @@ for (ParseIssue issue : reqif.getReqIFDocument().getParseIssues()) {
 
 - elements without `IDENTIFIER` are skipped;
 - an unresolvable type reference keeps the element and its reference (it
-  is written back), only its values cannot be interpreted and are skipped;
-- values of unknown attribute definitions are skipped, the others kept;
+  is written back); its values cannot be interpreted and are kept as
+  `UninterpretedAttributeValue`s - the XML element as read, written back
+  unchanged - as are values of unknown attribute definitions and values
+  whose kind does not match their definition (Polarion, for example,
+  writes `ReqIF.Text` values as `ATTRIBUTE-VALUE-STRING`);
+- an attribute definition whose datatype is missing is kept as read, too;
 - values that do not fit their datatype (`THE-VALUE="abc"` for an integer)
   are kept as written and written back unchanged;
 - identifiers used twice within one kind are reported, the later element

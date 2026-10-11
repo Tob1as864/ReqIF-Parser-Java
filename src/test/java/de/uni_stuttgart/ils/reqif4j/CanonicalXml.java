@@ -95,8 +95,19 @@ final class CanonicalXml {
 	}
 
 	private static boolean isEmpty(Element element) {
-		return !element.hasAttributes() && !element.hasChildNodes()
-				|| !element.hasAttributes() && element.getTextContent().isBlank() && !hasElementChild(element);
+		return !hasAttributes(element) && !element.hasChildNodes()
+				|| !hasAttributes(element) && element.getTextContent().isBlank() && !hasElementChild(element);
+	}
+
+	/** namespace declarations are not attributes of the content */
+	private static boolean hasAttributes(Element element) {
+		NamedNodeMap attributes = element.getAttributes();
+		for (int i = 0; i < attributes.getLength(); i++) {
+			if (!javax.xml.XMLConstants.XMLNS_ATTRIBUTE_NS_URI.equals(attributes.item(i).getNamespaceURI())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static boolean hasElementChild(Element element) {

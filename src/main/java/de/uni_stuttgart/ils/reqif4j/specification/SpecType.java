@@ -148,7 +148,7 @@ public class SpecType extends Identifiable {
 			if(definition != null) {
 				if(definition.getDataType() == null) {
 					issues.report(definition.getID(), "Attribute definition references a datatype that is not declared "
-							+ "in DATATYPES; it and its values cannot be written");
+							+ "in DATATYPES; it and its values are kept as written");
 				}
 				issues.put(this.attributeDefinitions, definition, "Attribute definition");
 			}

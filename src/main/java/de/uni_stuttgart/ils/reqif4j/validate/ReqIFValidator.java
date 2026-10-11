@@ -24,6 +24,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
+import de.uni_stuttgart.ils.reqif4j.attributes.UninterpretedAttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
@@ -88,6 +89,51 @@ public class ReqIFValidator {
 	 *         {@link ValidationResult#throwIfInvalid()}
 	 */
 	public ValidationResult validate(ReqIFDocument document) {
+		return validate(document, Set.of(), Set.of());
+	}
+
+	/**
+	 * Validates the documents of a .reqifz archive together. Relations may
+	 * connect spec objects, and relation groups specifications, of another
+	 * document of the archive (the schema types these references GLOBAL-REF),
+	 * so they are resolved across all documents; everything else within each
+	 * document. Each message names the document it is about.
+	 */
+	public ValidationResult validate(Map<String, ReqIFDocument> documents) {
+
+		Set<String> specObjects = new HashSet<String>();
+		Set<String> specifications = new HashSet<String>();
+		for (ReqIFDocument document : documents.values()) {
+			if (document != null && document.getCoreContent() != null) {
+				specObjects.addAll(document.getCoreContent().getSpecObjects().keySet());
+				specifications.addAll(document.getCoreContent().getSpecifications().keySet());
+			}
+		}
+		ValidationResult result = new ValidationResult();
+		for (Map.Entry<String, ReqIFDocument> document : documents.entrySet()) {
+			for (ValidationIssue issue : validate(document.getValue(), specObjects, specifications).getIssues()) {
+				result.add(issue.getSeverity(), issue.getElementID(), document.getKey() + ": " + issue.getMessage());
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Validates the documents of an archive together, see
+	 * {@link #validate(Map)}.
+	 */
+	public ValidationResult validate(de.uni_stuttgart.ils.reqif4j.reqif.ReqIFz archive) {
+		return validate(archive.getReqIFDocuments());
+	}
+
+	/**
+	 * @param globalSpecObjects     spec objects of other documents a relation
+	 *                              may reference
+	 * @param globalSpecifications  specifications of other documents a
+	 *                              relation group may reference
+	 */
+	private ValidationResult validate(ReqIFDocument document, Set<String> globalSpecObjects,
+			Set<String> globalSpecifications) {
 
 		ValidationResult result = new ValidationResult();
 
@@ -120,9 +166,9 @@ public class ReqIFValidator {
 		checkDatatypes(content, result, identifiers);
 		checkSpecTypes(content, result, identifiers);
 		checkSpecObjects(content, result, identifiers);
-		checkSpecRelations(content, result, identifiers);
+		checkSpecRelations(content, result, identifiers, globalSpecObjects);
 		checkSpecifications(content, result, identifiers);
-		checkRelationGroups(content, result, identifiers);
+		checkRelationGroups(content, result, identifiers, globalSpecifications);
 
 		return result;
 	}
@@ -259,17 +305,19 @@ public class ReqIFValidator {
 	}
 
 	private void checkSpecRelations(ReqIFCoreContent content, ValidationResult result,
-			Map<String, String> identifiers) {
+			Map<String, String> identifiers, Set<String> globalSpecObjects) {
 
 		for (SpecRelation relation : content.getSpecRelation().values()) {
 			checkIdentifiable(relation, "SPEC-RELATION", result, identifiers);
 			checkSpecTypeRef(content, relation.getID(), relation.getRelationTypeRef(), "SPEC-RELATION", result);
 
-			if (content.getSpecObject(relation.getSourceObjID()) == null) {
+			if (content.getSpecObject(relation.getSourceObjID()) == null
+					&& !globalSpecObjects.contains(relation.getSourceObjID())) {
 				result.error(relation.getID(), "Relation source " + relation.getSourceObjID()
 						+ " is not a known spec object");
 			}
-			if (content.getSpecObject(relation.getTargetObjID()) == null) {
+			if (content.getSpecObject(relation.getTargetObjID()) == null
+					&& !globalSpecObjects.contains(relation.getTargetObjID())) {
 				result.error(relation.getID(), "Relation target " + relation.getTargetObjID()
 						+ " is not a known spec object");
 			}
@@ -335,7 +383,7 @@ public class ReqIFValidator {
 	}
 
 	private void checkRelationGroups(ReqIFCoreContent content, ValidationResult result,
-			Map<String, String> identifiers) {
+			Map<String, String> identifiers, Set<String> globalSpecifications) {
 
 		for (RelationGroup group : content.getRelationGroups().values()) {
 			checkIdentifiable(group, "RELATION-GROUP", result, identifiers);
@@ -346,8 +394,8 @@ public class ReqIFValidator {
 				result.error(group.getID(), "Relation group references type " + group.getRelationGroupTypeRef()
 						+ ", which is not declared in SPEC-TYPES");
 			}
-			checkSpecificationRef(content, group, group.getSourceSpecificationRef(), "source", result);
-			checkSpecificationRef(content, group, group.getTargetSpecificationRef(), "target", result);
+			checkSpecificationRef(content, group, group.getSourceSpecificationRef(), "source", result, globalSpecifications);
+			checkSpecificationRef(content, group, group.getTargetSpecificationRef(), "target", result, globalSpecifications);
 
 			for (String relationRef : group.getSpecRelationRefs()) {
 				if (content.getSpecRelation(relationRef) == null) {
@@ -359,11 +407,11 @@ public class ReqIFValidator {
 	}
 
 	private void checkSpecificationRef(ReqIFCoreContent content, RelationGroup group, String specificationRef,
-			String role, ValidationResult result) {
+			String role, ValidationResult result, Set<String> globalSpecifications) {
 
 		if (isBlank(specificationRef)) {
 			result.error(group.getID(), "Relation group has no " + role + " specification");
-		} else if (content.getSpecification(specificationRef) == null) {
+		} else if (content.getSpecification(specificationRef) == null && !globalSpecifications.contains(specificationRef)) {
 			result.error(group.getID(), "Relation group " + role + " specification " + specificationRef
 					+ " is not declared in SPECIFICATIONS");
 		}
@@ -393,6 +441,10 @@ public class ReqIFValidator {
 				result.error(ownerID, "Attribute value '" + attributeValue.getName() + "' uses definition "
 						+ definition.getID() + ", which does not belong to spec type " + specTypeID);
 			}
+			if (attributeValue instanceof UninterpretedAttributeValue) {
+				checkUninterpreted(ownerID, (UninterpretedAttributeValue) attributeValue, definition, specType, result);
+				continue;
+			}
 			if (attributeValue.getValue() != null && !(attributeValue instanceof AttributeValueEnumeration)
 					&& !(attributeValue instanceof AttributeValueXHTML)) {
 				Object value = attributeValue.getValue();
@@ -411,6 +463,39 @@ public class ReqIFValidator {
 							+ enumValue.getValueRefs().size() + " values");
 				}
 			}
+		}
+	}
+
+	/**
+	 * A value kept as read is written back unchanged: its THE-VALUE must fit
+	 * the kind of its own element, and a kind that does not match its
+	 * definition is worth a warning, as importing tools may reject it.
+	 */
+	private static void checkUninterpreted(String ownerID, UninterpretedAttributeValue value,
+			AttributeDefinition definition, SpecType specType, ValidationResult result) {
+
+		String elementName = value.getSourceElementName();
+		String kind = ReqIFConst.kindOf(elementName);
+		String theValue = de.uni_stuttgart.ils.reqif4j.util.XmlUtils.attribute(value.getElement(), ReqIFConst.THE_VALUE);
+		boolean simpleKind = List.of(ReqIFConst.BOOLEAN, ReqIFConst.INTEGER, ReqIFConst.REAL, ReqIFConst.DATE,
+				ReqIFConst.STRING).contains(kind);
+		if (simpleKind && theValue == null) {
+			// written as read, so the required attribute stays missing
+			result.error(ownerID, elementName + " for " + definition.getID() + " has no THE-VALUE");
+		} else if (simpleKind && !(ReqIFConst.BOOLEAN.equals(kind) && XsdTypes.isBoolean(theValue)
+				|| ReqIFConst.INTEGER.equals(kind) && XsdTypes.isInteger(theValue)
+				|| ReqIFConst.REAL.equals(kind) && XsdTypes.isDouble(theValue)
+				|| ReqIFConst.DATE.equals(kind) && XsdTypes.isDateTime(theValue)
+				|| ReqIFConst.STRING.equals(kind) && XsdTypes.isXmlText(theValue))) {
+			result.error(ownerID, elementName + " for " + definition.getID() + ": '" + theValue
+					+ "' is not valid for its kind");
+		}
+		AttributeDefinition declared = specType.getAttributeDefinition(definition.getID());
+		String declaredKind = declared == null || declared.getDataType() == null ? null
+				: ReqIFConst.datatypeSuffix(declared.getDataType().getType());
+		if (declaredKind != null && !declaredKind.equals(kind)) {
+			result.warning(ownerID, elementName + " for attribute '" + declared.getName() + "' (" + declared.getID()
+					+ "), which is an " + declared.getElementName() + "; it is written as read");
 		}
 	}
 

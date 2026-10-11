@@ -1,6 +1,7 @@
 package de.uni_stuttgart.ils.reqif4j;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssue;
+import de.uni_stuttgart.ils.reqif4j.attributes.UninterpretedAttributeValue;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFCoreContent;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
@@ -38,14 +40,38 @@ class TolerantImportTest {
 		assertNotNull(boot, "the object is kept");
 		assertEquals("st-gone", boot.getSpecTypeID());
 		assertNull(boot.getSpecTypeName());
-		assertTrue(boot.getValues().isEmpty());
-		assertEquals(List.of("[so-1] SPEC-OBJECT references type st-gone, which is not declared; its 8 values are skipped"),
+		assertEquals(8, boot.getValues().size(), "the values are kept, uninterpreted");
+		assertTrue(boot.getValues().values().stream().allMatch(v -> v instanceof UninterpretedAttributeValue));
+		assertEquals("REQ-1", boot.getValue("ad-id").getValue(), "THE-VALUE as written");
+		assertEquals(List.of("[so-1] SPEC-OBJECT references type st-gone, which is not declared; its 8 values are kept as written"),
 				issues(reqif), "one report per defect");
-		assertTrue(new ReqIFWriter().toXml(reqif.getReqIFDocument()).contains("<SPEC-OBJECT-TYPE-REF>st-gone</SPEC-OBJECT-TYPE-REF>"));
+		String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+		assertTrue(xml.contains("<SPEC-OBJECT-TYPE-REF>st-gone</SPEC-OBJECT-TYPE-REF>"));
+		assertTrue(xml.contains("<ATTRIBUTE-DEFINITION-REAL-REF>ad-effort</ATTRIBUTE-DEFINITION-REAL-REF>"), xml);
 	}
 
 	@Test
-	void valueOfAnUnknownDefinitionIsSkipped(@TempDir Path tempDir) throws Exception {
+	void valuesOfAnUnknownTypeAreCheckedAsWritten(@TempDir Path tempDir) throws Exception {
+
+		// two values for one definition, one without the required THE-VALUE
+		ReqIF reqif = parse(tempDir, TestFixtures.SCHEMA_VALID_REQIF
+				.replaceFirst("<SPEC-OBJECT-TYPE-REF>st-req</SPEC-OBJECT-TYPE-REF>", "<SPEC-OBJECT-TYPE-REF>st-gone</SPEC-OBJECT-TYPE-REF>")
+				// so-1's boolean value: no THE-VALUE, and the definition of another value
+				.replaceFirst("<ATTRIBUTE-VALUE-BOOLEAN THE-VALUE=\"true\">(\\s*)<DEFINITION><ATTRIBUTE-DEFINITION-BOOLEAN-REF>ad-safety",
+						"<ATTRIBUTE-VALUE-BOOLEAN>$1<DEFINITION><ATTRIBUTE-DEFINITION-BOOLEAN-REF>ad-id"));
+		SpecObject boot = reqif.getReqIFCoreContent().getSpecObject("so-1");
+
+		assertTrue(issues(reqif).contains("[so-1] SPEC-OBJECT references type st-gone, which is not declared; "
+				+ "its 7 values are kept as written"), issues(reqif).toString());
+		assertTrue(issues(reqif).contains("[so-1] Attribute definition ad-id has two values; the later one replaces the earlier"));
+		assertEquals("ev-approved", boot.getValue("ad-status").getValue(), "the enum value IDENTIFIERs");
+		assertTrue(boot.getValue("ad-text").getValue().toString().startsWith("The system"), boot.getValue("ad-text").getValue().toString());
+		String report = new de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator().validate(reqif.getReqIFDocument()).toString();
+		assertFalse(report.contains("has no THE-VALUE"), "the type is unknown, so the values are not checked:\n" + report);
+	}
+
+	@Test
+	void valueOfAnUnknownDefinitionIsKeptAsWritten(@TempDir Path tempDir) throws Exception {
 
 		// the only value referencing ad-effort is so-1's
 		ReqIF reqif = parse(tempDir, TestFixtures.SCHEMA_VALID_REQIF.replace(
@@ -53,8 +79,14 @@ class TolerantImportTest {
 				"<ATTRIBUTE-DEFINITION-REAL-REF>ad-gone</ATTRIBUTE-DEFINITION-REAL-REF></DEFINITION>"));
 
 		assertEquals(List.of("[so-1] Value references attribute definition ad-gone, which spec type st-req does not "
-				+ "declare; the value is skipped"), issues(reqif));
-		assertEquals(7, reqif.getReqIFCoreContent().getSpecObject("so-1").getValues().size(), "the other values are kept");
+				+ "declare; the value is kept as written"), issues(reqif));
+		SpecObject boot = reqif.getReqIFCoreContent().getSpecObject("so-1");
+		assertEquals(8, boot.getValues().size());
+		assertTrue(boot.getValue("ad-gone") instanceof UninterpretedAttributeValue);
+		assertTrue(new ReqIFWriter().toXml(reqif.getReqIFDocument())
+				.contains("<ATTRIBUTE-DEFINITION-REAL-REF>ad-gone</ATTRIBUTE-DEFINITION-REAL-REF>"));
+		assertTrue(new de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator().validate(reqif.getReqIFDocument())
+				.toString().contains("uses definition ad-gone, which does not belong to spec type st-req"));
 	}
 
 	@Test
@@ -119,8 +151,22 @@ class TolerantImportTest {
 				"<DATATYPE-DEFINITION-DATE-REF>dt-date</DATATYPE-DEFINITION-DATE-REF>",
 				"<DATATYPE-DEFINITION-DATE-REF>dt-gone</DATATYPE-DEFINITION-DATE-REF>"));
 
-		assertTrue(issues(reqif).contains("[ad-due] Attribute definition references a datatype that is not declared "
-				+ "in DATATYPES; it and its values cannot be written"), issues(reqif).toString());
+		assertEquals(List.of("[ad-due] Attribute definition references a datatype that is not declared "
+				+ "in DATATYPES; it and its values are kept as written"), issues(reqif));
+		// both are written back as read
+		String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+		assertTrue(xml.contains("<DATATYPE-DEFINITION-DATE-REF>dt-gone</DATATYPE-DEFINITION-DATE-REF>"), xml);
+		assertTrue(xml.contains("<ATTRIBUTE-DEFINITION-DATE-REF>ad-due</ATTRIBUTE-DEFINITION-DATE-REF>"), xml);
+
+		// what the model changes is written, the rest as read
+		de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition due = reqif.getReqIFCoreContent()
+				.getSpecType("st-req").getAttributeDefinition("ad-due");
+		due.setName("Deadline");
+		due.setEditable(true);
+		String changed = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+		assertTrue(changed.contains("IDENTIFIER=\"ad-due\" IS-EDITABLE=\"true\""), changed);
+		assertTrue(changed.contains("LONG-NAME=\"Deadline\""), changed);
+		assertFalse(due.isModified(), "stamped like every other element");
 	}
 
 	@Test

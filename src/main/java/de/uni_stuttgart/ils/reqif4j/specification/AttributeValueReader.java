@@ -16,6 +16,7 @@ import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueInteger;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueString;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
+import de.uni_stuttgart.ils.reqif4j.attributes.UninterpretedAttributeValue;
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
 import de.uni_stuttgart.ils.reqif4j.reqif.ParseIssues;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
@@ -35,10 +36,13 @@ final class AttributeValueReader {
 	/**
 	 * Reads the explicit values, the ones the element itself carries.
 	 *
-	 * A value whose definition cannot be found is reported and skipped. A
-	 * value that does not fit its datatype (e.g. THE-VALUE="abc" for an
-	 * integer) is kept as written, as a plain {@link AttributeValue}, so it
-	 * is written back unchanged and the validator can report it.
+	 * A value whose definition cannot be found, whose definition has no
+	 * datatype, or whose kind does not match its definition is reported and
+	 * kept as an {@link UninterpretedAttributeValue}, which is written back
+	 * unchanged. A value that does not fit its datatype (e.g.
+	 * THE-VALUE="abc" for an integer) is kept as written, as a plain
+	 * {@link AttributeValue}, so it is written back unchanged and the
+	 * validator can report it.
 	 *
 	 * @param element  the SPEC-OBJECT, SPEC-RELATION or SPECIFICATION
 	 * @param specType the element's resolved spec type
@@ -65,19 +69,35 @@ final class AttributeValueReader {
 				continue;
 			}
 			String attributeDefinitionRef = definitionRef.getTextContent().trim();
-			AttributeDefinition attributeDefinition = specType.getAttributeDefinition(attributeDefinitionRef);
-			if(attributeDefinition == null) {
-				issues.report(ownerID, "Value references attribute definition " + attributeDefinitionRef
-						+ ", which spec type " + specType.getID() + " does not declare; the value is skipped");
-				continue;
-			}
 			if(values.explicit().containsKey(attributeDefinitionRef)) {
 				issues.report(ownerID, "Attribute definition " + attributeDefinitionRef
 						+ " has two values; the later one replaces the earlier");
 			}
+			AttributeDefinition attributeDefinition = specType.getAttributeDefinition(attributeDefinitionRef);
+			String kind = ReqIFConst.kindOf(attValNodeName);
+			String definitionKind = attributeDefinition == null || attributeDefinition.getDataType() == null ? null
+					: ReqIFConst.datatypeSuffix(attributeDefinition.getDataType().getType());
+			String reason = null;
+			if(attributeDefinition == null) {
+				reason = "Value references attribute definition " + attributeDefinitionRef
+						+ ", which spec type " + specType.getID() + " does not declare";
+			} else if(attributeDefinition.getDataType() == null) {
+				reason = "Value of attribute definition " + attributeDefinitionRef + ", which has no datatype";
+			} else if(definitionKind != null && !kind.equals(definitionKind)) {
+				reason = attValNodeName + " for attribute definition " + attributeDefinitionRef + ", which is of kind "
+						+ definitionKind;
+			}
+			if(reason != null) {
+				// a definition without datatype is reported once, with its values
+				if(attributeDefinition == null || attributeDefinition.getDataType() != null) {
+					issues.report(ownerID, reason + "; the value is kept as written");
+				}
+				values.put(new UninterpretedAttributeValue(attribute,
+						attributeDefinition != null ? attributeDefinition : standIn(attributeDefinitionRef), reason));
+				continue;
+			}
 
 			String theValue = theValue(attribute);
-			String kind = attValNodeName.substring(attValNodeName.lastIndexOf("-")+1);
 			if(THE_VALUE_KINDS.contains(kind) && XmlUtils.attribute(attribute, ReqIFConst.THE_VALUE) == null) {
 				// read as the neutral value (false, 0, ""), as earlier versions did
 				issues.report(ownerID, attValNodeName + " for " + attributeDefinitionRef
@@ -136,6 +156,43 @@ final class AttributeValueReader {
 					break;
 			}
 		}
+	}
+
+	/**
+	 * Keeps the values of an element whose spec type is not declared as
+	 * written: without the type, they cannot be interpreted.
+	 *
+	 * @return the number of values kept
+	 */
+	static int readUninterpreted(Node element, String reason, AttributeValues values, ParseIssues issues) {
+
+		int count = 0;
+		String ownerID = XmlUtils.attribute(element, ReqIFConst.IDENTIFIER);
+		for(Element attribute: XmlUtils.childElements(XmlUtils.firstChildElementByLocalName(element, ReqIFConst.VALUES))) {
+			Element definitionRef = XmlUtils.firstChildElement(
+					XmlUtils.firstChildElementByLocalName(attribute, ReqIFConst.DEFINITION));
+			if(definitionRef == null) {
+				issues.report(ownerID, XmlUtils.localName(attribute) + " has no DEFINITION; the value is skipped");
+				continue;
+			}
+			String attributeDefinitionRef = definitionRef.getTextContent().trim();
+			if(values.explicit().containsKey(attributeDefinitionRef)) {
+				issues.report(ownerID, "Attribute definition " + attributeDefinitionRef
+						+ " has two values; the later one replaces the earlier");
+			} else {
+				count++;
+			}
+			values.put(new UninterpretedAttributeValue(attribute, standIn(attributeDefinitionRef), reason));
+		}
+		return count;
+	}
+
+	/**
+	 * @return an attribute definition that stands in for an undeclared one:
+	 *         only its IDENTIFIER is known
+	 */
+	private static AttributeDefinition standIn(String attributeDefinitionID) {
+		return new AttributeDefinition(attributeDefinitionID, null, null, null);
 	}
 
 	private static final java.util.Set<String> BOOLEAN_TEXT = java.util.Set.of("true", "false", "1", "0");

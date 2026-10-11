@@ -23,8 +23,12 @@ public class AttributeValue {
 		return this.type;
 	}
 	
+	/**
+	 * @return the category of the definition's datatype, or null if the
+	 *         definition has no datatype
+	 */
 	public String getDatatype() {
-		return this.type.getDataType().getType();
+		return this.type.getDataType() == null ? null : this.type.getDataType().getType();
 	}
 
 	/**

@@ -97,6 +97,14 @@ public class ReqIFConst {
 	public final static String EOD = "EOD";
 
 	/**
+	 * @return the kind an element name ends with, e.g. STRING for
+	 *         ATTRIBUTE-VALUE-STRING or REAL for ATTRIBUTE-DEFINITION-REAL
+	 */
+	public static String kindOf(String elementName) {
+		return elementName == null ? null : elementName.substring(elementName.lastIndexOf('-') + 1);
+	}
+
+	/**
 	 * @return the suffix of the element names belonging to a datatype
 	 *         category, e.g. "REAL" for DOUBLE as in DATATYPE-DEFINITION-REAL,
 	 *         or null for a category the parser does not model

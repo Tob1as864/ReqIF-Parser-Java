@@ -19,6 +19,7 @@ public class AttributeDefinition extends Identifiable {
 	private String sourceElementName;
 	private Boolean editable;
 	private AttributeValueXHTML defaultXhtml;
+	private Element unresolvedElement;
 	
 	
 	
@@ -63,6 +64,14 @@ public class AttributeDefinition extends Identifiable {
 	}
 
 	/**
+	 * @return the element this definition was read from if its datatype is not
+	 *         declared - it is then written back as read - otherwise null
+	 */
+	public Element getUnresolvedElement() {
+		return this.type == null ? this.unresolvedElement : null;
+	}
+
+	/**
 	 * @return the element name this definition is written with, e.g.
 	 *         ATTRIBUTE-DEFINITION-STRING; for datatype kinds the parser does
 	 *         not model the name it was read with; null if neither is known
@@ -101,6 +110,11 @@ public class AttributeDefinition extends Identifiable {
 		Element typeRef = XmlUtils.firstChildElement(typeElement);
 		if(typeRef != null) {
 			this.type = dataTypes.get(typeRef.getTextContent().trim());
+		}
+		if(this.type == null && attributeDefinition instanceof Element) {
+			// without its datatype the definition cannot be interpreted; it is
+			// written back as read
+			this.unresolvedElement = (Element) attributeDefinition;
 		}
 
 		Element defVal = XmlUtils.firstChildElementByLocalName(attributeDefinition, ReqIFConst.DEFAULT_VALUE);

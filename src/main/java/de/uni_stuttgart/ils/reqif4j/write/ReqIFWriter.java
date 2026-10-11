@@ -22,8 +22,10 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NamedNodeMap;
 
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
+import de.uni_stuttgart.ils.reqif4j.attributes.UninterpretedAttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinitionEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
@@ -47,6 +49,7 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
 import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
+import de.uni_stuttgart.ils.reqif4j.util.XmlUtils;
 import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 
 /**
@@ -68,6 +71,8 @@ import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 public class ReqIFWriter {
 
 	public static final String REQIF_NAMESPACE = "http://www.omg.org/spec/ReqIF/20110401/reqif.xsd";
+	/** what all ReqIF namespaces, also those of drafts, begin with */
+	private static final String REQIF_NAMESPACE_PREFIX = "http://www.omg.org/spec/ReqIF/";
 	public static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
 	/** REQ-IF-TOOL-ID and SOURCE-TOOL-ID written when the header has none. */
@@ -229,6 +234,11 @@ public class ReqIFWriter {
 		root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:" + XHTML_PREFIX, XHTML_NAMESPACE);
 		if (document.getLang() != null) {
 			root.setAttributeNS(XMLConstants.XML_NS_URI, "xml:lang", document.getLang());
+		}
+		if (document.getSchemaLocation() != null) {
+			root.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:xsi", XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI);
+			root.setAttributeNS(XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI, "xsi:schemaLocation",
+					schemaLocation(document.getSchemaLocation()));
 		}
 		xml.appendChild(root);
 
@@ -421,6 +431,26 @@ public class ReqIFWriter {
 	private Element attributeDefinition(Document xml, AttributeDefinition definition) {
 
 		Datatype datatype = definition.getDataType();
+		if (datatype == null && definition.getUnresolvedElement() != null) {
+			// as read, with the properties the model may have changed
+			Element copy = asReqIF(xml, definition.getUnresolvedElement());
+			for (String name : List.of(ReqIFConst.LONG_NAME, ReqIFConst.DESC, ReqIFConst.IS_EDITABLE)) {
+				copy.removeAttribute(name);
+			}
+			Element alternativeID = XmlUtils.firstChildElementByLocalName(copy, ReqIFConst.ALTERNATIVE_ID);
+			if (alternativeID != null) {
+				copy.removeChild(alternativeID);
+			}
+			Node first = copy.getFirstChild();
+			identifiable(xml, copy, definition);
+			Element written = XmlUtils.firstChildElementByLocalName(copy, ReqIFConst.ALTERNATIVE_ID);
+			if (written != null && first != null) {
+				// the schema wants it first
+				copy.insertBefore(written, first);
+			}
+			setAttributeIfPresent(copy, ReqIFConst.IS_EDITABLE, toString(definition.getEditable()));
+			return copy;
+		}
 		// datatype kinds the parser does not model keep their original name
 		String elementName = definition.getElementName();
 		if (datatype == null || elementName == null) {
@@ -595,6 +625,9 @@ public class ReqIFWriter {
 
 	private Element attributeValue(Document xml, AttributeValue attributeValue) {
 
+		if (attributeValue instanceof UninterpretedAttributeValue) {
+			return asReqIF(xml, ((UninterpretedAttributeValue) attributeValue).getElement());
+		}
 		AttributeDefinition definition = attributeValue.getAttributeDefinitionType();
 		// a definition that cannot be written cannot be referenced either
 		if (definition == null || definition.getDataType() == null || definition.getElementName() == null) {
@@ -697,6 +730,54 @@ public class ReqIFWriter {
 			return null;
 		}
 		return xml.importNode(XhtmlParser.parseDiv(value.toString()), true);
+	}
+
+	/**
+	 * @return the schema location with the namespace of a ReqIF draft
+	 *         replaced by the one written; each even token is a namespace,
+	 *         each odd one the schema file for it
+	 */
+	private static String schemaLocation(String schemaLocation) {
+		String[] tokens = schemaLocation.trim().split("\\s+");
+		for (int i = 0; i < tokens.length; i += 2) {
+			if (tokens[i].startsWith(REQIF_NAMESPACE_PREFIX)) {
+				tokens[i] = REQIF_NAMESPACE;
+			}
+		}
+		return String.join(" ", tokens);
+	}
+
+	/**
+	 * Copies an element read from a document. Its ReqIF elements are put into
+	 * the namespace written - the source may use a prefix or an earlier ReqIF
+	 * namespace - everything else, such as XHTML, stays as it is.
+	 */
+	private static Element asReqIF(Document xml, Element source) {
+		Element copy = (Element) xml.importNode(source, true);
+		return (Element) toReqIFNamespace(xml, copy);
+	}
+
+	private static Node toReqIFNamespace(Document xml, Node node) {
+		Node result = node;
+		if (node.getNodeType() == Node.ELEMENT_NODE && node.getNamespaceURI() != null
+				&& node.getNamespaceURI().startsWith(REQIF_NAMESPACE_PREFIX)) {
+			result = xml.renameNode(node, REQIF_NAMESPACE, node.getLocalName());
+		}
+		if (result.getNodeType() == Node.ELEMENT_NODE) {
+			// declarations of a ReqIF namespace would contradict the renamed elements
+			NamedNodeMap attributes = result.getAttributes();
+			for (int i = attributes.getLength() - 1; i >= 0; i--) {
+				Node attribute = attributes.item(i);
+				if (XMLConstants.XMLNS_ATTRIBUTE_NS_URI.equals(attribute.getNamespaceURI())
+						&& attribute.getNodeValue().startsWith(REQIF_NAMESPACE_PREFIX)) {
+					((Element) result).removeAttributeNode((org.w3c.dom.Attr) attribute);
+				}
+			}
+		}
+		for (Node child = result.getFirstChild(); child != null; child = child.getNextSibling()) {
+			child = toReqIFNamespace(xml, child);
+		}
+		return result;
 	}
 
 	private Element definitionRef(Document xml, AttributeDefinition definition) {

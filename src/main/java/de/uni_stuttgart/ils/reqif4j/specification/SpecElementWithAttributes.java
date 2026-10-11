@@ -189,10 +189,11 @@ public abstract class SpecElementWithAttributes extends Identifiable {
 			AttributeValueReader.read(element, specType, values, issues);
 			return;
 		}
-		int count = XmlUtils.childElements(XmlUtils.firstChildElementByLocalName(element, ReqIFConst.VALUES)).size();
-		issues.report(getID(), XmlUtils.localName(element)
-				+ (typeRef == null ? " has no type reference" : " references type " + typeRef + ", which is not declared")
-				+ (count == 0 ? "" : "; its " + count + " value" + (count == 1 ? " is" : "s are") + " skipped"));
+		String problem = XmlUtils.localName(element)
+				+ (typeRef == null ? " has no type reference" : " references type " + typeRef + ", which is not declared");
+		int count = AttributeValueReader.readUninterpreted(element, problem, values, issues);
+		issues.report(getID(), problem
+				+ (count == 0 ? "" : "; its " + count + " value" + (count == 1 ? " is" : "s are") + " kept as written"));
 	}
 
 	/**

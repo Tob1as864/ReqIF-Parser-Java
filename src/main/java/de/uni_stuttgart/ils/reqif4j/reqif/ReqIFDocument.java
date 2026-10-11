@@ -27,6 +27,7 @@ public class ReqIFDocument {
 	private ReqIFCoreContent content;
 	private final java.util.List<org.w3c.dom.Node> toolExtensions = new java.util.ArrayList<>();
 	private String lang;
+	private String schemaLocation;
 
 
 	public String getFilePath() {
@@ -61,6 +62,19 @@ public class ReqIFDocument {
 	 */
 	public String getLang() {
 		return this.lang;
+	}
+
+	/**
+	 * @return xsi:schemaLocation of REQ-IF: pairs of namespace and schema file
+	 *         that tell a validator where to find the schemas, or null
+	 */
+	public String getSchemaLocation() {
+		return this.schemaLocation;
+	}
+
+	public ReqIFDocument setSchemaLocation(String schemaLocation) {
+		this.schemaLocation = schemaLocation;
+		return this;
 	}
 
 	public ReqIFDocument setLang(String lang) {
@@ -171,6 +185,9 @@ public class ReqIFDocument {
 		Element root = this.reqifDocument.getDocumentElement();
 		if (root.hasAttributeNS(XMLConstants.XML_NS_URI, "lang")) {
 			this.lang = root.getAttributeNS(XMLConstants.XML_NS_URI, "lang");
+		}
+		if (root.hasAttributeNS(XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI, "schemaLocation")) {
+			this.schemaLocation = root.getAttributeNS(XMLConstants.W3C_XML_SCHEMA_INSTANCE_NS_URI, "schemaLocation");
 		}
 
 		// Tool extensions are kept verbatim; the parser does not interpret them.
