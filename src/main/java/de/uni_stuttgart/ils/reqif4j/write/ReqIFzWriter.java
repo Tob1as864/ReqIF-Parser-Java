@@ -16,19 +16,19 @@ import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFz;
 
 /**
  * Writes a .reqifz archive: one or more ReqIF documents together with the
- * images they reference.
+ * files they reference - images, embedded OLE objects, PDFs or anything else.
  *
- * Image entries are stored under the path the XHTML {@code object} elements
- * reference (forward slashes), so a written archive resolves its images the
- * same way a tool-generated one does:
+ * Attachments are stored under the path the XHTML {@code object} elements
+ * reference (forward slashes), so a written archive resolves them the same
+ * way a tool-generated one does:
  *
  * <pre>
- * Map&lt;String, byte[]&gt; pictures = Map.of("files/diagram.png", pngBytes);
- * new ReqIFzWriter().write(document, "spec.reqif", pictures, Path.of("spec.reqifz"));
+ * Map&lt;String, byte[]&gt; attachments = Map.of("files/diagram.png", pngBytes);
+ * new ReqIFzWriter().write(document, "spec.reqif", attachments, Path.of("spec.reqifz"));
  * </pre>
  *
- * An archive that was read can be re-packed without consuming its picture
- * streams, because {@link ReqIFz} keeps the extracted files:
+ * An archive that was read can be re-packed; every attachment is copied from
+ * the files {@link ReqIFz} extracted, without loading them into memory:
  *
  * <pre>
  * try (ReqIFz source = new ReqIFz("in.reqifz")) {
@@ -37,6 +37,11 @@ import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFz;
  * </pre>
  */
 public class ReqIFzWriter {
+
+	/** The content of one archive entry. */
+	private interface Content {
+		void writeTo(OutputStream out) throws IOException;
+	}
 
 	private final ReqIFWriter documentWriter;
 
@@ -53,33 +58,67 @@ public class ReqIFzWriter {
 
 
 	/**
-	 * Writes a single document without images.
+	 * Writes a single document without attachments.
 	 */
 	public void write(ReqIFDocument document, String entryName, Path archive) throws IOException {
 		write(document, entryName, null, archive);
 	}
 
 	/**
-	 * Writes a single document together with its images.
+	 * Writes a single document together with its attachments.
 	 *
-	 * @param entryName name of the ReqIF entry inside the archive,
-	 *                  e.g. {@code spec.reqif}
-	 * @param pictures  image data keyed by the archive path referenced from the
-	 *                  XHTML object elements, e.g. {@code files/diagram.png};
-	 *                  may be null
+	 * @param entryName   name of the ReqIF entry inside the archive,
+	 *                    e.g. {@code spec.reqif}
+	 * @param attachments file contents keyed by the archive path referenced
+	 *                    from the XHTML object elements, e.g.
+	 *                    {@code files/diagram.png}; may be null
 	 */
-	public void write(ReqIFDocument document, String entryName, Map<String, byte[]> pictures, Path archive)
+	public void write(ReqIFDocument document, String entryName, Map<String, byte[]> attachments, Path archive)
 			throws IOException {
 
 		Map<String, ReqIFDocument> documents = new LinkedHashMap<String, ReqIFDocument>();
 		documents.put(normalizeEntryName(entryName), document);
-		write(documents, pictures, archive);
+		write(documents, attachments, archive);
 	}
 
 	/**
-	 * Writes several documents and their images into one archive.
+	 * Writes several documents and their attachments into one archive.
 	 */
-	public void write(Map<String, ReqIFDocument> documents, Map<String, byte[]> pictures, Path archive)
+	public void write(Map<String, ReqIFDocument> documents, Map<String, byte[]> attachments, Path archive)
+			throws IOException {
+
+		Map<String, Content> contents = new LinkedHashMap<String, Content>();
+		if (attachments != null) {
+			for (Map.Entry<String, byte[]> attachment : attachments.entrySet()) {
+				byte[] bytes = attachment.getValue();
+				contents.put(attachment.getKey(), out -> {
+					if (bytes != null) {
+						out.write(bytes);
+					}
+				});
+			}
+		}
+		writeArchive(documents, contents, archive);
+	}
+
+	/**
+	 * Re-packs an archive that was read: the documents are serialized from the
+	 * object model (so modifications are included) while every other entry -
+	 * images, OLE objects, PDFs, ... - is copied unchanged from the extracted
+	 * files.
+	 */
+	public void write(ReqIFz source, Path archive) throws IOException {
+
+		Map<String, Content> contents = new LinkedHashMap<String, Content>();
+		for (Map.Entry<String, File> attachment : source.getAttachmentFiles().entrySet()) {
+			Path file = attachment.getValue().toPath();
+			contents.put(attachment.getKey(), out -> Files.copy(file, out));
+		}
+		writeArchive(source.getReqIFDocuments(), contents, archive);
+	}
+
+
+	private void writeArchive(Map<String, ReqIFDocument> documents, Map<String, Content> attachments, Path archive)
 			throws IOException {
 
 		if (documents == null || documents.isEmpty()) {
@@ -88,43 +127,31 @@ public class ReqIFzWriter {
 
 		// Collect and check the names first: a zip cannot hold the same entry
 		// twice, and the raw ZipException would not say which name clashed.
-		Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
+		// Documents are serialized up front, so a failure leaves no half
+		// written archive behind.
+		Map<String, Content> entries = new LinkedHashMap<String, Content>();
 		for (Map.Entry<String, ReqIFDocument> document : documents.entrySet()) {
-			addEntry(entries, normalizeEntryName(document.getKey()), documentBytes(document.getValue()));
+			byte[] bytes = documentBytes(document.getValue());
+			addEntry(entries, normalizeEntryName(document.getKey()), out -> out.write(bytes));
 		}
-		if (pictures != null) {
-			for (Map.Entry<String, byte[]> picture : pictures.entrySet()) {
-				addEntry(entries, normalizeEntryName(picture.getKey()), picture.getValue());
-			}
+		for (Map.Entry<String, Content> attachment : attachments.entrySet()) {
+			addEntry(entries, normalizeEntryName(attachment.getKey()), attachment.getValue());
 		}
 
 		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
-			for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-				writeEntry(zip, entry.getKey(), entry.getValue());
+			for (Map.Entry<String, Content> entry : entries.entrySet()) {
+				zip.putNextEntry(new ZipEntry(entry.getKey()));
+				entry.getValue().writeTo(zip);
+				zip.closeEntry();
 			}
 		}
 	}
 
-	/**
-	 * Re-packs an archive that was read: the documents are serialized from the
-	 * object model (so modifications are included) while the images are copied
-	 * from the extracted files.
-	 */
-	public void write(ReqIFz source, Path archive) throws IOException {
-
-		Map<String, byte[]> pictures = new LinkedHashMap<String, byte[]>();
-		for (Map.Entry<String, File> picture : source.getPictureFiles().entrySet()) {
-			pictures.put(picture.getKey(), Files.readAllBytes(picture.getValue().toPath()));
-		}
-		write(source.getReqIFDocuments(), pictures, archive);
-	}
-
-
-	private static void addEntry(Map<String, byte[]> entries, String name, byte[] content) {
+	private static void addEntry(Map<String, Content> entries, String name, Content content) {
 
 		if (entries.containsKey(name)) {
 			throw new ReqIFWriteException("Archive entry '" + name + "' is added twice; "
-					+ "document and picture names must be unique within the archive");
+					+ "document and attachment names must be unique within the archive");
 		}
 		entries.put(name, content);
 	}
@@ -134,15 +161,6 @@ public class ReqIFzWriter {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 		this.documentWriter.write(document, (OutputStream) bytes);
 		return bytes.toByteArray();
-	}
-
-	private static void writeEntry(ZipOutputStream zip, String name, byte[] content) throws IOException {
-
-		zip.putNextEntry(new ZipEntry(name));
-		if (content != null) {
-			zip.write(content);
-		}
-		zip.closeEntry();
 	}
 
 	/**

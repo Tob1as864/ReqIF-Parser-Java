@@ -422,19 +422,33 @@ values too. The content category of generated spec objects is derived by
 the same `TypeClassifier` used when reading (`typeClassifier(...)` to
 override).
 
-## Writing .reqifz archives
+## Reading and writing .reqifz archives
 
-Images travel with the document, stored under the path the XHTML
+A .reqifz archive holds one or more ReqIF documents plus the files they
+reference - images, embedded OLE objects, PDFs or anything else. Reading
+it keeps every entry: the documents in `getReqIFDocuments()`, all other
+files in `getAttachmentFiles()` (pictures additionally in
+`getPictureFiles()`). The archive is extracted into a temporary
+directory that `close()` deletes again, so use try-with-resources and
+read the files before closing. Archives can also be read from a stream:
+
+```java
+try (ReqIFz reqifz = new ReqIFz(uploadStream, "upload.reqifz")) {
+    File ole = reqifz.getAttachmentFiles().get("files/diagram.ole");
+}
+```
+
+Attachments travel with the document, stored under the path the XHTML
 `object` elements reference:
 
 ```java
-Map<String, byte[]> pictures = Map.of("files/diagram.png", pngBytes);
-new ReqIFzWriter().write(document, "spec.reqif", pictures, Path.of("spec.reqifz"));
+Map<String, byte[]> attachments = Map.of("files/diagram.png", pngBytes);
+new ReqIFzWriter().write(document, "spec.reqif", attachments, Path.of("spec.reqifz"));
 ```
 
 An archive that was read can be re-packed - the documents are serialized
-from the model (so modifications are included) while the images are
-copied from the extracted files, without consuming the one-shot streams:
+from the model (so modifications are included) while every attachment is
+copied unchanged from the extracted files:
 
 ```java
 try (ReqIFz source = new ReqIFz("in.reqifz")) {
