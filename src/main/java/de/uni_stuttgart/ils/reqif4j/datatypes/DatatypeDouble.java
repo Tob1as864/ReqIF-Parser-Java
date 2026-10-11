@@ -1,7 +1,7 @@
 package de.uni_stuttgart.ils.reqif4j.datatypes;
 
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
-import de.uni_stuttgart.ils.reqif4j.util.XsdDouble;
+import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 
 /**
  * A DATATYPE-DEFINITION-REAL. The parser normalizes the ReqIF kind REAL to the
@@ -82,7 +82,7 @@ public class DatatypeDouble extends Datatype {
 			return fallback;
 		}
 		try {
-			return XsdDouble.parse(value);
+			return XsdTypes.parseDouble(value);
 		} catch (NumberFormatException e) {
 			return fallback;
 		}

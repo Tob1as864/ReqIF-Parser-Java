@@ -47,7 +47,7 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
 import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
-import de.uni_stuttgart.ils.reqif4j.util.XsdDouble;
+import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 
 /**
  * Serializes a parsed {@link ReqIFDocument} back to ReqIF XML.
@@ -295,8 +295,8 @@ public class ReqIFWriter {
 		} else if (datatype instanceof DatatypeDouble) {
 			DatatypeDouble real = (DatatypeDouble) datatype;
 			definition.setAttribute(ReqIFConst.ACCURACY, Integer.toString(real.getAccuracy()));
-			definition.setAttribute(ReqIFConst.MIN, XsdDouble.format(real.getMin()));
-			definition.setAttribute(ReqIFConst.MAX, XsdDouble.format(real.getMax()));
+			definition.setAttribute(ReqIFConst.MIN, XsdTypes.formatDouble(real.getMin()));
+			definition.setAttribute(ReqIFConst.MAX, XsdTypes.formatDouble(real.getMax()));
 
 		} else if (datatype instanceof DatatypeString) {
 			definition.setAttribute(ReqIFConst.MAX_LENGTH,
@@ -416,6 +416,17 @@ public class ReqIFWriter {
 
 		if (definition.getDefaultValue() == null) {
 			return null;
+		}
+		if (ReqIFConst.XHTML.equals(datatype.getType())) {
+			// an XHTML value carries its content in a THE-VALUE element, not in
+			// an attribute
+			Element value = xhtmlValue(xml, definition, new AttributeValueXHTML(definition.getDefaultValue(), definition));
+			if (value == null) {
+				return null;
+			}
+			Element defaultValue = element(xml, ReqIFConst.DEFAULT_VALUE);
+			defaultValue.appendChild(value);
+			return defaultValue;
 		}
 		String elementName = ReqIFElements.attributeValue(datatype.getType());
 		if (elementName == null) {
@@ -549,7 +560,7 @@ public class ReqIFWriter {
 
 		Element element = element(xml, elementName);
 		element.setAttribute(ReqIFConst.THE_VALUE,
-				value instanceof Double ? XsdDouble.format((Double) value) : String.valueOf(value));
+				value instanceof Double ? XsdTypes.formatDouble((Double) value) : String.valueOf(value));
 		element.appendChild(definitionRef(xml, definition));
 		return element;
 	}

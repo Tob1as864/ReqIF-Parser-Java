@@ -198,6 +198,23 @@ class RequiredValuesTest {
 	}
 
 	@Test
+	void xhtmlDefaultValueIsWrittenAsMarkup() throws Exception {
+
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr"))
+				.xhtmlDatatype("dt-xhtml", "XHTML")
+				.specObjectType("st", "Type", t -> t.attribute("ad-text", "Text", "dt-xhtml", "<p>to be written</p>"))
+				.build();
+
+		String xml = new ReqIFWriter().setClock(FIXED).toXml(document);
+
+		assertTrue(xml.contains("<DEFAULT-VALUE><ATTRIBUTE-VALUE-XHTML><DEFINITION>"
+				+ "<ATTRIBUTE-DEFINITION-XHTML-REF>ad-text</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>"
+				+ "<THE-VALUE><div xmlns=\"http://www.w3.org/1999/xhtml\"><p>to be written</p></div></THE-VALUE>"), xml);
+		OfficialReqIFSchema.assertSchemaValid(document);
+	}
+
+	@Test
 	void outputCarriesNoInternalState() {
 
 		Document xml = new ReqIFWriter().buildDocument(minimalDocument(h -> h.id("hdr")));

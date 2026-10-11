@@ -1,6 +1,6 @@
 package de.uni_stuttgart.ils.reqif4j.attributes;
 
-import de.uni_stuttgart.ils.reqif4j.util.XsdDouble;
+import de.uni_stuttgart.ils.reqif4j.util.XsdTypes;
 
 public class AttributeValueDouble extends AttributeValue{
 
@@ -12,7 +12,7 @@ public class AttributeValueDouble extends AttributeValue{
             this.value = 0.0;
         }else {
             // xsd:double notation: INF / -INF for infinity
-            this.value = XsdDouble.parse(value);
+            this.value = XsdTypes.parseDouble(value);
         }
     }
 

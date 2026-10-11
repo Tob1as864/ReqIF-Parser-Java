@@ -61,7 +61,20 @@ class ReqIFValidatorTest {
 
 		ValidationResult result = validate(reqif.getReqIFDocument());
 
-		assertTrue(result.isValid(), "the fixture must validate cleanly, got:\n" + result);
+		// The main fixture deliberately carries a date-only DATE value, which the
+		// reader accepts leniently but the schema does not (xsd:dateTime needs a
+		// time). That must be the only finding.
+		assertEquals(1, result.getIssues().size(), result.toString());
+		assertTrue(hasError(result, "'2026-01-01' is not an xsd:dateTime"), result.toString());
+	}
+
+	@Test
+	void schemaValidFixtureIsValid(@TempDir Path tempDir) throws Exception {
+		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "valid.reqif", TestFixtures.SCHEMA_VALID_REQIF).toString());
+
+		ValidationResult result = validate(reqif.getReqIFDocument());
+
+		assertTrue(result.getIssues().isEmpty(), "the fixture must validate cleanly, got:\n" + result);
 	}
 
 	@Test

@@ -25,8 +25,20 @@ schemagültigen Round-Trip verhinderten:
 Eine API-Änderung: `getName()` liefert für Elemente ohne `LONG-NAME` jetzt `null` (vorher Absturz,
 bei Enum-Werten `""`). `DatatypeEnumeration.getEnumValueName()` liefert weiterhin `""`.
 
-Offen für Phase 2: ein Default für `LAST-CHANGE` bei erzeugten Elementen (2.1), die übrigen
-Pflichtattribute (2.2) und deren Prüfung im Modellvalidator (2.3).
+| Phase | Stand | Ergebnis |
+|---|---|---|
+| **2.1** `LAST-CHANGE`-Default | ✅ erledigt | Der Writer setzt fehlendes `LAST-CHANGE` auf die `CREATION-TIME` des Headers bzw. den Schreibzeitpunkt (Clock injizierbar). Das Modell bleibt unverändert. |
+| **2.2** Pflichtattribute | ✅ erledigt | `MULTI-VALUED` und `OTHER-CONTENT` werden immer geschrieben, REAL behält `ACCURACY`/`MIN`/`MAX` (Defaults 15 / voller double-Bereich), Header-Pflichtfelder bekommen Defaults, der Builder vergibt eine freie Header-ID. Unendlich wird als `INF`/`-INF` geschrieben und gelesen, XHTML-Defaults werden als Markup geschrieben. |
+| **2.3** Modellvalidator | ✅ erledigt | Fehler bei allem, was die Ausgabe schemaungültig machen würde: ungültige `xsd:ID`, kein `xsd:dateTime` (`LAST-CHANGE`, `CREATION-TIME`, DATE-Werte), `REQ-IF-VERSION` ≠ `1.0`, nicht ganzzahliger Enum-`KEY`, Defaults nicht in Schema-Notation, fehlender Header. Warnungen bei Verstößen gegen `MAX-LENGTH` und `MIN`/`MAX`. Vertrag: Ein Dokument ohne Fehler wird schemagültig geschrieben. |
+
+Ergebnis von Phase 2: Mit dem Builder erzeugte Dokumente (das README-Beispiel) und der Round-Trip einer
+schemagültigen Datei mit REAL-Grenzen, `MULTI-VALUED="false"` und leerem `OTHER-CONTENT` bestehen das
+offizielle OMG-Schema. Die Tests prüfen das in der CI gegen das echte XSD.
+
+Bekannte Grenzen: Die xsd:ID-Prüfung folgt den Namenszeichen von XML 1.0 (5. Ausgabe), der
+JDK-Validator den älteren Tabellen. Bei exotischen Unicode-Zeichen können beide abweichen. Ein reines
+Datum (`2026-01-01`) in DATE-Werten liest der Parser weiterhin tolerant ein, der Validator meldet es als
+Fehler.
 
 ## 1. Zusammenfassung
 
@@ -92,27 +104,27 @@ Legende: ✅ unterstützt · ⚠️ teilweise · ❌ fehlt · — nicht anwendba
 | ReqIF-Element / -Attribut | Import | Export | Builder |
 |---|---|---|---|
 | `REQ-IF` `xml:lang` | ❌ | ❌ | ❌ |
-| Header: `COMMENT`, `CREATION-TIME`, `REQ-IF-TOOL-ID`, `REQ-IF-VERSION`, `SOURCE-TOOL-ID`, `TITLE` | ✅ | ⚠️ leere Werte werden ausgelassen, obwohl sie Pflicht sind | ⚠️ nicht erzwungen |
+| Header: `COMMENT`, `CREATION-TIME`, `REQ-IF-TOOL-ID`, `REQ-IF-VERSION`, `SOURCE-TOOL-ID`, `TITLE` | ✅ | ✅ Pflichtfelder mit Default *(2.2)* | ✅ freie Header-ID als Default *(2.2)* |
 | Header: `REPOSITORY-ID` | ❌ | ❌ | ❌ |
 | `TOOL-EXTENSIONS` | ✅ (roh) | ✅ (roh) | ❌ |
 | Identifiable: `IDENTIFIER` | ✅ | ✅ | ✅ |
-| Identifiable: `LAST-CHANGE` (**Pflicht**) | ✅ *(1.2)* | ⚠️ nur wenn vorhanden, kein Default *(2.1)* | ⚠️ nur per Setter |
+| Identifiable: `LAST-CHANGE` (**Pflicht**) | ✅ *(1.2)* | ✅ mit Default *(2.1)* | ⚠️ nur per Setter, sonst Default |
 | Identifiable: `DESC` | ✅ *(1.2)* | ✅ *(1.2)* | ⚠️ nur per Setter |
 | Identifiable: `LONG-NAME` | ✅ alle Elemente, optional *(1.2)* | ✅ *(1.2)* | ⚠️ nicht für Spec-Objekte |
 | `ALTERNATIVE-ID` | ✅ verschachtelte und flache Form *(1.2)* | ✅ verschachtelt *(1.2)* | ⚠️ nur per Setter |
 | `DATATYPE-DEFINITION-BOOLEAN` / `-DATE` / `-XHTML` | ✅ | ✅ | ✅ |
 | `DATATYPE-DEFINITION-STRING` `MAX-LENGTH` | ✅ | ✅ | ✅ |
 | `DATATYPE-DEFINITION-INTEGER` `MIN`/`MAX` | ✅ (long) | ✅ | ✅ |
-| `DATATYPE-DEFINITION-REAL` `ACCURACY`/`MIN`/`MAX` (**Pflicht**) | ❌ | ❌ | ❌ |
+| `DATATYPE-DEFINITION-REAL` `ACCURACY`/`MIN`/`MAX` (**Pflicht**) | ✅ *(2.2)* | ✅ *(2.2)* | ✅ *(2.2)* |
 | `DATATYPE-DEFINITION-ENUMERATION`, `ENUM-VALUE`, `KEY` | ✅ | ✅ | ✅ |
-| `EMBEDDED-VALUE` `OTHER-CONTENT` (**Pflicht**) | ✅ | ⚠️ entfällt, wenn leer | ✅ |
+| `EMBEDDED-VALUE` `OTHER-CONTENT` (**Pflicht**) | ✅ | ✅ auch leer *(2.2)* | ✅ |
 | `SPEC-OBJECT-TYPE`, `SPECIFICATION-TYPE`, `SPEC-RELATION-TYPE` | ✅ | ✅ | ✅ |
 | `RELATION-GROUP-TYPE` | ✅ | ✅ | ❌ |
 | `ATTRIBUTE-DEFINITION-*` | ✅ | ✅ | ✅ |
 | `ATTRIBUTE-DEFINITION-*` `IS-EDITABLE` | ❌ | ❌ | ❌ |
-| `ATTRIBUTE-DEFINITION-ENUMERATION` `MULTI-VALUED` (**Pflicht**) | ✅ | ⚠️ nur `true` wird geschrieben | ✅ |
+| `ATTRIBUTE-DEFINITION-ENUMERATION` `MULTI-VALUED` (**Pflicht**) | ✅ | ✅ auch `false` *(2.2)* | ✅ |
 | `DEFAULT-VALUE` (einfache Typen, Enum) | ✅ | ✅ | ✅ |
-| `DEFAULT-VALUE` (XHTML) | ❌ | ❌ | ❌ |
+| `DEFAULT-VALUE` (XHTML) | ❌ *(3.3)* | ✅ als Markup *(2.2)* | ✅ über `attribute(...)` |
 | `ATTRIBUTE-VALUE-*` (alle 7 Arten) | ✅ | ✅ | ✅ |
 | `ATTRIBUTE-VALUE-INTEGER` außerhalb des int-Bereichs | ❌ Absturz | — | ⚠️ |
 | `ATTRIBUTE-VALUE-XHTML` `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` | ❌ | ❌ | ❌ |

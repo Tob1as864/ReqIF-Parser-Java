@@ -311,12 +311,35 @@ in the nested form the schema prescribes
 (`<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>`);
 the flat form older versions of this library wrote is still read.
 
-A schema-valid document stays schema-valid after a round trip, as long as
-it uses only what the writer already covers. Not yet covered: elements
-without `LAST-CHANGE` (e.g. generated with `ReqIFBuilder`) get none, and
-`MULTI-VALUED="false"`, an empty `OTHER-CONTENT` and the `ACCURACY`/`MIN`/`MAX`
-of REAL datatypes are not written although the schema requires them - see
-`IST-SOLL-ANALYSE.md`.
+## Schema-valid output
+
+The writer emits every value the official ReqIF schema requires, also when
+the model does not carry it - typically for a document built with
+`ReqIFBuilder`. The model itself is not changed:
+
+| missing in the model | written as |
+|---|---|
+| `LAST-CHANGE` of an element | the header's `CREATION-TIME`, or the time of writing |
+| header `CREATION-TIME` | the time of writing |
+| header `REQ-IF-TOOL-ID`, `SOURCE-TOOL-ID` | `reqif4j` |
+| header `REQ-IF-VERSION` | `1.0` (the only value the schema allows) |
+| header `TITLE` | empty |
+| `ACCURACY` / `MIN` / `MAX` of a REAL datatype | 15 / full double range |
+
+`MULTI-VALUED` and `OTHER-CONTENT` are always written, also when `false`
+or empty, and infinite REAL values use the xsd notation `INF` / `-INF`.
+The time of writing comes from a `java.time.Clock`; pass a fixed one for
+reproducible output:
+
+```java
+new ReqIFWriter().setClock(Clock.fixed(Instant.parse("2026-10-11T12:00:00Z"), ZoneOffset.UTC))
+        .write(document, Path.of("out.reqif"));
+```
+
+What no default can fix - a missing header, missing or invalid
+identifiers, malformed dates - is reported by `ReqIFValidator` (see
+below). A document the validator accepts without errors is written
+schema-valid.
 
 Indenting is **off by default**: the XML indenter inserts whitespace into
 mixed content, which would change XHTML attribute values. Enable it with
@@ -389,10 +412,18 @@ try (ReqIFz source = new ReqIFz("in.reqifz")) {
 # Validation
 
 `ReqIFValidator` checks a document before it is written: identifiers
-present and globally unique, resolvable datatype and spec type
-references, attribute values matching their spec type, enum value
-references, relation endpoints, spec hierarchy targets and relation
+present, valid `xsd:ID`s and globally unique, resolvable datatype and
+spec type references, attribute values matching their spec type, enum
+value references, relation endpoints, spec hierarchy targets and relation
 group references.
+
+Values the schema constrains are errors when they do not fit:
+`LAST-CHANGE`, `CREATION-TIME` and DATE values must be `xsd:dateTime`
+(a date alone is not enough), enum `KEY`s integers, `REQ-IF-VERSION`
+`1.0`, and default values - written as they are - must already be in
+schema notation (`true`/`false`, `1.5`, `INF`). Values outside the
+limits of their datatype (`MAX-LENGTH`, `MIN`/`MAX`) are warnings: the
+schema cannot express those limits, but importing tools may reject them.
 
 ```java
 new ReqIFValidator().validate(document).throwIfInvalid();
