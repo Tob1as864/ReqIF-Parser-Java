@@ -51,6 +51,19 @@ class SchemaConformanceTest {
 	}
 
 	@Test
+	void malformedFileIsReportedOnce(@TempDir Path tempDir) throws Exception {
+
+		Path file = TestFixtures.write(tempDir, "truncated.reqif",
+				"<REQ-IF xmlns=\"http://www.omg.org/spec/ReqIF/20110401/reqif.xsd\"><THE-HEADER>");
+
+		ValidationResult result = new ReqIFValidator()
+				.validateAgainstSchema(file, OfficialReqIFSchema.reqifXsd());
+
+		// the parser reports a fatal error and then throws it again
+		assertEquals(1, result.getErrors().size(), result.toString());
+	}
+
+	@Test
 	void roundTripOfASchemaValidDocumentStaysSchemaValid(@TempDir Path tempDir) throws Exception {
 
 		ReqIF reqif = new ReqIF(TestFixtures.write(tempDir, "in.reqif", TestFixtures.SCHEMA_VALID_REQIF).toString());

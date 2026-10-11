@@ -7,8 +7,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFConst;
-
 /**
  * Helper methods for namespace- and whitespace-independent DOM navigation.
  *
@@ -138,12 +136,14 @@ public final class XmlUtils {
 	 */
 	public static String alternativeID(Node identifiable) {
 
-		Element wrapper = firstChildElementByLocalName(identifiable, ReqIFConst.ALTERNATIVE_ID);
+		// literals instead of ReqIFConst: this package must not depend on the
+		// model packages, which depend on it
+		Element wrapper = firstChildElementByLocalName(identifiable, "ALTERNATIVE-ID");
 		if (wrapper == null) {
 			return null;
 		}
-		Element nested = firstChildElementByLocalName(wrapper, ReqIFConst.ALTERNATIVE_ID);
-		return attribute(nested != null ? nested : wrapper, ReqIFConst.IDENTIFIER);
+		Element nested = firstChildElementByLocalName(wrapper, "ALTERNATIVE-ID");
+		return attribute(nested != null ? nested : wrapper, "IDENTIFIER");
 	}
 
 	/**

@@ -2,9 +2,8 @@ package de.uni_stuttgart.ils.reqif4j.validate;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -408,11 +407,15 @@ public class ReqIFValidator {
 	/**
 	 * Records parser findings as issues. Warnings stay warnings; errors and
 	 * fatal errors are errors.
+	 *
+	 * After a fatal error the parser throws a new exception for the same
+	 * problem, so findings are told apart by position and message, not by
+	 * object identity.
 	 */
 	private static final class IssueCollector implements ErrorHandler {
 
 		private final ValidationResult result;
-		private final Set<SAXException> reported = Collections.newSetFromMap(new IdentityHashMap<SAXException, Boolean>());
+		private final Set<String> reported = new HashSet<String>();
 
 		IssueCollector(ValidationResult result) {
 			this.result = result;
@@ -420,29 +423,36 @@ public class ReqIFValidator {
 
 		@Override
 		public void warning(SAXParseException exception) {
-			this.reported.add(exception);
-			this.result.warning(null, message(exception));
+			if (this.reported.add(fingerprint(exception))) {
+				this.result.warning(null, message(exception));
+			}
 		}
 
 		@Override
 		public void error(SAXParseException exception) {
-			this.reported.add(exception);
-			this.result.error(null, message(exception));
+			reportUnlessReported(exception);
 		}
 
 		@Override
 		public void fatalError(SAXParseException exception) {
-			this.reported.add(exception);
-			this.result.error(null, message(exception));
+			reportUnlessReported(exception);
 		}
 
 		void reportUnlessReported(SAXException exception) {
-			if (!this.reported.contains(exception)) {
-				this.reported.add(exception);
+			if (this.reported.add(fingerprint(exception))) {
 				this.result.error(null, exception instanceof SAXParseException
 						? message((SAXParseException) exception)
 						: exception.getMessage());
 			}
+		}
+
+		private static String fingerprint(SAXException exception) {
+			if (exception instanceof SAXParseException) {
+				SAXParseException parseException = (SAXParseException) exception;
+				return parseException.getSystemId() + ':' + parseException.getLineNumber() + ':'
+						+ parseException.getColumnNumber() + ':' + parseException.getMessage();
+			}
+			return String.valueOf(exception.getMessage());
 		}
 
 		private static String message(SAXParseException exception) {
