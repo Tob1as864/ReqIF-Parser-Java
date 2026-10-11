@@ -22,6 +22,24 @@ schemagültigen Round-Trip verhinderten:
 - **Werte unbenannter Attributdefinitionen überschrieben sich.** Ohne `LONG-NAME` dient jetzt die ID als
   Schlüssel. Die eigentliche Umstellung auf IDs bleibt Arbeitspaket 3.1.
 
+| Phase | Stand | Ergebnis |
+|---|---|---|
+| **3.1/3.2** Werte | ✅ erledigt | Werte liegen nach Definitions-ID in Dokumentreihenfolge vor (`getValues()`), Defaults werden nicht mehr als Werte geschrieben. `getAttributes()` bleibt als schreibgeschützte Sicht mit Defaults nach `LONG-NAME`, `setValue`/`removeValue` ändern Werte. Gemeinsame Basisklasse `SpecElementWithAttributes`. |
+| **3.3** Zahlen | ✅ erledigt | Integer ohne Größenbeschränkung (`getBigInteger()`), REAL-Grenzen und XHTML-Defaults schon in Phase 2. |
+| **3.4** Metadaten | ✅ erledigt | `xml:lang`, `REPOSITORY-ID`, `IS-EDITABLE`, `IS-TABLE-INTERNAL`, `EDITABLE-ATTS`, `THE-ORIGINAL-VALUE`, `IS-SIMPLIFIED`, `p`-Inhalt statt `div`. Laut Schemaabgleich fehlt dem Code kein Element und kein Attribut des XSD mehr. |
+| **3.5** `.reqifz` | ✅ erledigt | Alle Anhänge bleiben erhalten (OLE, PDF, GIF …), Neupacken ohne Speicherladen, `InputStream`-Konstruktor, Entpacken in ein Temp-Verzeichnis, das `close()` löscht. |
+| **3.6** toleranter Import | ✅ erledigt | Statt Abstürzen gibt es `ReqIFDocument.getParseIssues()`. Unpassende Werte bleiben als Rohtext erhalten, nicht auflösbare Referenzen werden mitgeschrieben, nur Unverwendbares wird übersprungen. Der Validator meldet das als Warnungen. |
+| **3.7** Round-Trip-Test | ✅ erledigt | `LosslessRoundTripTest` mit einer schemagültigen Datei, die alle Elemente und Attribute nutzt. Der kanonische XML-Vergleich ignoriert nur, was das Schema offenlässt. |
+
+Ergebnis von Phase 3: Import und Export sind im Sinne des Zielbilds vollständig. Was eine schemagültige
+Datei enthält, wird gelesen und inhaltlich unverändert geschrieben. Lexikalisch normalisiert werden nur
+typisierte Werte (`1` → `true`, `1e3` → `1000.0`). Kaputte Dateien werden gelesen, soweit es geht, und die
+Probleme gemeldet.
+
+API-Änderungen in Phase 3: `getAttributes()` ist schreibgeschützt (Änderungen über `setValue`/`removeValue`),
+`ReqIFz` entpackt nicht mehr neben die Quelldatei, und ein XHTML-Default gilt jetzt als effektiver Wert. Bei
+attributbasierter Klassifizierung kann sich dadurch die Kategorie von Objekten ohne eigenen Wert ändern.
+
 Eine API-Änderung: `getName()` liefert für Elemente ohne `LONG-NAME` jetzt `null` (vorher Absturz,
 bei Enum-Werten `""`). `DatatypeEnumeration.getEnumValueName()` liefert weiterhin `""`.
 
@@ -109,9 +127,9 @@ Legende: ✅ unterstützt · ⚠️ teilweise · ❌ fehlt · — nicht anwendba
 
 | ReqIF-Element / -Attribut | Import | Export | Builder |
 |---|---|---|---|
-| `REQ-IF` `xml:lang` | ❌ | ❌ | ❌ |
+| `REQ-IF` `xml:lang` | ✅ *(3.4)* | ✅ *(3.4)* | ⚠️ per Setter |
 | Header: `COMMENT`, `CREATION-TIME`, `REQ-IF-TOOL-ID`, `REQ-IF-VERSION`, `SOURCE-TOOL-ID`, `TITLE` | ✅ | ✅ Pflichtfelder mit Default *(2.2)* | ✅ freie Header-ID als Default *(2.2)* |
-| Header: `REPOSITORY-ID` | ❌ | ❌ | ❌ |
+| Header: `REPOSITORY-ID` | ✅ *(3.4)* | ✅ *(3.4)* | ✅ *(3.4)* |
 | `TOOL-EXTENSIONS` | ✅ (roh) | ✅ (roh) | ❌ |
 | Identifiable: `IDENTIFIER` | ✅ | ✅ | ✅ |
 | Identifiable: `LAST-CHANGE` (**Pflicht**) | ✅ *(1.2)* | ✅ mit Default *(2.1)* | ⚠️ nur per Setter, sonst Default |
@@ -127,22 +145,22 @@ Legende: ✅ unterstützt · ⚠️ teilweise · ❌ fehlt · — nicht anwendba
 | `SPEC-OBJECT-TYPE`, `SPECIFICATION-TYPE`, `SPEC-RELATION-TYPE` | ✅ | ✅ | ✅ |
 | `RELATION-GROUP-TYPE` | ✅ | ✅ | ❌ |
 | `ATTRIBUTE-DEFINITION-*` | ✅ | ✅ | ✅ |
-| `ATTRIBUTE-DEFINITION-*` `IS-EDITABLE` | ❌ | ❌ | ❌ |
+| `ATTRIBUTE-DEFINITION-*` `IS-EDITABLE` | ✅ *(3.4)* | ✅ *(3.4)* | ⚠️ per Setter |
 | `ATTRIBUTE-DEFINITION-ENUMERATION` `MULTI-VALUED` (**Pflicht**) | ✅ | ✅ auch `false` *(2.2)* | ✅ |
 | `DEFAULT-VALUE` (einfache Typen, Enum) | ✅ | ✅ | ✅ |
 | `DEFAULT-VALUE` (XHTML) | ✅ *(2.2, aus 3.3 vorgezogen)* | ✅ als Markup *(2.2)* | ✅ über `attribute(...)` |
 | `ATTRIBUTE-VALUE-*` (alle 7 Arten) | ✅ | ✅ | ✅ |
-| `ATTRIBUTE-VALUE-INTEGER` außerhalb des int-Bereichs | ❌ Absturz | — | ⚠️ |
-| `ATTRIBUTE-VALUE-XHTML` `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` | ❌ | ❌ | ❌ |
+| `ATTRIBUTE-VALUE-INTEGER` außerhalb des int-Bereichs | ✅ unbegrenzt *(3.3)* | ✅ *(3.3)* | ✅ *(3.3)* |
+| `ATTRIBUTE-VALUE-XHTML` `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` | ✅ *(3.4)* | ✅ *(3.4)* | ❌ *(4.2)* |
 | `SPEC-OBJECT` | ✅ | ✅ | ✅ |
 | `SPEC-RELATION` (+ Attribute) | ✅ | ✅ | ✅ |
 | `SPECIFICATION` (+ Attribute) | ✅ | ✅ | ✅ |
 | `SPEC-HIERARCHY` | ✅ | ✅ | ✅ |
-| `SPEC-HIERARCHY` `IS-TABLE-INTERNAL`, `IS-EDITABLE`, `EDITABLE-ATTS` | ❌ | ❌ | ❌ |
+| `SPEC-HIERARCHY` `IS-TABLE-INTERNAL`, `IS-EDITABLE`, `EDITABLE-ATTS` | ✅ *(3.4)* | ✅ *(3.4)* | ⚠️ Flags per Setter, `EDITABLE-ATTS` *(4.2)* |
 | `RELATION-GROUP` | ✅ | ✅ | ❌ |
 | `.reqifz` mit mehreren `.reqif` | ✅ | ✅ | — |
 | `.reqifz`-Anhänge `png`/`jpg`/`jpeg` | ✅ | ✅ | ✅ |
-| `.reqifz`-Anhänge OLE, GIF, SVG, PDF, RTF … | ❌ | ❌ | ⚠️ manuell über `Map<String, byte[]>` |
+| `.reqifz`-Anhänge OLE, GIF, SVG, PDF, RTF … | ✅ *(3.5)* | ✅ *(3.5)* | ✅ über `Map<String, byte[]>` |
 
 ## 4. Befunde: Was zum Zielstand fehlt
 

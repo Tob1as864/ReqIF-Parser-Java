@@ -114,6 +114,32 @@ class ModelCompletenessTest {
 	}
 
 	@Test
+	void xhtmlDefaultWithTheOriginalValueFirst(@TempDir Path tempDir) throws Exception {
+
+		// xsd:all: THE-ORIGINAL-VALUE may come before THE-VALUE; xml:lang must
+		// survive rendering, so lang next to xml:lang is no duplicate
+		String reordered = LosslessRoundTripTest.fullFeatureDocument().replace(
+				"<THE-VALUE><xhtml:p>to be written</xhtml:p></THE-VALUE><THE-ORIGINAL-VALUE><xhtml:div><xhtml:p>to be <xhtml:b>written</xhtml:b></xhtml:p></xhtml:div></THE-ORIGINAL-VALUE>",
+				"<THE-ORIGINAL-VALUE><xhtml:div><xhtml:p>to be <xhtml:b>written</xhtml:b></xhtml:p></xhtml:div></THE-ORIGINAL-VALUE><THE-VALUE><xhtml:p xml:lang=\"de\" lang=\"de\">to be written</xhtml:p></THE-VALUE>");
+		ReqIF withOriginalFirst = new ReqIF(TestFixtures.write(tempDir, "reordered.reqif", reordered).toString());
+		de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition text =
+				withOriginalFirst.getReqIFCoreContent().getSpecType("st-req").getAttributeDefinition("ad-text");
+
+		assertEquals("<p lang=\"de\" xml:lang=\"de\">to be written</p>", text.getDefaultValue());
+		assertTrue(new ReqIFValidator().validate(withOriginalFirst.getReqIFDocument()).isValid());
+	}
+
+	@Test
+	void xhtmlContentOfAHierarchyNodePrefersTheObjectsOwnText() {
+
+		// so-2 has its own ReqIF.Text; no other XHTML default may stand in
+		SpecHierarchy row = this.content.getSpecification("spec-1").getChildren().get(0).getChildren().get(0);
+
+		assertEquals("A single paragraph.", ((de.uni_stuttgart.ils.reqif4j.xhtml.XHTMLElement) row.getXHTMLDivContent().get(0))
+				.getChildren().get(0).toString());
+	}
+
+	@Test
 	void invalidBooleanFlagIsNotFlipped(@TempDir Path tempDir) throws Exception {
 
 		// xsd:boolean is case sensitive; TRUE is not false, it is unknown

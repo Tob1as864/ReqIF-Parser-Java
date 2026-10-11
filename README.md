@@ -288,6 +288,9 @@ embedded OLE object of which `THE-VALUE` only shows the preview).
 `LosslessRoundTripTest` checks this with a document that uses all of
 them; the comparison ignores only what the schema leaves open (namespace
 prefixes, attribute order, the order of xsd:all children, formatting).
+Typed values are written in canonical notation, so the lexical form of
+a value may change while its meaning does not: `1` becomes `true` for a
+boolean, `1e3` becomes `1000.0` for a real, `+5` becomes `5`.
 Attribute values are written in document order. Integer values have no
 size limit (`AttributeValueInteger.getBigInteger()`).
 

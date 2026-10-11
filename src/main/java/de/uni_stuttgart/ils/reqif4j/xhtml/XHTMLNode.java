@@ -104,7 +104,12 @@ public class XHTMLNode {
 			if(name.equals("xmlns") || name.startsWith("xmlns:")) {
 				continue;
 			}
-			sb.append(' ').append(XmlUtils.localName(attributeNode))
+			// xml:lang and xml:space keep their prefix: "lang" next to "xml:lang"
+			// would be a duplicate attribute, and the XHTML schema has no "space"
+			String attributeName = "http://www.w3.org/XML/1998/namespace".equals(attributeNode.getNamespaceURI())
+					? "xml:" + XmlUtils.localName(attributeNode)
+					: XmlUtils.localName(attributeNode);
+			sb.append(' ').append(attributeName)
 			  .append("=\"").append(escapeAttribute(attributeNode.getNodeValue())).append('"');
 		}
 		return sb.toString();

@@ -194,8 +194,10 @@ public class ReqIFValidator {
 
 			for (AttributeDefinition definition : specType.getAttributeDefinitions().values()) {
 				checkIdentifiable(definition, "ATTRIBUTE-DEFINITION", result, identifiers);
-				// written verbatim, so it must already be in schema notation
-				if (definition.getDefaultValue() != null && !(definition instanceof AttributeDefinitionEnumeration)) {
+				// written verbatim, so it must already be in schema notation; an XHTML
+				// default read from a document is well-formed by construction
+				if (definition.getDefaultValue() != null && !(definition instanceof AttributeDefinitionEnumeration)
+						&& definition.getDefaultXhtmlValue() == null) {
 					checkScalar(definition.getID(), "Default value", definition, definition.getDefaultValue(), result);
 				}
 

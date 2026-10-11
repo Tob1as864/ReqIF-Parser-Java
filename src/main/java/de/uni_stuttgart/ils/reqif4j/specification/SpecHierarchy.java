@@ -117,31 +117,54 @@ public class SpecHierarchy extends Identifiable {
 		return (Object)this.specObject.getAttribute(attributeName);
 	}
 	
+	/**
+	 * @return the token list of the object's first XHTML value - its own values
+	 *         before defaults, so another attribute's default never stands in
+	 *         for the object's text - or null if it has none
+	 */
 	public AttributeValueXHTMLElementList getXHTMLContent() {
-		for(AttributeValue attributeValue: this.specObject.getAttributes().values()) {
-			// getValue() returns the rendered string, so the element list has
-			// to be fetched via its dedicated getter (the former cast threw
-			// ClassCastException on every call).
-			if(attributeValue instanceof AttributeValueXHTML) {
-				return ((AttributeValueXHTML)attributeValue).getElementList();
-			}
-		}
-		return null;
+		AttributeValueXHTML xhtml = firstXhtmlValue();
+		return xhtml == null ? null : xhtml.getElementList();
 	}
-	
+
+	/**
+	 * @return the block elements of the object's first XHTML value (see
+	 *         {@link #getXHTMLContent()}), or null if it has none
+	 */
 	public List<XHTMLNode> getXHTMLDivContent() {
-		for(AttributeValue attributeValue: this.specObject.getAttributes().values()) {
-			if(attributeValue instanceof AttributeValueXHTML) {
-				XHTMLElementDiv value = ((AttributeValueXHTML)attributeValue).getDivValue();
-				if(value != null) {
-					// a value may consist of a single p instead of a div
-					return XHTML.P.equals(value.getTagName()) ? List.of(value) : value.getChildren();
+		AttributeValueXHTML xhtml = firstXhtmlValue();
+		XHTMLElementDiv value = xhtml == null ? null : xhtml.getDivValue();
+		if(value == null) {
+			return null;
+		}
+		// a value may consist of a single p instead of a div
+		return XHTML.P.equals(value.getTagName()) ? List.of(value) : value.getChildren();
+	}
+
+	/**
+	 * @return the first XHTML value with content, the object's own values
+	 *         first; failing that any XHTML value, as earlier versions returned
+	 *         an empty token list rather than null for it
+	 */
+	private AttributeValueXHTML firstXhtmlValue() {
+		AttributeValueXHTML withoutContent = null;
+		for(java.util.Collection<AttributeValue> values: List.of(this.specObject.getValues().values(),
+				this.specObject.getAttributes().values())) {
+			for(AttributeValue attributeValue: values) {
+				if(attributeValue instanceof AttributeValueXHTML) {
+					AttributeValueXHTML xhtml = (AttributeValueXHTML) attributeValue;
+					if(xhtml.getDivValue() != null) {
+						return xhtml;
+					}
+					if(withoutContent == null) {
+						withoutContent = xhtml;
+					}
 				}
 			}
 		}
-		return null;
+		return withoutContent;
 	}
-	
+
 	public String getSpecType() {
 		return this.specObject.getSpecType();
 	}
