@@ -30,7 +30,7 @@ public interface HierarchyParent {
 	 */
 	default SpecHierarchy getChild(String specHierarchyID) {
 		for (SpecHierarchy child : getChildren()) {
-			if (child.getID().equals(specHierarchyID)) {
+			if (child.getID() != null && child.getID().equals(specHierarchyID)) {
 				return child;
 			}
 		}

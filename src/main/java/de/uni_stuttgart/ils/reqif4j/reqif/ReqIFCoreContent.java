@@ -627,7 +627,7 @@ public class ReqIFCoreContent {
         String dataTypeName = XmlUtils.attribute(dataType, ReqIFConst.LONG_NAME);
 
         Datatype datatype;
-        switch (dataTypeNodeName.substring(dataTypeNodeName.lastIndexOf("-") + 1)) {
+        switch (ReqIFConst.kindOf(dataTypeNodeName)) {
 
             case ReqIFConst.BOOLEAN:
                 datatype = new DatatypeBoolean(dataTypeID, dataTypeName);

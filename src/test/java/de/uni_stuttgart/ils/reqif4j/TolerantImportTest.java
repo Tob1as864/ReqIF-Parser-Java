@@ -71,6 +71,20 @@ class TolerantImportTest {
 	}
 
 	@Test
+	void valuesKeptAsWrittenJoinTheReqIFNamespace(@TempDir Path tempDir) throws Exception {
+
+		// a document without namespace, as some tools write it
+		ReqIF reqif = parse(tempDir, TestFixtures.SCHEMA_VALID_REQIF
+				.replace(" xmlns=\"http://www.omg.org/spec/ReqIF/20110401/reqif.xsd\"", "")
+				.replaceFirst("<SPEC-OBJECT-TYPE-REF>st-req</SPEC-OBJECT-TYPE-REF>", "<SPEC-OBJECT-TYPE-REF>st-gone</SPEC-OBJECT-TYPE-REF>"));
+
+		String xml = new ReqIFWriter().toXml(reqif.getReqIFDocument());
+
+		assertFalse(xml.contains("xmlns=\"\""), xml);
+		assertTrue(xml.contains("<ATTRIBUTE-VALUE-STRING THE-VALUE=\"REQ-1\">"), xml);
+	}
+
+	@Test
 	void valueOfAnUnknownDefinitionIsKeptAsWritten(@TempDir Path tempDir) throws Exception {
 
 		// the only value referencing ad-effort is so-1's

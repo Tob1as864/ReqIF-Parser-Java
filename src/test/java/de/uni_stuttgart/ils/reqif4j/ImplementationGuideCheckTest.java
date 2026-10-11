@@ -130,6 +130,19 @@ class ImplementationGuideCheckTest {
 	}
 
 	@Test
+	void referencesDoNotLeaveTheArchive(@TempDir Path dir) throws IOException {
+
+		Path archive = dir.resolve("spec.reqifz");
+		new ReqIFzWriter().write(document("<div><object data=\"../shared/logo.png\" type=\"image/png\">up</object></div>"),
+				"spec.reqif", Map.of("shared/logo.png", new byte[] { 1 }), archive);
+
+		try (ReqIFz read = new ReqIFz(archive.toString())) {
+			assertEquals(List.of("spec.reqif: Object ../shared/logo.png points outside the archive"),
+					messages(new ImplementationGuideCheck().check(read)));
+		}
+	}
+
+	@Test
 	void eachObjectIsReportedOnceAndDefaultsAreChecked() {
 
 		// the preview in THE-VALUE is the one nested in THE-ORIGINAL-VALUE

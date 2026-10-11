@@ -92,7 +92,12 @@ public class ImplementationGuideCheck {
 	 */
 	public ValidationResult check(ReqIFz archive) {
 		ValidationResult result = new ValidationResult();
-		Set<String> files = archive.getAttachmentFiles().keySet();
+		// entry names spelled like references: ./ and .. collapsed, decoded
+		Set<String> files = new java.util.HashSet<String>();
+		for (String entry : archive.getAttachmentFiles().keySet()) {
+			String normalized = resolve("", entry);
+			files.add(normalized != null ? normalized : entry);
+		}
 		for (Map.Entry<String, ReqIFDocument> document : archive.getReqIFDocuments().entrySet()) {
 			String entry = document.getKey().replace('\\', '/');
 			// objects reference files relative to the document
@@ -196,7 +201,7 @@ public class ImplementationGuideCheck {
 		for (XHTMLElementDiv content : new XHTMLElementDiv[] { value.getDivValue(), value.getOriginalValue() }) {
 			if (content != null && content.getNode() != null) {
 				for (Element object : XmlUtils.descendantsByLocalName(content.getNode(), XHTML.OBJECT)) {
-					if (isXhtmlObject(object) && checked.add(new XHTMLElementObject(object).toString())) {
+					if (isXhtmlObject(object) && checked.add(object.getAttribute("data") + "|" + object.getAttribute("type"))) {
 						checkObject(ownerID, object, scope, result);
 					}
 				}
@@ -223,8 +228,13 @@ public class ImplementationGuideCheck {
 		if (data != null && !inline && isAbsolute(data)) {
 			result.warning(ownerID, what + " is referenced by an absolute location; "
 					+ "objects reference files of the archive by a relative path");
-		} else if (data != null && !inline && scope.files != null && !scope.files.contains(resolve(scope.directory, data))) {
-			result.error(ownerID, what + " is not in the archive");
+		} else if (data != null && !inline && scope.files != null) {
+			String entry = resolve(scope.directory, data);
+			if (entry == null) {
+				result.error(ownerID, what + " points outside the archive");
+			} else if (!scope.files.contains(entry)) {
+				result.error(ownerID, what + " is not in the archive");
+			}
 		}
 		// an object a tool may not be able to show, e.g. an OLE object, comes
 		// with a PNG image as preview - unless it is the preview itself
@@ -251,7 +261,8 @@ public class ImplementationGuideCheck {
 
 	/**
 	 * @return the archive entry a reference names: decoded (%20), resolved
-	 *         against the document's directory, with forward slashes
+	 *         against the document's directory, with forward slashes; null if
+	 *         it climbs above the root of the archive
 	 */
 	private static String resolve(String directory, String data) {
 		String path = data.replace('\\', '/');
@@ -266,7 +277,9 @@ public class ImplementationGuideCheck {
 		java.util.Deque<String> segments = new java.util.ArrayDeque<String>();
 		for (String segment : (directory + path).split("/")) {
 			if (segment.equals("..")) {
-				segments.pollLast();
+				if (segments.pollLast() == null) {
+					return null;
+				}
 			} else if (!segment.isEmpty() && !segment.equals(".")) {
 				segments.addLast(segment);
 			}

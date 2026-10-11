@@ -438,7 +438,10 @@ public class ReqIFValidator {
 				continue;
 			}
 			if (specType.getAttributeDefinition(definition.getID()) == null) {
-				result.error(ownerID, "Attribute value '" + attributeValue.getName() + "' uses definition "
+				// a value of an undeclared definition knows only its IDENTIFIER
+				String label = attributeValue.getName() != null ? "Attribute value '" + attributeValue.getName() + "'"
+						: "A value";
+				result.error(ownerID, label + " uses definition "
 						+ definition.getID() + ", which does not belong to spec type " + specTypeID);
 			}
 			if (attributeValue instanceof UninterpretedAttributeValue) {

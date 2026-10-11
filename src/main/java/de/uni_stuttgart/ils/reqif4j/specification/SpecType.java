@@ -158,7 +158,7 @@ public class SpecType extends Identifiable {
 	private static AttributeDefinition readAttributeDefinition(Node attributeDefinition, Map<String, Datatype> dataTypes) {
 
 		String attDefNodeName = XmlUtils.localName(attributeDefinition);
-		switch(attDefNodeName.substring(attDefNodeName.lastIndexOf("-")+1)) {
+		switch(ReqIFConst.kindOf(attDefNodeName)) {
 
 			case ReqIFConst.BOOLEAN:		return new AttributeDefinitionBoolean(attributeDefinition, dataTypes);
 			case ReqIFConst.INTEGER:		return new AttributeDefinitionInteger(attributeDefinition, dataTypes);

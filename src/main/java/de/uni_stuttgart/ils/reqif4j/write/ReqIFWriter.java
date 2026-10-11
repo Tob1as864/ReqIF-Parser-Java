@@ -748,6 +748,19 @@ public class ReqIFWriter {
 	}
 
 	/**
+	 * @return whether the element is a ReqIF one: in a ReqIF namespace, or -
+	 *         in a document without namespace - named like one (ReqIF element
+	 *         names are upper case, XHTML ones lower case)
+	 */
+	private static boolean isReqIFElement(Node node) {
+		String namespace = node.getNamespaceURI();
+		if (namespace == null || namespace.isEmpty()) {
+			return XmlUtils.localName(node).matches("[A-Z][A-Z0-9-]*");
+		}
+		return namespace.startsWith(REQIF_NAMESPACE_PREFIX);
+	}
+
+	/**
 	 * Copies an element read from a document. Its ReqIF elements are put into
 	 * the namespace written - the source may use a prefix or an earlier ReqIF
 	 * namespace - everything else, such as XHTML, stays as it is.
@@ -759,9 +772,8 @@ public class ReqIFWriter {
 
 	private static Node toReqIFNamespace(Document xml, Node node) {
 		Node result = node;
-		if (node.getNodeType() == Node.ELEMENT_NODE && node.getNamespaceURI() != null
-				&& node.getNamespaceURI().startsWith(REQIF_NAMESPACE_PREFIX)) {
-			result = xml.renameNode(node, REQIF_NAMESPACE, node.getLocalName());
+		if (node.getNodeType() == Node.ELEMENT_NODE && isReqIFElement(node)) {
+			result = xml.renameNode(node, REQIF_NAMESPACE, XmlUtils.localName(node));
 		}
 		if (result.getNodeType() == Node.ELEMENT_NODE) {
 			// declarations of a ReqIF namespace would contradict the renamed elements
