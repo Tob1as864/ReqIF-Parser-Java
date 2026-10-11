@@ -149,6 +149,21 @@ class ReqIFValidatorTest {
 	}
 
 	@Test
+	void editableAttributesMustBeDeclared() throws Exception {
+		// as read from a file; the model refuses such a list
+		String xml = new de.uni_stuttgart.ils.reqif4j.write.ReqIFWriter().toXml(validBuilder().build()).replace(
+				"<OBJECT><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF>",
+				"<EDITABLE-ATTS><ATTRIBUTE-DEFINITION-STRING-REF>ad-ghost</ATTRIBUTE-DEFINITION-STRING-REF></EDITABLE-ATTS>"
+						+ "<OBJECT><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF>");
+		ReqIFDocument document = new ReqIFDocument(new java.io.ByteArrayInputStream(
+				xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)), "ghost.reqif");
+
+		ValidationResult result = validate(document);
+
+		assertTrue(hasError(result, "EDITABLE-ATTS references attribute definition ad-ghost"), result.toString());
+	}
+
+	@Test
 	void relationGroupWithUnknownReferencesIsReported() {
 		ReqIFDocument document = validBuilder().build();
 		document.getCoreContent().addRelationGroup(

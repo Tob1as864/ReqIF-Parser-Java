@@ -30,6 +30,9 @@ public class ReqIFConst {
 	public final static String SPEC_ATTRIBUTES = "SPEC-ATTRIBUTES";
 	public final static String ALTERNATIVE_ID = "ALTERNATIVE-ID";
 	public final static String TOOL_EXTENSIONS = "TOOL-EXTENSIONS";
+	public final static String REQ_IF_TOOL_EXTENSION = "REQ-IF-TOOL-EXTENSION";
+
+
 	public final static String SPEC_RELATION_GROUPS = "SPEC-RELATION-GROUPS";
 	public final static String RELATION_GROUP = "RELATION-GROUP";
 	public final static String RELATION_GROUP_TYPE = "RELATION-GROUP-TYPE";
@@ -92,4 +95,25 @@ public class ReqIFConst {
 	
 	public final static String EOR = "EOR";
 	public final static String EOD = "EOD";
-}
+
+	/**
+	 * @return the suffix of the element names belonging to a datatype
+	 *         category, e.g. "REAL" for DOUBLE as in DATATYPE-DEFINITION-REAL,
+	 *         or null for a category the parser does not model
+	 */
+	public static String datatypeSuffix(String datatypeCategory) {
+		if (datatypeCategory == null) {
+			return null;
+		}
+		switch (datatypeCategory) {
+			case DOUBLE:
+			case REAL:		return REAL;
+			case BOOLEAN:
+			case INTEGER:
+			case STRING:
+			case DATE:
+			case XHTML:
+			case ENUMERATION:	return datatypeCategory;
+			default:		return null;
+		}
+	}}

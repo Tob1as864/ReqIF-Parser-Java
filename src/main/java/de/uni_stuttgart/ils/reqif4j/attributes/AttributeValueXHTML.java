@@ -128,6 +128,25 @@ public class AttributeValueXHTML extends AttributeValue {
 		this.value = deconstructXHTML(this.divValue);
 	}
 
+	/**
+	 * Creates an XHTML value whose THE-VALUE is a simplified version of the
+	 * complete content, e.g. the preview image of an embedded OLE object.
+	 *
+	 * @param value         the simplified markup
+	 * @param originalValue the complete markup (THE-ORIGINAL-VALUE)
+	 * @throws IllegalArgumentException if the markup is not well-formed
+	 */
+	public AttributeValueXHTML(String value, String originalValue, AttributeDefinition type) {
+		this(value, type);
+
+		if(value == null || value.isBlank() || originalValue == null || originalValue.isBlank()) {
+			throw new IllegalArgumentException("A simplified XHTML value of attribute "
+					+ (type == null ? null : type.getID()) + " needs both the value and the original value");
+		}
+		this.originalValue = new XHTMLElementDiv(XhtmlParser.parseDiv(originalValue));
+		this.simplified = Boolean.TRUE;
+	}
+
 	public XHTMLElementDiv getDivValue() {
 		return this.divValue;
 	}

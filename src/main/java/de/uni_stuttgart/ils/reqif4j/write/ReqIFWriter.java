@@ -421,15 +421,9 @@ public class ReqIFWriter {
 	private Element attributeDefinition(Document xml, AttributeDefinition definition) {
 
 		Datatype datatype = definition.getDataType();
-		if (datatype == null) {
-			return null;
-		}
-		String elementName = ReqIFElements.attributeDefinition(datatype.getType());
-		if (elementName == null) {
-			// datatype kinds the parser does not model: keep the original name
-			elementName = definition.getSourceElementName();
-		}
-		if (elementName == null) {
+		// datatype kinds the parser does not model keep their original name
+		String elementName = definition.getElementName();
+		if (datatype == null || elementName == null) {
 			return null;
 		}
 
@@ -559,8 +553,14 @@ public class ReqIFWriter {
 		setAttributeIfPresent(element, ReqIFConst.IS_EDITABLE, toString(hierarchy.getEditable()));
 		if (!hierarchy.getEditableAttributeRefs().isEmpty()) {
 			Element editableAtts = element(xml, ReqIFConst.EDITABLE_ATTS);
+			SpecType objectType = hierarchy.getSpecObject() == null ? null
+					: hierarchy.getSpecObject().getResolvedSpecType();
 			for (java.util.Map.Entry<String, String> ref : hierarchy.getEditableAttributeRefs()) {
-				Element refElement = element(xml, ref.getValue());
+				// the reference must name the kind the definition is written as
+				AttributeDefinition definition = objectType == null ? null
+						: objectType.getAttributeDefinition(ref.getKey());
+				Element refElement = element(xml, definition != null && definition.getElementName() != null
+						? definition.getElementName() + "-REF" : ref.getValue());
 				refElement.setTextContent(ref.getKey());
 				editableAtts.appendChild(refElement);
 			}
@@ -596,7 +596,8 @@ public class ReqIFWriter {
 	private Element attributeValue(Document xml, AttributeValue attributeValue) {
 
 		AttributeDefinition definition = attributeValue.getAttributeDefinitionType();
-		if (definition == null || definition.getDataType() == null) {
+		// a definition that cannot be written cannot be referenced either
+		if (definition == null || definition.getDataType() == null || definition.getElementName() == null) {
 			return null;
 		}
 		String datatypeCategory = definition.getDataType().getType();
@@ -701,11 +702,7 @@ public class ReqIFWriter {
 	private Element definitionRef(Document xml, AttributeDefinition definition) {
 
 		Element definitionElement = element(xml, ReqIFConst.DEFINITION);
-		String refName = ReqIFElements.attributeDefinitionRef(definition.getDataType().getType());
-		if (refName == null && definition.getSourceElementName() != null) {
-			refName = definition.getSourceElementName() + "-REF";
-		}
-		Element ref = element(xml, refName);
+		Element ref = element(xml, definition.getElementName() + "-REF");
 		ref.setTextContent(nullToEmpty(definition.getID()));
 		definitionElement.appendChild(ref);
 		return definitionElement;

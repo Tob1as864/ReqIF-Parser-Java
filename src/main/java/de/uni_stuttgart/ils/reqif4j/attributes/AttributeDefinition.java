@@ -61,6 +61,19 @@ public class AttributeDefinition extends Identifiable {
 	public String getSourceElementName() {
 		return this.sourceElementName;
 	}
+
+	/**
+	 * @return the element name this definition is written with, e.g.
+	 *         ATTRIBUTE-DEFINITION-STRING; for datatype kinds the parser does
+	 *         not model the name it was read with; null if neither is known
+	 */
+	public String getElementName() {
+		String suffix = ReqIFConst.datatypeSuffix(this.type == null ? null : this.type.getType());
+		if(suffix != null) {
+			return "ATTRIBUTE-DEFINITION-" + suffix;
+		}
+		return this.sourceElementName;
+	}
 	
 	
 	

@@ -296,8 +296,40 @@ public class ReqIFValidator {
 					result.error(hierarchy.getSpecHierarchyID(), "Spec hierarchy references spec object "
 							+ hierarchy.getSpecObjectID() + ", which is not declared in SPEC-OBJECTS");
 				}
+				checkEditableAttributes(content, hierarchy, result);
 			}
 		}
+	}
+
+	/**
+	 * EDITABLE-ATTS names attributes of the node's object. (The writer derives
+	 * each reference element from the definition, so its kind need not be
+	 * checked.)
+	 */
+	private static void checkEditableAttributes(ReqIFCoreContent content, SpecHierarchy hierarchy,
+			ValidationResult result) {
+
+		SpecType objectType = hierarchy.getSpecObject() == null ? null : hierarchy.getSpecObject().getResolvedSpecType();
+		for (Map.Entry<String, String> ref : hierarchy.getEditableAttributeRefs()) {
+			String id = ref.getKey();
+			AttributeDefinition definition = objectType == null ? null : objectType.getAttributeDefinition(id);
+			if (definition == null && !declaresAttributeDefinition(content, id)) {
+				result.error(hierarchy.getID(), "EDITABLE-ATTS references attribute definition " + id
+						+ ", which no spec type declares");
+			} else if (definition == null && objectType != null) {
+				result.error(hierarchy.getID(), "EDITABLE-ATTS references attribute definition " + id
+						+ ", which is not an attribute of spec type " + objectType.getID() + " of the node's object");
+			}
+		}
+	}
+
+	private static boolean declaresAttributeDefinition(ReqIFCoreContent content, String attributeDefinitionID) {
+		for (SpecType specType : content.getSpecTypes().values()) {
+			if (specType.getAttributeDefinition(attributeDefinitionID) != null) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void checkRelationGroups(ReqIFCoreContent content, ValidationResult result,

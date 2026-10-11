@@ -310,8 +310,11 @@ AttributeValue text = specObject.getValue("ad-text");
 // definitions the element has no value for (read-only)
 Object priority = specObject.getAttribute("Priority");
 
-// changing values
-specObject.setValue(new AttributeValueString("REQ-1b", definition));
+// changing values, by attribute definition IDENTIFIER; the value class
+// follows the datatype, unknown definitions and enum values are refused
+specObject.set("ad-prio", 7)
+          .setXhtml("ad-text", "<p>The system shall boot.</p>")
+          .setEnum("ad-status", "ev-draft", "ev-approved");
 specObject.removeValue("ad-text");   // the default applies again
 ```
 
@@ -340,7 +343,16 @@ specObject.setDesc("reviewed").setLastChange("2026-10-11T12:00:00Z");
 ```
 
 They are written back unchanged; properties a document does not declare
-stay absent instead of being written empty. `ALTERNATIVE-ID` is written
+stay absent instead of being written empty.
+
+Elements created from plain values, and elements changed through the API
+(values, properties, structure), are *modified* (`isModified()`): the
+writer gives them the time of writing as `LAST-CHANGE`, so a tool that
+imports the document sees what changed, and once the output succeeded
+takes that time into the model - writing again reports no new change.
+`setLastChange(...)` after the last change keeps the given value;
+`ReqIFCoreContent.clearModified()` keeps every element's `LAST-CHANGE`.
+`buildDocument` and the validator leave the model alone. `ALTERNATIVE-ID` is written
 in the nested form the schema prescribes
 (`<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>`);
 the flat form older versions of this library wrote is still read.
@@ -353,6 +365,7 @@ the model does not carry it - typically for a document built with
 
 | missing in the model | written as |
 |---|---|
+| `LAST-CHANGE` of a modified element | the time of writing |
 | `LAST-CHANGE` of an element | the header's `CREATION-TIME`, or the time of writing |
 | header `CREATION-TIME` | the time of writing |
 | header `REQ-IF-TOOL-ID`, `SOURCE-TOOL-ID` | `reqif4j` |
@@ -381,6 +394,35 @@ Indenting is **off by default**: the XML indenter inserts whitespace into
 mixed content, which would change XHTML attribute values. Enable it with
 `new ReqIFWriter().setIndent(true)` only when readable output matters more
 than exact XHTML content.
+
+## Changing documents
+
+The content is changed through its methods, which keep the references
+between elements consistent; the maps its getters return are read-only.
+
+```java
+ReqIFCoreContent content = reqif.getReqIFCoreContent();
+
+// hierarchy: insert, move (to any specification or node) and remove nodes
+content.addSpecHierarchy("spec-1", 0, new SpecHierarchy("sh-new", 0, 0, specObject, null));
+content.moveSpecHierarchy("sh-new", "sh-1", 2);   // below sh-1, third child
+content.removeSpecHierarchy("sh-new");            // with everything below it
+
+// elements: identifiers must be unused anywhere in the document
+content.addSpecObject(new SpecObject("so-3", content.getSpecType("st-req"), List.of()));
+content.removeSpecObject("so-1");     // its nodes' children move up, its relations go
+content.removeSpecRelation("sr-1");   // also from its relation groups
+content.removeSpecification("spec-2"); // with the relation groups between it and others
+content.removeSpecType("st-old");     // refused while an element has this type
+content.removeDatatype("dt-old");     // refused while an attribute uses it
+
+// relations and relation groups
+content.getSpecRelation("sr-2").setSourceObjID("so-3").setTargetObjID("so-2");
+content.getRelationGroup("rg-1").addSpecRelationRef("sr-2");
+```
+
+Levels and section numbers of hierarchy nodes follow every change; a node
+is in one place only (`getParent()`) and never below itself.
 
 ## Creating documents from scratch
 
@@ -418,6 +460,29 @@ ReqIFDocument document = ReqIFBuilder.create()
 
 new ReqIFWriter().write(document, Path.of("out.reqif"));
 ```
+
+Everything the parser reads can be built as well:
+
+```java
+builder
+        .relationGroupType("st-group", "Trace", t -> {})
+        .specObjectType("st-req", "Requirement Type", t -> t
+                .xhtmlAttribute("ad-text", "ReqIF.Text", "dt-xhtml")
+                .editable("ad-text", true))                         // IS-EDITABLE
+        .specObject("so-ole", "st-req", o -> o                      // IS-SIMPLIFIED
+                .setXhtml("ad-text", "<p>preview</p>", "<p>complete content</p>"))
+        .specification("spec-1", "System", "st-spec", s -> s
+                .child("sh-1", "so-1", h -> h.tableInternal(false).editable(true)
+                        .editableAttributes("ad-text")))            // EDITABLE-ATTS
+        .relationGroup("rg-1", "System to software", "st-group", "spec-1", "spec-2", "sr-1")
+        .with("so-1", e -> e.setDesc("Boot").setAlternativeID("REQ-1"))   // any element
+        .lang("de")                                                 // xml:lang
+        .toolExtension("<tool:settings xmlns:tool=\"urn:example\"/>");
+```
+
+Tool extensions must be elements of a namespace of their own, as the
+schema requires. The builder's elements count as unchanged: they get the
+header's `CREATION-TIME` as `LAST-CHANGE` unless one is set with `with`.
 
 XHTML values may be passed with or without a surrounding `div`; the
 markup is parsed, so the node tree and the token list work on generated

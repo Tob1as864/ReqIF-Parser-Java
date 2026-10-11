@@ -15,30 +15,9 @@ final class ReqIFElements {
 	private ReqIFElements() {
 	}
 
-	/**
-	 * @return the ReqIF name of a datatype category (e.g. "REAL" for DOUBLE)
-	 */
-	static String datatypeSuffix(String datatypeCategory) {
-
-		if (datatypeCategory == null) {
-			return null;
-		}
-		switch (datatypeCategory) {
-			case ReqIFConst.DOUBLE:
-			case ReqIFConst.REAL:	return ReqIFConst.REAL;
-			case ReqIFConst.BOOLEAN:
-			case ReqIFConst.INTEGER:
-			case ReqIFConst.STRING:
-			case ReqIFConst.DATE:
-			case ReqIFConst.XHTML:
-			case ReqIFConst.ENUMERATION:	return datatypeCategory;
-			default:				return null;
-		}
-	}
-
 	/** @return e.g. DATATYPE-DEFINITION-STRING */
 	static String datatypeDefinition(String datatypeCategory) {
-		String suffix = datatypeSuffix(datatypeCategory);
+		String suffix = ReqIFConst.datatypeSuffix(datatypeCategory);
 		return suffix == null ? null : "DATATYPE-DEFINITION-" + suffix;
 	}
 
@@ -47,21 +26,9 @@ final class ReqIFElements {
 		return sourceElementName + "-REF";
 	}
 
-	/** @return e.g. ATTRIBUTE-DEFINITION-STRING */
-	static String attributeDefinition(String datatypeCategory) {
-		String suffix = datatypeSuffix(datatypeCategory);
-		return suffix == null ? null : "ATTRIBUTE-DEFINITION-" + suffix;
-	}
-
-	/** @return e.g. ATTRIBUTE-DEFINITION-STRING-REF */
-	static String attributeDefinitionRef(String datatypeCategory) {
-		String definition = attributeDefinition(datatypeCategory);
-		return definition == null ? null : definition + "-REF";
-	}
-
 	/** @return e.g. ATTRIBUTE-VALUE-STRING */
 	static String attributeValue(String datatypeCategory) {
-		String suffix = datatypeSuffix(datatypeCategory);
+		String suffix = ReqIFConst.datatypeSuffix(datatypeCategory);
 		return suffix == null ? null : "ATTRIBUTE-VALUE-" + suffix;
 	}
 

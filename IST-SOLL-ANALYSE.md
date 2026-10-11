@@ -24,6 +24,21 @@ schemagültigen Round-Trip verhinderten:
 
 | Phase | Stand | Ergebnis |
 |---|---|---|
+| **4.1** Mutations-API | ✅ erledigt | Werte per Definitions-ID setzen (`set`, `setXhtml`, `setEnum`, `removeValue`), Hierarchieknoten einfügen, verschieben und löschen (`addChild`, `addSpecHierarchy`, `moveSpecHierarchy`, `removeSpecHierarchy`), Relationen und Relationsgruppen umhängen. Löschen hält Referenzen konsistent: Ein entferntes Spec-Objekt nimmt seine Relationen mit, die Kinder seiner Knoten rücken nach. Entfernte Relationen verlassen ihre Gruppen, entfernte Spezifikationen nehmen ihre Gruppen mit. Typen und Datentypen in Verwendung werden nicht gelöscht. IDs müssen dokumentweit frei sein. Neue und geänderte Elemente bekommen beim Schreiben den Schreibzeitpunkt als `LAST-CHANGE`, der nach erfolgreicher Ausgabe ins Modell übernommen wird. |
+| **4.2** Builder | ✅ erledigt | Relationsgruppen und ihre Typen, `with(id, …)` für `LONG-NAME`/`DESC`/`LAST-CHANGE`/`ALTERNATIVE-ID` jedes Elements, `lang`, Tool-Extensions (nur Elemente eines eigenen Namespace, wie das Schema verlangt), `IS-EDITABLE` an Attributdefinitionen und Knoten, `IS-TABLE-INTERNAL`, `EDITABLE-ATTS`, XHTML mit `THE-ORIGINAL-VALUE`/`IS-SIMPLIFIED`. Der Validator prüft jetzt auch `EDITABLE-ATTS`. |
+
+Ergebnis von Phase 4: „Import → Änderung → Export“ funktioniert über das Modell, ohne dass Aufrufer
+Referenzen selbst nachziehen müssen. Alles, was der Parser liest, lässt sich auch erzeugen.
+
+API-Änderungen in Phase 4: Die Maps von `ReqIFCoreContent` (`getSpecObjects()` …) sind schreibgeschützt,
+geändert wird über `add…`/`remove…`. `add…` lehnt vergebene IDs ab, statt still zu ersetzen.
+`getAllSpecHierarchies()` liefert eine schreibgeschützte Liste. Ein Knoten lässt sich nur an einer Stelle
+einhängen (verschieben mit `moveSpecHierarchy`). Aus Werten erzeugte Elemente gelten als geändert, bis
+der Builder (oder `clearModified()`) das zurücksetzt. `ReqIFBuildException` ist eine
+`IllegalArgumentException`.
+
+| Phase | Stand | Ergebnis |
+|---|---|---|
 | **3.1/3.2** Werte | ✅ erledigt | Werte liegen nach Definitions-ID in Dokumentreihenfolge vor (`getValues()`), Defaults werden nicht mehr als Werte geschrieben. `getAttributes()` bleibt als schreibgeschützte Sicht mit Defaults nach `LONG-NAME`, `setValue`/`removeValue` ändern Werte. Gemeinsame Basisklasse `SpecElementWithAttributes`. |
 | **3.3** Zahlen | ✅ erledigt | Integer ohne Größenbeschränkung (`getBigInteger()`), REAL-Grenzen und XHTML-Defaults schon in Phase 2. |
 | **3.4** Metadaten | ✅ erledigt | `xml:lang`, `REPOSITORY-ID`, `IS-EDITABLE`, `IS-TABLE-INTERNAL`, `EDITABLE-ATTS`, `THE-ORIGINAL-VALUE`, `IS-SIMPLIFIED`, `p`-Inhalt statt `div`. Laut Schemaabgleich fehlt dem Code kein Element und kein Attribut des XSD mehr. |
@@ -143,21 +158,21 @@ Legende: ✅ unterstützt · ⚠️ teilweise · ❌ fehlt · — nicht anwendba
 | `DATATYPE-DEFINITION-ENUMERATION`, `ENUM-VALUE`, `KEY` | ✅ | ✅ | ✅ |
 | `EMBEDDED-VALUE` `OTHER-CONTENT` (**Pflicht**) | ✅ | ✅ auch leer *(2.2)* | ✅ |
 | `SPEC-OBJECT-TYPE`, `SPECIFICATION-TYPE`, `SPEC-RELATION-TYPE` | ✅ | ✅ | ✅ |
-| `RELATION-GROUP-TYPE` | ✅ | ✅ | ❌ |
+| `RELATION-GROUP-TYPE` | ✅ | ✅ | ✅ *(4.2)* |
 | `ATTRIBUTE-DEFINITION-*` | ✅ | ✅ | ✅ |
-| `ATTRIBUTE-DEFINITION-*` `IS-EDITABLE` | ✅ *(3.4)* | ✅ *(3.4)* | ⚠️ per Setter |
+| `ATTRIBUTE-DEFINITION-*` `IS-EDITABLE` | ✅ *(3.4)* | ✅ *(3.4)* | ✅ *(4.2)* |
 | `ATTRIBUTE-DEFINITION-ENUMERATION` `MULTI-VALUED` (**Pflicht**) | ✅ | ✅ auch `false` *(2.2)* | ✅ |
 | `DEFAULT-VALUE` (einfache Typen, Enum) | ✅ | ✅ | ✅ |
 | `DEFAULT-VALUE` (XHTML) | ✅ *(2.2, aus 3.3 vorgezogen)* | ✅ als Markup *(2.2)* | ✅ über `attribute(...)` |
 | `ATTRIBUTE-VALUE-*` (alle 7 Arten) | ✅ | ✅ | ✅ |
 | `ATTRIBUTE-VALUE-INTEGER` außerhalb des int-Bereichs | ✅ unbegrenzt *(3.3)* | ✅ *(3.3)* | ✅ *(3.3)* |
-| `ATTRIBUTE-VALUE-XHTML` `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` | ✅ *(3.4)* | ✅ *(3.4)* | ❌ *(4.2)* |
+| `ATTRIBUTE-VALUE-XHTML` `THE-ORIGINAL-VALUE` / `IS-SIMPLIFIED` | ✅ *(3.4)* | ✅ *(3.4)* | ✅ *(4.2)* |
 | `SPEC-OBJECT` | ✅ | ✅ | ✅ |
 | `SPEC-RELATION` (+ Attribute) | ✅ | ✅ | ✅ |
 | `SPECIFICATION` (+ Attribute) | ✅ | ✅ | ✅ |
 | `SPEC-HIERARCHY` | ✅ | ✅ | ✅ |
-| `SPEC-HIERARCHY` `IS-TABLE-INTERNAL`, `IS-EDITABLE`, `EDITABLE-ATTS` | ✅ *(3.4)* | ✅ *(3.4)* | ⚠️ Flags per Setter, `EDITABLE-ATTS` *(4.2)* |
-| `RELATION-GROUP` | ✅ | ✅ | ❌ |
+| `SPEC-HIERARCHY` `IS-TABLE-INTERNAL`, `IS-EDITABLE`, `EDITABLE-ATTS` | ✅ *(3.4)* | ✅ *(3.4)* | ✅ *(4.2)* |
+| `RELATION-GROUP` | ✅ | ✅ | ✅ *(4.2)* |
 | `.reqifz` mit mehreren `.reqif` | ✅ | ✅ | — |
 | `.reqifz`-Anhänge `png`/`jpg`/`jpeg` | ✅ | ✅ | ✅ |
 | `.reqifz`-Anhänge OLE, GIF, SVG, PDF, RTF … | ✅ *(3.5)* | ✅ *(3.5)* | ✅ über `Map<String, byte[]>` |
@@ -257,13 +272,13 @@ Das ist im README dokumentiert, aber ungelöst. Der Parser sollte Duplikate beim
 
 ### P2: Vollständigkeit, API und Betrieb
 
-**4.13 Keine API zum Bearbeiten geparster Dokumente.**
+**4.13 Keine API zum Bearbeiten geparster Dokumente.** *(behoben in 4.1)*
 `AttributeValue` hat keine Setter, Hierarchien und Relationen lassen sich nicht umhängen,
 Objekte nicht konsistent löschen (inklusive Referenzen in Hierarchien und Relationen).
 Der Builder erzeugt nur *neue* Dokumente. Für „Import → Änderung → Export“ fehlt eine
 Bearbeitungsschicht, die auch `LAST-CHANGE` automatisch fortschreibt.
 
-**4.14 Builder unvollständig.**
+**4.14 Builder unvollständig.** *(behoben in 2.2, 3.4 und 4.2)*
 Es fehlen `RELATION-GROUP` und `RELATION-GROUP-TYPE`, `ALTERNATIVE-ID`, `DESC`, `LAST-CHANGE`,
 `LONG-NAME` für Objekte, `REPOSITORY-ID`, `IS-EDITABLE`, Real-Attribute (`ACCURACY` …),
 Tool-Extensions und Defaults für Pflicht-Header-Felder.

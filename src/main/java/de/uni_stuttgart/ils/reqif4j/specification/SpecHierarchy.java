@@ -8,6 +8,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import de.uni_stuttgart.ils.reqif4j.attributes.AttributeDefinition;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.attributes.XHTML;
@@ -97,6 +98,34 @@ public class SpecHierarchy extends Identifiable implements HierarchyParent {
 	 */
 	public List<Map.Entry<String, String>> getEditableAttributeRefs() {
 		return java.util.Collections.unmodifiableList(this.editableAttributes);
+	}
+
+	/**
+	 * Sets the attributes of the node's object that are editable on this node
+	 * (EDITABLE-ATTS); none or null to remove the list.
+	 *
+	 * @throws IllegalArgumentException if a definition is null, of a datatype
+	 *         kind that cannot be written, or not an attribute of the spec
+	 *         type of the node's object
+	 */
+	public SpecHierarchy setEditableAttributes(List<AttributeDefinition> attributeDefinitions) {
+		List<Map.Entry<String, String>> refs = new ArrayList<Map.Entry<String, String>>();
+		SpecType objectType = this.specObject == null ? null : this.specObject.getResolvedSpecType();
+		for(AttributeDefinition definition: attributeDefinitions == null ? List.<AttributeDefinition>of() : attributeDefinitions) {
+			if(definition == null || definition.getElementName() == null) {
+				throw new IllegalArgumentException("Editable attributes need attribute definitions of a known kind");
+			}
+			if(objectType != null && objectType.getAttributeDefinition(definition.getID()) != definition) {
+				throw new IllegalArgumentException("Attribute definition " + definition.getID()
+						+ " is not an attribute of spec type " + objectType.getID() + " of the node's object");
+			}
+			refs.add(new java.util.AbstractMap.SimpleImmutableEntry<String, String>(
+					definition.getID(), definition.getElementName() + "-REF"));
+		}
+		this.editableAttributes.clear();
+		this.editableAttributes.addAll(refs);
+		markModified();
+		return this;
 	}
 	
 	public int getHierarchyLvl() {

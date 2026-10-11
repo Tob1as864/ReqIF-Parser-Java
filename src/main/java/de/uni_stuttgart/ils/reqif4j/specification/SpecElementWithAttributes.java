@@ -90,6 +90,16 @@ public abstract class SpecElementWithAttributes extends Identifiable {
 	}
 
 	/**
+	 * Sets an XHTML value that is a simplified version of the complete
+	 * content, e.g. the preview image of an embedded OLE object.
+	 *
+	 * @param originalMarkup the complete content (THE-ORIGINAL-VALUE)
+	 */
+	public SpecElementWithAttributes setXhtml(String attributeDefinitionID, String markup, String originalMarkup) {
+		return setValue(AttributeValueFactory.xhtml(definition(attributeDefinitionID), markup, originalMarkup));
+	}
+
+	/**
 	 * Selects enum values by their IDENTIFIER; none for an empty selection.
 	 */
 	public SpecElementWithAttributes setEnum(String attributeDefinitionID, String... enumValueIDs) {
@@ -110,6 +120,14 @@ public abstract class SpecElementWithAttributes extends Identifiable {
 			valuesChanged();
 		}
 		return removed;
+	}
+
+	/**
+	 * @return the element's spec type, or null if its type reference could
+	 *         not be resolved
+	 */
+	public SpecType getResolvedSpecType() {
+		return this.values.specType();
 	}
 
 	private AttributeDefinition definition(String attributeDefinitionID) {

@@ -76,6 +76,21 @@ public class SpecTypeBuilder {
 		return enumerationAttribute(id, name, datatypeID, multiValued, null);
 	}
 
+	/**
+	 * Sets IS-EDITABLE of an attribute definition added before: whether its
+	 * values may be edited in the receiving tool.
+	 */
+	public SpecTypeBuilder editable(String attributeDefinitionID, boolean editable) {
+
+		AttributeDefinition definition = this.specType.getAttributeDefinition(attributeDefinitionID);
+		if (definition == null) {
+			throw new ReqIFBuildException("Spec type " + this.specType.getID()
+					+ " has no attribute definition " + attributeDefinitionID);
+		}
+		definition.setEditable(editable);
+		return this;
+	}
+
 	/** Adds an attribute definition for a datatype without a shorthand. */
 	public SpecTypeBuilder attribute(String id, String name, String datatypeID, String defaultValue) {
 

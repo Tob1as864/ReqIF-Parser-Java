@@ -44,10 +44,22 @@ public class ValuesBuilder {
 	}
 
 	/**
+	 * Sets an XHTML value that is a simplified version of the complete
+	 * content, e.g. the preview image of an embedded OLE object; the value is
+	 * marked IS-SIMPLIFIED.
+	 *
+	 * @param originalMarkup the complete content (THE-ORIGINAL-VALUE)
+	 */
+	public ValuesBuilder setXhtml(String attributeDefinitionID, String markup, String originalMarkup) {
+		AttributeDefinition definition = requireDefinition(attributeDefinitionID);
+		return add(() -> AttributeValueFactory.xhtml(definition, markup, originalMarkup));
+	}
+
+	/**
 	 * Sets one or more enum values by their IDENTIFIER (multiselect).
 	 */
 	public ValuesBuilder setEnum(String attributeDefinitionID, String... enumValueIDs) {
-		return setEnum(attributeDefinitionID, Arrays.asList(enumValueIDs));
+		return setEnum(attributeDefinitionID, enumValueIDs == null ? null : Arrays.asList(enumValueIDs));
 	}
 
 	public ValuesBuilder setEnum(String attributeDefinitionID, List<String> enumValueIDs) {

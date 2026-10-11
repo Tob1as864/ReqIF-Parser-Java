@@ -64,6 +64,18 @@ public final class AttributeValueFactory {
 	}
 
 	/**
+	 * @param markup         the simplified XHTML (THE-VALUE)
+	 * @param originalMarkup the complete XHTML (THE-ORIGINAL-VALUE); the value
+	 *                       is marked IS-SIMPLIFIED
+	 * @throws IllegalArgumentException if the attribute is not an XHTML one or
+	 *         the markup is not well-formed
+	 */
+	public static AttributeValueXHTML xhtml(AttributeDefinition definition, String markup, String originalMarkup) {
+		requireCategory(definition, ReqIFConst.XHTML);
+		return new AttributeValueXHTML(markup, originalMarkup, definition);
+	}
+
+	/**
 	 * @param enumValueIDs the IDENTIFIERs of the selected enum values; none for
 	 *                     an empty selection
 	 * @throws IllegalArgumentException if the attribute is not an enumeration
