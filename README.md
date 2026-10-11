@@ -586,6 +586,32 @@ Identifiers duplicated within one category cannot be seen in the model
 (maps are keyed by identifier, so the later element has replaced the
 earlier); the parser reports them while reading, see below.
 
+## Conventions of the ReqIF Implementation Guide
+
+`ImplementationGuideCheck` checks what tools exchanging ReqIF rely on
+beyond the schema, following the *ReqIF Implementation Guide* of the
+ReqIF Implementor Forum:
+
+- the standard attributes have the datatype tools expect: dates
+  (`ReqIF.ForeignCreatedOn`, `ReqIF.ForeignModifiedOn`) are DATE,
+  `ReqIF.ForeignDeleted` is BOOLEAN, `ReqIF.Text` is XHTML, names and
+  descriptions are STRING or XHTML;
+- embedded objects state their MIME type and reference a file of the
+  archive by a relative path; an object that is not a PNG image, such as
+  an OLE object, contains a PNG image as preview;
+- a simplified XHTML value (`IS-SIMPLIFIED`) carries
+  `THE-ORIGINAL-VALUE`, and the other way round;
+- for an archive, every file an object references is in it.
+
+```java
+ValidationResult conventions = new ImplementationGuideCheck().check(document);
+ValidationResult archiveConventions = new ImplementationGuideCheck().check(reqifz);
+```
+
+Findings are warnings - the document is valid ReqIF, but importing tools
+may show it differently than intended - except for files missing from an
+archive, which are errors.
+
 # Tested against real exports
 
 `CorpusTest` reads exports of IBM DOORS, Siemens Polarion, ReqIF Studio,
