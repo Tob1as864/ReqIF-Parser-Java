@@ -85,7 +85,7 @@ class IdentifiableTest {
 		ReqIFCoreContent roundTripped = parse(tempDir, written);
 
 		Map<String, List<String>> before = identifiables(original.getReqIFCoreContent());
-		assertEquals(25, before.size(), "every identifiable of the fixture is collected");
+		assertEquals(28, before.size(), "every identifiable of the fixture is collected");
 		assertEquals(before, identifiables(roundTripped));
 	}
 

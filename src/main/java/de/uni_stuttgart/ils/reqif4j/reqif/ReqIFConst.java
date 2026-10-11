@@ -12,6 +12,7 @@ public class ReqIFConst {
 	public final static String MIN = "MIN";
 	public final static String MAX = "MAX";
 	public final static String MAX_LENGTH = "MAX-LENGTH";
+	public final static String ACCURACY = "ACCURACY";
 	
 	public final static String _TEXT = "#text";
 	public final static String ENUM_VALUE = "ENUM-VALUE";

@@ -6,6 +6,8 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -27,6 +29,7 @@ import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValue;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueEnumeration;
 import de.uni_stuttgart.ils.reqif4j.attributes.AttributeValueXHTML;
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
+import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeDouble;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumeration;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeEnumerationValue;
 import de.uni_stuttgart.ils.reqif4j.datatypes.DatatypeInteger;
@@ -44,6 +47,7 @@ import de.uni_stuttgart.ils.reqif4j.specification.SpecType;
 import de.uni_stuttgart.ils.reqif4j.specification.Specification;
 import de.uni_stuttgart.ils.reqif4j.util.SecureXml;
 import de.uni_stuttgart.ils.reqif4j.util.XhtmlParser;
+import de.uni_stuttgart.ils.reqif4j.util.XsdDouble;
 
 /**
  * Serializes a parsed {@link ReqIFDocument} back to ReqIF XML.
@@ -66,9 +70,17 @@ public class ReqIFWriter {
 	public static final String REQIF_NAMESPACE = "http://www.omg.org/spec/ReqIF/20110401/reqif.xsd";
 	public static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
+	/** REQ-IF-TOOL-ID and SOURCE-TOOL-ID written when the header has none. */
+	public static final String DEFAULT_TOOL_ID = "reqif4j";
+	/** The only REQ-IF-VERSION the schema allows. */
+	public static final String REQIF_VERSION = "1.0";
+
 	private static final String XHTML_PREFIX = "xhtml";
+	/** user data key of the output DOM holding the LAST-CHANGE default */
+	private static final String DEFAULT_LAST_CHANGE = "reqif4j.defaultLastChange";
 
 	private boolean indent = false;
+	private Clock clock = Clock.systemUTC();
 
 	/**
 	 * Enables pretty-printing.
@@ -80,6 +92,17 @@ public class ReqIFWriter {
 	 */
 	public ReqIFWriter setIndent(boolean indent) {
 		this.indent = indent;
+		return this;
+	}
+
+
+	/**
+	 * Sets the clock that supplies the timestamp for required dates the model
+	 * does not carry; see {@link #buildDocument(ReqIFDocument)}. Mainly useful
+	 * to make generated output reproducible.
+	 */
+	public ReqIFWriter setClock(Clock clock) {
+		this.clock = clock == null ? Clock.systemUTC() : clock;
 		return this;
 	}
 
@@ -120,6 +143,22 @@ public class ReqIFWriter {
 
 	/**
 	 * Builds the output DOM from the object model.
+	 *
+	 * The schema requires some values a model may lack, typically one that was
+	 * generated rather than parsed. They are filled in on output only; the
+	 * model is not changed:
+	 *
+	 * <ul>
+	 * <li>LAST-CHANGE of an element: the header's CREATION-TIME, or the time
+	 * of writing if the header has none;</li>
+	 * <li>header CREATION-TIME: the time of writing;</li>
+	 * <li>header REQ-IF-TOOL-ID and SOURCE-TOOL-ID: {@value #DEFAULT_TOOL_ID};
+	 * REQ-IF-VERSION: {@value #REQIF_VERSION}; TITLE: empty.</li>
+	 * </ul>
+	 *
+	 * Not filled in, because no default would be meaningful: a missing header
+	 * and missing identifiers. {@link de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator}
+	 * reports both.
 	 */
 	public Document buildDocument(ReqIFDocument document) {
 
@@ -128,12 +167,17 @@ public class ReqIFWriter {
 		}
 
 		Document xml = newDocument();
+		// one timestamp for the whole document, so all defaults agree
+		String now = this.clock.instant().truncatedTo(ChronoUnit.SECONDS).toString();
+		String creationTime = document.getHeader() == null ? "" : document.getHeader().getCreationTime();
+		xml.setUserData(DEFAULT_LAST_CHANGE, isBlank(creationTime) ? now : creationTime, null);
+
 		Element root = xml.createElementNS(REQIF_NAMESPACE, "REQ-IF");
 		root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:" + XHTML_PREFIX, XHTML_NAMESPACE);
 		xml.appendChild(root);
 
 		if (document.getHeader() != null) {
-			root.appendChild(header(xml, document.getHeader()));
+			root.appendChild(header(xml, document.getHeader(), now));
 		}
 		root.appendChild(coreContent(xml, document.getCoreContent()));
 
@@ -142,11 +186,17 @@ public class ReqIFWriter {
 			root.appendChild(xml.importNode(extension, true));
 		}
 
+		// only needed while building; not part of the returned document
+		xml.setUserData(DEFAULT_LAST_CHANGE, null, null);
 		return xml;
 	}
 
 
-	private Element header(Document xml, ReqIFHeader header) {
+	/**
+	 * REQ-IF-HEADER is an xsd:sequence; only COMMENT and REPOSITORY-ID are
+	 * optional, the other elements get a default if the header lacks them.
+	 */
+	private Element header(Document xml, ReqIFHeader header, String now) {
 
 		Element theHeader = element(xml, ReqIFConst.THE_HEADER);
 		Element reqifHeader = element(xml, ReqIFConst.REQ_IF_HEADER);
@@ -154,11 +204,11 @@ public class ReqIFWriter {
 		theHeader.appendChild(reqifHeader);
 
 		appendTextIfPresent(xml, reqifHeader, ReqIFConst.COMMENT, header.getComment());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.CREATION_TIME, header.getCreationTime());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.REQ_IF_TOOL_ID, header.getToolID());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.REQ_IF_VERSION, header.getReqIFVersion());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.SOURCE_TOOL_ID, header.getSourceToolID());
-		appendTextIfPresent(xml, reqifHeader, ReqIFConst.TITLE, header.getTitle());
+		appendText(xml, reqifHeader, ReqIFConst.CREATION_TIME, orDefault(header.getCreationTime(), now));
+		appendText(xml, reqifHeader, ReqIFConst.REQ_IF_TOOL_ID, orDefault(header.getToolID(), DEFAULT_TOOL_ID));
+		appendText(xml, reqifHeader, ReqIFConst.REQ_IF_VERSION, orDefault(header.getReqIFVersion(), REQIF_VERSION));
+		appendText(xml, reqifHeader, ReqIFConst.SOURCE_TOOL_ID, orDefault(header.getSourceToolID(), DEFAULT_TOOL_ID));
+		appendText(xml, reqifHeader, ReqIFConst.TITLE, nullToEmpty(header.getTitle()));
 
 		return theHeader;
 	}
@@ -242,6 +292,12 @@ public class ReqIFWriter {
 			definition.setAttribute(ReqIFConst.MIN, Long.toString(integer.getMin()));
 			definition.setAttribute(ReqIFConst.MAX, Long.toString(integer.getMax()));
 
+		} else if (datatype instanceof DatatypeDouble) {
+			DatatypeDouble real = (DatatypeDouble) datatype;
+			definition.setAttribute(ReqIFConst.ACCURACY, Integer.toString(real.getAccuracy()));
+			definition.setAttribute(ReqIFConst.MIN, XsdDouble.format(real.getMin()));
+			definition.setAttribute(ReqIFConst.MAX, XsdDouble.format(real.getMax()));
+
 		} else if (datatype instanceof DatatypeString) {
 			definition.setAttribute(ReqIFConst.MAX_LENGTH,
 					Integer.toString(((DatatypeString) datatype).getMaxLength()));
@@ -263,10 +319,9 @@ public class ReqIFWriter {
 		identifiable(xml, enumValue, value);
 
 		Element embedded = element(xml, ReqIFConst.EMBEDDED_VALUE);
+		// both attributes are required, OTHER-CONTENT even when empty
 		embedded.setAttribute(ReqIFConst.KEY, nullToEmpty(value.getKey()));
-		if (value.getOtherContent() != null && !value.getOtherContent().isEmpty()) {
-			embedded.setAttribute(ReqIFConst.OTHER_CONTENT, value.getOtherContent());
-		}
+		embedded.setAttribute(ReqIFConst.OTHER_CONTENT, nullToEmpty(value.getOtherContent()));
 
 		Element properties = element(xml, ReqIFConst.PROPERTIES);
 		properties.appendChild(embedded);
@@ -322,9 +377,11 @@ public class ReqIFWriter {
 		Element attributeDefinition = element(xml, elementName);
 		identifiable(xml, attributeDefinition, definition);
 
-		if (definition instanceof AttributeDefinitionEnumeration
-				&& ((AttributeDefinitionEnumeration) definition).isMultiValued()) {
-			attributeDefinition.setAttribute(ReqIFConst.MULTI_VALUED, "true");
+		// required on every enumeration attribute definition, "false" included
+		if (ReqIFConst.ENUMERATION.equals(datatype.getType())) {
+			boolean multiValued = definition instanceof AttributeDefinitionEnumeration
+					&& ((AttributeDefinitionEnumeration) definition).isMultiValued();
+			attributeDefinition.setAttribute(ReqIFConst.MULTI_VALUED, Boolean.toString(multiValued));
 		}
 
 		Element type = element(xml, ReqIFConst.TYPE);
@@ -491,7 +548,8 @@ public class ReqIFWriter {
 		}
 
 		Element element = element(xml, elementName);
-		element.setAttribute(ReqIFConst.THE_VALUE, String.valueOf(value));
+		element.setAttribute(ReqIFConst.THE_VALUE,
+				value instanceof Double ? XsdDouble.format((Double) value) : String.valueOf(value));
 		element.appendChild(definitionRef(xml, definition));
 		return element;
 	}
@@ -616,7 +674,8 @@ public class ReqIFWriter {
 	/**
 	 * Writes IDENTIFIER, LONG-NAME, DESC, LAST-CHANGE and ALTERNATIVE-ID. Optional
 	 * properties the element does not have are left out rather than written
-	 * empty, so a document round-trips unchanged.
+	 * empty, so a document round-trips unchanged; the required LAST-CHANGE gets
+	 * the document's default.
 	 *
 	 * The ALTERNATIVE-ID is wrapped twice, as the schema prescribes:
 	 * {@code <ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="..."/></ALTERNATIVE-ID>}.
@@ -627,7 +686,10 @@ public class ReqIFWriter {
 		element.setAttribute(ReqIFConst.IDENTIFIER, nullToEmpty(identifiable.getID()));
 		setAttributeIfPresent(element, ReqIFConst.LONG_NAME, identifiable.getName());
 		setAttributeIfPresent(element, ReqIFConst.DESC, identifiable.getDesc());
-		setAttributeIfPresent(element, ReqIFConst.LAST_CHANGE, identifiable.getLastChange());
+		// required by the schema; see buildDocument for the default
+		element.setAttribute(ReqIFConst.LAST_CHANGE, isBlank(identifiable.getLastChange())
+				? (String) xml.getUserData(DEFAULT_LAST_CHANGE)
+				: identifiable.getLastChange());
 
 		String alternativeID = identifiable.getAlternativeID();
 		if (alternativeID != null && !alternativeID.isEmpty()) {
@@ -654,6 +716,11 @@ public class ReqIFWriter {
 		if (text == null || text.isEmpty()) {
 			return;
 		}
+		appendText(xml, parent, name, text);
+	}
+
+	private void appendText(Document xml, Element parent, String name, String text) {
+
 		Element element = element(xml, name);
 		element.setTextContent(text);
 		parent.appendChild(element);
@@ -661,6 +728,14 @@ public class ReqIFWriter {
 
 	private static String nullToEmpty(String value) {
 		return value == null ? "" : value;
+	}
+
+	private static String orDefault(String value, String fallback) {
+		return isBlank(value) ? fallback : value;
+	}
+
+	private static boolean isBlank(String value) {
+		return value == null || value.isBlank();
 	}
 
 	private Document newDocument() {

@@ -195,7 +195,9 @@ public final class TestFixtures {
 	 * every Identifiable property (LAST-CHANGE, LONG-NAME, DESC, ALTERNATIVE-ID)
 	 * on the elements that carry one, including spec objects, relations and
 	 * hierarchy nodes. Values are set for some attributes only, and the
-	 * ALTERNATIVE-ID uses the nested form the schema prescribes.
+	 * ALTERNATIVE-ID uses the nested form the schema prescribes. Also covers the
+	 * required attributes that are easy to drop: REAL ACCURACY/MIN/MAX,
+	 * MULTI-VALUED="false" and an empty OTHER-CONTENT.
 	 */
 	public static final String SCHEMA_VALID_REQIF = """
 			<?xml version="1.0" encoding="UTF-8"?>
@@ -218,6 +220,7 @@ public final class TestFixtures {
 			        </DATATYPE-DEFINITION-STRING>
 			        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Int" MIN="0" MAX="1000"/>
 			        <DATATYPE-DEFINITION-BOOLEAN IDENTIFIER="dt-bool" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Bool"/>
+			        <DATATYPE-DEFINITION-REAL IDENTIFIER="dt-real" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Real" ACCURACY="3" MIN="-1.5" MAX="1000.0"/>
 			        <DATATYPE-DEFINITION-DATE IDENTIFIER="dt-date" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Date"/>
 			        <DATATYPE-DEFINITION-XHTML IDENTIFIER="dt-xhtml" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Formatted text"/>
 			        <DATATYPE-DEFINITION-ENUMERATION IDENTIFIER="dt-enum" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Status">
@@ -229,7 +232,7 @@ public final class TestFixtures {
 			            </ENUM-VALUE>
 			            <ENUM-VALUE IDENTIFIER="ev-approved" LAST-CHANGE="2026-07-01T08:00:00Z" LONG-NAME="Approved">
 			              <PROPERTIES>
-			                <EMBEDDED-VALUE KEY="2" OTHER-CONTENT="green"/>
+			                <EMBEDDED-VALUE KEY="2" OTHER-CONTENT=""/>
 			              </PROPERTIES>
 			            </ENUM-VALUE>
 			          </SPECIFIED-VALUES>
@@ -261,6 +264,12 @@ public final class TestFixtures {
 			            <ATTRIBUTE-DEFINITION-ENUMERATION IDENTIFIER="ad-status" LAST-CHANGE="2026-07-02T08:00:00Z" LONG-NAME="Status" MULTI-VALUED="true">
 			              <TYPE><DATATYPE-DEFINITION-ENUMERATION-REF>dt-enum</DATATYPE-DEFINITION-ENUMERATION-REF></TYPE>
 			            </ATTRIBUTE-DEFINITION-ENUMERATION>
+			            <ATTRIBUTE-DEFINITION-ENUMERATION IDENTIFIER="ad-review" LAST-CHANGE="2026-07-02T08:00:00Z" LONG-NAME="Review state" MULTI-VALUED="false">
+			              <TYPE><DATATYPE-DEFINITION-ENUMERATION-REF>dt-enum</DATATYPE-DEFINITION-ENUMERATION-REF></TYPE>
+			            </ATTRIBUTE-DEFINITION-ENUMERATION>
+			            <ATTRIBUTE-DEFINITION-REAL IDENTIFIER="ad-effort" LAST-CHANGE="2026-07-02T08:00:00Z" LONG-NAME="Effort">
+			              <TYPE><DATATYPE-DEFINITION-REAL-REF>dt-real</DATATYPE-DEFINITION-REAL-REF></TYPE>
+			            </ATTRIBUTE-DEFINITION-REAL>
 			          </SPEC-ATTRIBUTES>
 			        </SPEC-OBJECT-TYPE>
 			        <SPEC-RELATION-TYPE IDENTIFIER="st-rel" LAST-CHANGE="2026-07-02T08:00:00Z" LONG-NAME="refines"/>
@@ -291,6 +300,13 @@ public final class TestFixtures {
 			              <DEFINITION><ATTRIBUTE-DEFINITION-ENUMERATION-REF>ad-status</ATTRIBUTE-DEFINITION-ENUMERATION-REF></DEFINITION>
 			              <VALUES><ENUM-VALUE-REF>ev-approved</ENUM-VALUE-REF></VALUES>
 			            </ATTRIBUTE-VALUE-ENUMERATION>
+			            <ATTRIBUTE-VALUE-ENUMERATION>
+			              <DEFINITION><ATTRIBUTE-DEFINITION-ENUMERATION-REF>ad-review</ATTRIBUTE-DEFINITION-ENUMERATION-REF></DEFINITION>
+			              <VALUES><ENUM-VALUE-REF>ev-draft</ENUM-VALUE-REF></VALUES>
+			            </ATTRIBUTE-VALUE-ENUMERATION>
+			            <ATTRIBUTE-VALUE-REAL THE-VALUE="2.5">
+			              <DEFINITION><ATTRIBUTE-DEFINITION-REAL-REF>ad-effort</ATTRIBUTE-DEFINITION-REAL-REF></DEFINITION>
+			            </ATTRIBUTE-VALUE-REAL>
 			          </VALUES>
 			          <TYPE><SPEC-OBJECT-TYPE-REF>st-req</SPEC-OBJECT-TYPE-REF></TYPE>
 			        </SPEC-OBJECT>

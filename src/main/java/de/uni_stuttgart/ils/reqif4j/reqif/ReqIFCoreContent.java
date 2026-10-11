@@ -186,7 +186,10 @@ public class ReqIFCoreContent {
                             break;
 
                         case ReqIFConst.DOUBLE, ReqIFConst.REAL:
-                            this.dataTypes.put(dataTypeID, new DatatypeDouble(dataTypeID, dataTypeName));
+                            this.dataTypes.put(dataTypeID, new DatatypeDouble(dataTypeID, dataTypeName,
+                                    XmlUtils.attribute(dataType, ReqIFConst.ACCURACY),
+                                    XmlUtils.attribute(dataType, ReqIFConst.MIN),
+                                    XmlUtils.attribute(dataType, ReqIFConst.MAX)));
                             break;
 
                         default:

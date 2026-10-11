@@ -11,7 +11,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import de.uni_stuttgart.ils.reqif4j.build.ReqIFBuilder;
 import de.uni_stuttgart.ils.reqif4j.reqif.ReqIF;
+import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
 import de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationIssue;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationResult;
@@ -75,6 +77,43 @@ class SchemaConformanceTest {
 		Path written = tempDir.resolve("out.reqif");
 		new ReqIFWriter().write(reqif.getReqIFDocument(), written);
 		OfficialReqIFSchema.assertSchemaValid(written);
+	}
+
+	@Test
+	void documentGeneratedWithTheBuilderIsSchemaValid() throws Exception {
+
+		// the README example, plus the kinds whose required attributes are easy
+		// to drop: REAL bounds, a single-valued enumeration, empty OTHER-CONTENT
+		ReqIFDocument document = ReqIFBuilder.create()
+				.header(h -> h.id("hdr-1").title("My Spec").toolID("reqif4j")
+						.creationTime("2026-07-23T10:00:00Z"))
+				.stringDatatype("dt-string", "String", 4096)
+				.xhtmlDatatype("dt-xhtml", "XHTML")
+				.realDatatype("dt-real", "Real")
+				.enumerationDatatype("dt-enum", "Color", e -> e
+						.value("ev-red", "Red", "1", "#ff0000")
+						.value("ev-blue", "Blue", "2"))
+				.specObjectType("st-req", "Requirement Type", t -> t
+						.stringAttribute("ad-title", "ReqIF.Name", "dt-string")
+						.xhtmlAttribute("ad-text", "ReqIF.Text", "dt-xhtml")
+						.realAttribute("ad-effort", "Effort", "dt-real")
+						.enumerationAttribute("ad-color", "Colors", "dt-enum", true, List.of("ev-blue"))
+						.enumerationAttribute("ad-main", "Main color", "dt-enum", false))
+				.specificationType("st-spec", "Specification Type", t -> { })
+				.specRelationType("st-rel", "satisfies", t -> { })
+				.specObject("so-1", "st-req", o -> o
+						.set("ad-title", "First requirement")
+						.set("ad-effort", 2.5)
+						.setEnum("ad-color", "ev-red", "ev-blue")
+						.setEnum("ad-main", "ev-red")
+						.setXhtml("ad-text", "<p>The system shall boot.</p>"))
+				.specObject("so-2", "st-req")
+				.specRelation("sr-1", "st-rel", "so-1", "so-2")
+				.specification("spec-1", "Main Spec", "st-spec", s -> s
+						.child("sh-1", "so-1", c -> c.child("sh-2", "so-2")))
+				.build();
+
+		OfficialReqIFSchema.assertSchemaValid(document);
 	}
 
 	@Test

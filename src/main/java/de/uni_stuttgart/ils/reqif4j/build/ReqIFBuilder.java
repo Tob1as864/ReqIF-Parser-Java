@@ -2,9 +2,11 @@ package de.uni_stuttgart.ils.reqif4j.build;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import de.uni_stuttgart.ils.reqif4j.datatypes.Datatype;
@@ -58,6 +60,9 @@ import de.uni_stuttgart.ils.reqif4j.specification.TypeClassifier;
  * {@link ReqIFBuildException} instead of producing a broken document.
  */
 public class ReqIFBuilder {
+
+	/** IDENTIFIER of the header if {@link HeaderBuilder#id(String)} is not set. */
+	public static final String DEFAULT_HEADER_ID = "reqif4j-header";
 
 	private final Map<String, Datatype> datatypes = new LinkedHashMap<String, Datatype>();
 	private final Map<String, SpecType> specTypes = new LinkedHashMap<String, SpecType>();
@@ -114,9 +119,29 @@ public class ReqIFBuilder {
 		return datatype(new DatatypeDate(id, name));
 	}
 
-	/** Written as DATATYPE-DEFINITION-REAL. */
+	/**
+	 * Written as DATATYPE-DEFINITION-REAL, with the default accuracy and the
+	 * full double range ({@link DatatypeDouble#DEFAULT_ACCURACY}).
+	 */
 	public ReqIFBuilder realDatatype(String id, String name) {
 		return datatype(new DatatypeDouble(id, name));
+	}
+
+	/**
+	 * Written as DATATYPE-DEFINITION-REAL.
+	 *
+	 * @param accuracy the maximum precision of the values, not negative
+	 * @param min      lower bound, may be {@link Double#NEGATIVE_INFINITY}
+	 * @param max      upper bound, not below {@code min}
+	 */
+	public ReqIFBuilder realDatatype(String id, String name, int accuracy, double min, double max) {
+		if (accuracy < 0) {
+			throw new ReqIFBuildException("Accuracy of real datatype '" + id + "' must not be negative: " + accuracy);
+		}
+		if (Double.isNaN(min) || Double.isNaN(max) || min > max) {
+			throw new ReqIFBuildException("Real datatype '" + id + "' needs min <= max, got " + min + " and " + max);
+		}
+		return datatype(new DatatypeDouble(id, name, accuracy, min, max));
 	}
 
 	public ReqIFBuilder xhtmlDatatype(String id, String name) {
@@ -232,7 +257,29 @@ public class ReqIFBuilder {
 			content.addSpecification(specification);
 		}
 
-		return new ReqIFDocument(this.headerBuilder.build(), content);
+		return new ReqIFDocument(this.headerBuilder.build(defaultHeaderID()), content);
+	}
+
+	/**
+	 * The schema requires a header IDENTIFIER that is unique in the document;
+	 * if none was set, the first free one of reqif4j-header, reqif4j-header-2, ...
+	 */
+	private String defaultHeaderID() {
+
+		Set<String> used = new HashSet<String>(this.identifiers.keySet());
+		for (SpecType specType : this.specTypes.values()) {
+			used.addAll(specType.getAttributeDefinitions().keySet());
+		}
+		for (Datatype datatype : this.datatypes.values()) {
+			if (datatype instanceof DatatypeEnumeration) {
+				used.addAll(((DatatypeEnumeration) datatype).getEnumValues().keySet());
+			}
+		}
+		String id = DEFAULT_HEADER_ID;
+		for (int suffix = 2; used.contains(id); suffix++) {
+			id = DEFAULT_HEADER_ID + "-" + suffix;
+		}
+		return id;
 	}
 
 
@@ -418,9 +465,9 @@ public class ReqIFBuilder {
 			return this;
 		}
 
-		private ReqIFHeader build() {
-			return new ReqIFHeader(this.id, this.title, this.comment, this.creationTime,
-					this.toolID, this.sourceToolID, this.reqifVersion);
+		private ReqIFHeader build(String defaultID) {
+			return new ReqIFHeader(this.id == null || this.id.isBlank() ? defaultID : this.id, this.title,
+					this.comment, this.creationTime, this.toolID, this.sourceToolID, this.reqifVersion);
 		}
 	}
 

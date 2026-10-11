@@ -74,7 +74,8 @@ public class ReqIFValidator {
 			return result;
 		}
 		if (document.getHeader() == null) {
-			result.warning(null, "Document has no THE-HEADER");
+			// the schema requires THE-HEADER, and the writer cannot invent its IDENTIFIER
+			result.error(null, "Document has no THE-HEADER");
 		} else if (isBlank(document.getHeader().getID())) {
 			result.error(null, "REQ-IF-HEADER has no IDENTIFIER");
 		}
@@ -316,6 +317,11 @@ public class ReqIFValidator {
 	 * Validates the XML the writer produces for this document against an XML
 	 * Schema. The OMG ReqIF XSD is not bundled with this library for licensing
 	 * reasons; download it from the OMG and pass its path here.
+	 *
+	 * What is checked is the output, not the model: required values the writer
+	 * fills in (LAST-CHANGE, header fields, see
+	 * {@link ReqIFWriter#buildDocument(ReqIFDocument)}) are not reported as
+	 * missing.
 	 *
 	 * The official {@code reqif.xsd} imports {@code xml.xsd}, {@code driver.xsd}
 	 * and the XHTML modules ({@code xhtml-*-1.xsd}) by http URL. Validation never

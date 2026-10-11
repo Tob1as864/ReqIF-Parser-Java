@@ -18,7 +18,6 @@ import de.uni_stuttgart.ils.reqif4j.reqif.ReqIFDocument;
 import de.uni_stuttgart.ils.reqif4j.specification.RelationGroup;
 import de.uni_stuttgart.ils.reqif4j.specification.SpecObject;
 import de.uni_stuttgart.ils.reqif4j.validate.ReqIFValidator;
-import de.uni_stuttgart.ils.reqif4j.validate.ValidationIssue;
 import de.uni_stuttgart.ils.reqif4j.validate.ValidationResult;
 
 /**
@@ -146,15 +145,16 @@ class ReqIFValidatorTest {
 	}
 
 	@Test
-	void missingHeaderIsOnlyAWarning() {
+	void missingHeaderIsAnError() {
 		ReqIFDocument document = new ReqIFDocument(null,
 				validBuilder().build().getCoreContent());
 
 		ValidationResult result = validate(document);
 
-		assertTrue(result.isValid(), "a missing header must not make the document invalid");
+		// the schema requires THE-HEADER, and the writer cannot invent its IDENTIFIER
+		assertFalse(result.isValid());
 		assertEquals(1, result.getIssues().size());
-		assertEquals(ValidationIssue.Severity.WARNING, result.getIssues().get(0).getSeverity());
+		assertEquals("Document has no THE-HEADER", result.getIssues().get(0).getMessage());
 	}
 
 	@Test
